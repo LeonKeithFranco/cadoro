@@ -3,7 +3,7 @@
 
 import { percentOf } from './percent';
 import type { Routine } from './routine';
-import { MS_PER_SECOND } from './time';
+import { MS_PER_SECOND, minutesToMs } from './time';
 
 /** The parts of a routine that decide the order a run goes through it. */
 export type RoutinePlan = Pick<Routine, 'rounds' | 'blocks'>;
@@ -163,7 +163,7 @@ export function positionLabel(plan: RoutinePlan, position: Position): string {
 	return parts.join(' · ');
 }
 
-/** A work period that has ended, by Next or, from round 6, by Finish. */
+/** A work period that has ended, by Next or by Finish. */
 export type EndedWorkPeriod = {
 	/** Where it was in the routine. */
 	readonly position: Position;
@@ -277,13 +277,11 @@ export function play(run: RunState, now: number): RunState {
 			return startWork(run.plan, [], firstPosition, now);
 		case 'working':
 			return resume(run, now);
-		case 'break': {
-			const breakIsOver = breakRemainingMs(run, now) === 0;
-			if (breakIsOver) {
+		case 'break':
+			if (isBreakOver(run, now)) {
 				return startWork(run.plan, run.endedPeriods, run.nextWorkPosition, now);
 			}
 			return resume(run, now);
-		}
 		case 'ended':
 			return run;
 	}
@@ -311,8 +309,7 @@ export function pause(run: RunState, now: number): RunState {
 		}
 		case 'break': {
 			const isPaused = run.runningSince === null;
-			const breakIsOver = breakRemainingMs(run, now) === 0;
-			if (isPaused || breakIsOver) {
+			if (isPaused || isBreakOver(run, now)) {
 				return run;
 			}
 			return { ...run, remainingMs: breakRemainingMs(run, now), runningSince: null };
@@ -346,6 +343,231 @@ export function next(run: RunState, now: number): RunState {
 		case 'ended':
 			return run;
 	}
+}
+
+/**
+ * Presses Finish, once confirmed: ends the run.
+ *
+ * @remarks
+ * The current work period, if any, is saved up to now, however short. A break in progress is
+ * dropped, since breaks aren't recorded. This is how an infinite routine ends, and how a finite
+ * one ends early.
+ *
+ * @param run - The run.
+ * @param now - The current moment, in milliseconds since 1970 (UTC).
+ * @returns The run, finished. A run that hasn't started, or that has ended, is returned as it
+ * was.
+ */
+export function finish(run: RunState, now: number): RunState {
+	switch (run.status) {
+		case 'working': {
+			const endedPeriods = [...run.endedPeriods, currentPeriodUpTo(run, now)];
+			return endRun(run.plan, endedPeriods, 'finished');
+		}
+		case 'break':
+			return endRun(run.plan, run.endedPeriods, 'finished');
+		case 'ready':
+		case 'ended':
+			return run;
+	}
+}
+
+/** What the timer's controls show, for every kind of run. */
+type ControlsView = {
+	/** Whether a timer is counting, so the Play button shows Pause. */
+	readonly isRunning: boolean;
+	/** Whether the run has started and not yet ended, so Next and Finish can be pressed. */
+	readonly isInProgress: boolean;
+};
+
+/** What the timer screen shows before Play is pressed. */
+export type ReadyView = ControlsView & {
+	/** Marks the view of a run not started yet. */
+	readonly status: 'ready';
+	/** Where the run will start, such as "Round 1 · Block 1 of 2 · Cycle 1 of 3". */
+	readonly label: string;
+};
+
+/** What the timer screen shows during a work period. */
+export type WorkView = ControlsView & {
+	/** Marks the view of a run in a work period. */
+	readonly status: 'working';
+	/** The block whose work timer is active, counting from 0. */
+	readonly block: number;
+	/** Where the run is, such as "Round 2 of 4 · Block 2 of 3 · Cycle 1 of 3". */
+	readonly label: string;
+	/** The time worked so far in this work period, in milliseconds. */
+	readonly workedMs: number;
+	/** The block's target, in milliseconds. */
+	readonly targetMs: number;
+	/** Whether the work has reached its target, so the timer shows overtime. */
+	readonly isOvertime: boolean;
+	/** The break earned so far, which grows as the work goes on, in whole seconds, as milliseconds. */
+	readonly breakEarnedMs: number;
+};
+
+/** What the timer screen shows during a break. */
+export type BreakView = ControlsView & {
+	/** Marks the view of a run on a break. */
+	readonly status: 'break';
+	/** The block whose break timer is active, counting from 0. */
+	readonly block: number;
+	/** Where the run is: the work period this break follows. */
+	readonly label: string;
+	/** The whole break earned, in whole seconds, as milliseconds. */
+	readonly earnedMs: number;
+	/** The break left, in milliseconds. */
+	readonly remainingMs: number;
+	/** Whether the break has reached 0:00, so Play starts the next work period. */
+	readonly isOver: boolean;
+};
+
+/** What the timer screen shows once a run has ended. */
+export type EndedView = ControlsView & {
+	/** Marks the view of a run that has ended. */
+	readonly status: 'ended';
+	/** The totals for the run summary. */
+	readonly summary: RunSummary;
+};
+
+/**
+ * Everything the timer screen shows about a run at one moment.
+ *
+ * @remarks
+ * Like the run itself, each kind of view is its own type, told apart by `status`.
+ */
+export type RunView = ReadyView | WorkView | BreakView | EndedView;
+
+/** The totals the run summary shows once a run ends. */
+export type RunSummary = {
+	/** The time worked across the whole run, in milliseconds. */
+	readonly totalWorkMs: number;
+	/** The work periods the run saved, including one that Finish ended early. */
+	readonly periodsCompleted: number;
+	/** The rounds the run reached, counting the round it ended in. */
+	readonly roundsReached: number;
+	/** The time worked past each work period's target, added up, in milliseconds. */
+	readonly overtimeMs: number;
+};
+
+/**
+ * Works out everything the timer screen shows about a run at this moment.
+ *
+ * @remarks
+ * The screen calls this on every redraw, with the current time, and shows the result as it is,
+ * so the rules for what it shows live here rather than in the screen.
+ *
+ * @param run - The run.
+ * @param now - The current moment, in milliseconds since 1970 (UTC).
+ * @returns The run's view at this moment.
+ */
+export function viewRun(run: RunState, now: number): RunView {
+	switch (run.status) {
+		case 'ready':
+			return {
+				status: 'ready',
+				label: positionLabel(run.plan, firstPosition),
+				isRunning: false,
+				isInProgress: false
+			};
+		case 'working': {
+			const block = run.plan.blocks[run.position.block];
+			const workedSoFarMs = workedMs(run.segments, run.runningSince, now);
+			const targetMs = minutesToMs(block.targetMinutes);
+			return {
+				status: 'working',
+				block: run.position.block,
+				label: positionLabel(run.plan, run.position),
+				workedMs: workedSoFarMs,
+				targetMs,
+				isOvertime: workedSoFarMs >= targetMs,
+				breakEarnedMs: earnedBreakMs(workedSoFarMs, block.breakPercent),
+				isRunning: run.runningSince !== null,
+				isInProgress: true
+			};
+		}
+		case 'break': {
+			const isOver = isBreakOver(run, now);
+			const isPaused = run.runningSince === null;
+			return {
+				status: 'break',
+				block: run.position.block,
+				label: positionLabel(run.plan, run.position),
+				earnedMs: run.earnedMs,
+				remainingMs: breakRemainingMs(run, now),
+				isOver,
+				// A break at 0:00 waits for Play, so it shows as not running.
+				isRunning: !isPaused && !isOver,
+				isInProgress: true
+			};
+		}
+		case 'ended':
+			return {
+				status: 'ended',
+				summary: summarizeRun(run),
+				isRunning: false,
+				isInProgress: false
+			};
+	}
+}
+
+/**
+ * Works out the totals for a run's summary.
+ *
+ * @param run - The run, ended.
+ * @returns The run's total work, work periods, rounds reached and overtime.
+ */
+export function summarizeRun(run: EndedRun): RunSummary {
+	let totalWorkMs = 0;
+	let overtimeMs = 0;
+	for (const period of run.endedPeriods) {
+		totalWorkMs += period.workedMs;
+		overtimeMs += overtimeOf(period);
+	}
+
+	const lastPeriod = run.endedPeriods.at(-1);
+	// Positions count rounds from 0, so round 0 is the first round reached.
+	const roundsReached = lastPeriod === undefined ? 0 : lastPeriod.position.round + 1;
+
+	return { totalWorkMs, periodsCompleted: run.endedPeriods.length, roundsReached, overtimeMs };
+}
+
+/**
+ * Works out how long a work period ran past its target.
+ *
+ * @param period - The ended work period.
+ * @returns The time worked past the target, in milliseconds, or 0 if it ended before the target.
+ */
+function overtimeOf(period: EndedWorkPeriod): number {
+	const targetMs = minutesToMs(period.targetMinutes);
+	return Math.max(0, period.workedMs - targetMs);
+}
+
+/**
+ * Checks whether a break has reached 0:00.
+ *
+ * @param run - The run, on a break.
+ * @param now - The current moment, in milliseconds since 1970 (UTC).
+ * @returns Whether none of the break is left.
+ */
+function isBreakOver(run: BreakRun, now: number): boolean {
+	return breakRemainingMs(run, now) === 0;
+}
+
+/**
+ * Ends a run, keeping the work periods it ended.
+ *
+ * @param plan - The routine that was run.
+ * @param endedPeriods - Every work period the run ended, in order.
+ * @param outcome - `completed` when its last work period ended, or `finished` by Finish.
+ * @returns The ended run.
+ */
+function endRun(
+	plan: RoutinePlan,
+	endedPeriods: readonly EndedWorkPeriod[],
+	outcome: EndedRun['outcome']
+): EndedRun {
+	return { status: 'ended', plan, endedPeriods, outcome };
 }
 
 /**
@@ -396,6 +618,24 @@ function segmentsUpTo(run: WorkingRun, now: number): readonly Segment[] {
 }
 
 /**
+ * Records the current work period as it stands now, however short, as Next and Finish save it.
+ *
+ * @param run - The run, in a work period.
+ * @param now - The current moment, in milliseconds since 1970 (UTC).
+ * @returns The work period, with its stretches up to now and its block's target.
+ */
+function currentPeriodUpTo(run: WorkingRun, now: number): EndedWorkPeriod {
+	const block = run.plan.blocks[run.position.block];
+	const segments = segmentsUpTo(run, now);
+	return {
+		position: run.position,
+		targetMinutes: block.targetMinutes,
+		segments,
+		workedMs: workedMs(segments, null, now)
+	};
+}
+
+/**
  * Ends a work period and starts its break, or ends the run after a finite routine's last work
  * period.
  *
@@ -405,19 +645,13 @@ function segmentsUpTo(run: WorkingRun, now: number): readonly Segment[] {
  */
 function endWorkPeriod(run: WorkingRun, now: number): BreakRun | EndedRun {
 	const block = run.plan.blocks[run.position.block];
-	const segments = segmentsUpTo(run, now);
-	const endedPeriod: EndedWorkPeriod = {
-		position: run.position,
-		targetMinutes: block.targetMinutes,
-		segments,
-		workedMs: workedMs(segments, null, now)
-	};
+	const endedPeriod = currentPeriodUpTo(run, now);
 	const endedPeriods = [...run.endedPeriods, endedPeriod];
 
 	const nextWorkPosition = nextPosition(run.plan, run.position);
 	const wasLastWorkPeriod = nextWorkPosition === null;
 	if (wasLastWorkPeriod) {
-		return { status: 'ended', plan: run.plan, endedPeriods, outcome: 'completed' };
+		return endRun(run.plan, endedPeriods, 'completed');
 	}
 
 	const earnedMs = earnedBreakMs(endedPeriod.workedMs, block.breakPercent);
