@@ -1,10 +1,10 @@
 # Progress
 
-**Current status:** The spec, plan, progress log, decision log and `CLAUDE.md` are merged to `main`. The repo was renamed from `pomodoro` to `cadoro`. The project is a fresh `sv create` scaffold: SvelteKit 3, Svelte 5, strict TypeScript, Tailwind CSS 4, Vitest with browser mode, Playwright, ESLint and Prettier. There's no app code yet.
+**Current status:** The project builds as a static single-page app with `adapter-static`: SvelteKit 3, Svelte 5, strict TypeScript, Tailwind CSS 4 with the forms plugin, Vitest with browser mode, Playwright, ESLint and Prettier. The only page is a placeholder, with a component test and a Playwright test that runs on desktop and phone projects. The npm scripts match the weight tracker's. There's no CI yet.
 
-**Next:** Milestone 1's step 2, moving the end-to-end tests to `e2e/` with desktop and phone projects, then step 3, the checks workflow.
+**Next:** Milestone 1's step 3: the checks workflow, the ruleset protecting `main`, and checking that a failing test blocks a merge.
 
-**In progress:** Milestone 1, project setup and CI. Step 1, setting up the static single-page app, is on the `build/static-spa-setup` branch.
+**In progress:** Milestone 1, project setup and CI. Step 1, setting up the static single-page app, is merged. Step 2, the npm scripts and the Playwright projects in `e2e/`, is on the `test/e2e-projects` branch.
 
 Decisions and their reasons are in `docs/DECISIONS.md`.
 
