@@ -10,6 +10,16 @@ const SECONDS_PER_MINUTE = 60;
 const SECONDS_PER_HOUR = 60 * SECONDS_PER_MINUTE;
 
 /**
+ * Converts whole minutes, such as a block's target, to milliseconds.
+ *
+ * @param minutes - The minutes to convert.
+ * @returns The same length of time in milliseconds.
+ */
+export function minutesToMs(minutes: number): number {
+	return minutes * SECONDS_PER_MINUTE * MS_PER_SECOND;
+}
+
+/**
  * Formats time that has passed, such as work done so far.
  *
  * @remarks
