@@ -23,7 +23,10 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 # Playwright
 test-results
+
+# Editors
 .vscode
+.zed
 
 .claude/settings.local.json
 CLAUDE.local.md
