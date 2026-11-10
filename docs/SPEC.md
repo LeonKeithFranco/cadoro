@@ -148,7 +148,7 @@ They can be edited and deleted like any other routine, and aren't created again 
 
 - The routine picker at the top selects which routine to run. The app opens on the last routine used.
 - Each block shows its title, its target and break percentage, and two boxes: the work timer above the break timer, as in the original sketch.
-- The active timer is highlighted, and the screen shows exactly where the run is in both rounds and cycles, such as "Round 2 of 4 · Block 2 of 3 · Cycle 1 of 3". For an infinite routine it shows "Round 5" with no total.
+- The active timer is highlighted, and the screen shows exactly where the run is in both rounds and cycles, such as "Round 2 of 4 · Block 2 of 3 · Cycle 1 of 3". For an infinite routine it shows "Round 5" with no total. A part whose total is 1 never changes, so it's left out: Classic shows just "Round 5", and a block of 1 cycle shows no cycle.
 - While a work period runs, its box shows the elapsed time and the target, such as `31:40 / 25:00`, and the break box shows the break earned so far, which updates as you work.
 - Times show as `m:ss` under an hour and `h:mm:ss` from an hour.
 - Play/Pause, Next and Finish sit at the bottom of the screen.
