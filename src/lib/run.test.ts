@@ -1,13 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import type { Block } from './routine';
+import { createStarterRoutines, type Block } from './routine';
 import {
+	breakRemainingMs,
+	createRun,
 	earnedBreakMs,
 	firstPosition,
+	next,
 	nextPosition,
+	pause,
+	play,
 	positionLabel,
 	workedMs,
 	type Position,
-	type RoutinePlan
+	type RoutinePlan,
+	type RunState,
+	type WorkingRun
 } from './run';
 
 /**
@@ -45,6 +52,47 @@ function walk(routine: RoutinePlan, limit = 100): Position[] {
 		position = nextPosition(routine, position);
 	}
 	return positions;
+}
+
+/**
+ * Checks that a run is in the expected state, and returns it typed as that state, so a test can
+ * read the fields only that state has.
+ *
+ * @typeParam Status - The status the run should have.
+ * @param run - The run to check.
+ * @param status - The status the run should have.
+ * @returns The run, typed as the state with that status.
+ * @throws {@link Error}
+ * When the run has a different status, which fails the test.
+ */
+function inStatus<Status extends RunState['status']>(
+	run: RunState,
+	status: Status
+): Extract<RunState, { status: Status }> {
+	if (run.status !== status) {
+		throw new Error(`Expected the run to be ${status}, but it's ${run.status}`);
+	}
+	return run as Extract<RunState, { status: Status }>;
+}
+
+/** The starter routine whose blocks earn different breaks: 3 cycles at 20%, then 1 at 60%. */
+const [, classicWithLongBreak] = createStarterRoutines(new Date(0), () => 'id');
+
+/**
+ * Puts a run straight into a work period of Classic with long break, running from 0.
+ *
+ * @param position - Where the work period is in the routine.
+ * @returns The run, in that work period, with nothing ended yet.
+ */
+function workingAt(position: Position): WorkingRun {
+	return {
+		status: 'working',
+		plan: classicWithLongBreak,
+		endedPeriods: [],
+		position,
+		segments: [],
+		runningSince: 0
+	};
 }
 
 describe('workedMs', () => {
@@ -174,5 +222,192 @@ describe('positionLabel', () => {
 		['is empty for a routine of 1 round, 1 block and 1 cycle', plan(1, 1), firstPosition, '']
 	])('%s', (_rule, routine, position, label) => {
 		expect(positionLabel(routine, position)).toBe(label);
+	});
+});
+
+describe('createRun', () => {
+	it('is ready to start, with the routine to run', () => {
+		const routine = plan('infinite', 1);
+
+		expect(createRun(routine)).toEqual({ status: 'ready', plan: routine });
+	});
+});
+
+describe('play', () => {
+	it('starts the first work period, running from now', () => {
+		const routine = plan('infinite', 1);
+
+		expect(play(createRun(routine), 1_000)).toEqual({
+			status: 'working',
+			plan: routine,
+			endedPeriods: [],
+			position: firstPosition,
+			segments: [],
+			runningSince: 1_000
+		});
+	});
+
+	it('resumes paused work without counting the paused time', () => {
+		const paused = pause(play(createRun(plan('infinite', 1)), 0), 10_000);
+
+		const resumed = inStatus(play(paused, 30_000), 'working');
+
+		expect(workedMs(resumed.segments, resumed.runningSince, 40_000)).toBe(20_000);
+	});
+
+	it('resumes a paused break with the time it had left', () => {
+		const onBreak = next(play(createRun(plan('infinite', 1)), 0), 25 * 60_000);
+		const paused = pause(onBreak, 27 * 60_000);
+
+		const resumed = inStatus(play(paused, 37 * 60_000), 'break');
+
+		expect(breakRemainingMs(resumed, 38 * 60_000)).toBe(2 * 60_000);
+	});
+
+	it('starts the next work period once the break is over', () => {
+		const onBreak = next(play(createRun(plan('infinite', 1)), 0), 25 * 60_000);
+
+		expect(play(onBreak, 31 * 60_000)).toMatchObject({
+			status: 'working',
+			position: { round: 1, block: 0, cycle: 0 },
+			segments: [],
+			runningSince: 31 * 60_000
+		});
+	});
+
+	it('leaves running work, a running break and an ended run as they were', () => {
+		const working = play(createRun(plan('infinite', 1)), 0);
+		const onBreak = next(working, 25 * 60_000);
+		const ended = next(play(createRun(plan(1, 1)), 0), 25 * 60_000);
+
+		expect(play(working, 5_000)).toBe(working);
+		expect(play(onBreak, 26 * 60_000)).toBe(onBreak);
+		expect(play(ended, 30 * 60_000)).toBe(ended);
+	});
+});
+
+describe('pause', () => {
+	it('ends the running stretch of work as a segment', () => {
+		const working = play(createRun(plan('infinite', 1)), 1_000);
+
+		expect(pause(working, 4_000)).toMatchObject({
+			status: 'working',
+			segments: [{ start: 1_000, end: 4_000 }],
+			runningSince: null
+		});
+	});
+
+	it('keeps the time a paused break had left, however long the pause', () => {
+		const onBreak = next(play(createRun(plan('infinite', 1)), 0), 25 * 60_000);
+
+		const paused = inStatus(pause(onBreak, 27 * 60_000), 'break');
+
+		expect(breakRemainingMs(paused, 27 * 60_000)).toBe(3 * 60_000);
+		expect(breakRemainingMs(paused, 90 * 60_000)).toBe(3 * 60_000);
+	});
+
+	it('leaves paused work, a break that is over and a run not yet started as they were', () => {
+		const ready = createRun(plan('infinite', 1));
+		const paused = pause(play(ready, 0), 10_000);
+		const onBreak = next(play(ready, 0), 25 * 60_000);
+
+		expect(pause(paused, 20_000)).toBe(paused);
+		expect(pause(onBreak, 31 * 60_000)).toBe(onBreak);
+		expect(pause(ready, 0)).toBe(ready);
+	});
+});
+
+describe('next', () => {
+	it('ends a work period and starts its earned break, running from now', () => {
+		const routine = plan('infinite', 1);
+		const working = play(createRun(routine), 0);
+
+		expect(next(working, 25 * 60_000)).toEqual({
+			status: 'break',
+			plan: routine,
+			endedPeriods: [
+				{
+					position: firstPosition,
+					targetMinutes: 25,
+					segments: [{ start: 0, end: 25 * 60_000 }],
+					workedMs: 25 * 60_000
+				}
+			],
+			position: firstPosition,
+			nextWorkPosition: { round: 1, block: 0, cycle: 0 },
+			earnedMs: 5 * 60_000,
+			remainingMs: 5 * 60_000,
+			runningSince: 25 * 60_000
+		});
+	});
+
+	it('earns the break from the time worked, leaving out paused time', () => {
+		const working = play(pause(play(createRun(plan('infinite', 1)), 0), 10 * 60_000), 20 * 60_000);
+
+		expect(next(working, 30 * 60_000)).toMatchObject({ status: 'break', earnedMs: 4 * 60_000 });
+	});
+
+	it("earns each break at the percentage of the block just worked, across a block's end", () => {
+		const lastShortCycle = next(workingAt({ round: 0, block: 0, cycle: 2 }), 25 * 60_000);
+		const longBreakCycle = next(workingAt({ round: 0, block: 1, cycle: 0 }), 25 * 60_000);
+
+		expect(lastShortCycle).toMatchObject({
+			status: 'break',
+			earnedMs: 5 * 60_000,
+			nextWorkPosition: { round: 0, block: 1, cycle: 0 }
+		});
+		expect(longBreakCycle).toMatchObject({
+			status: 'break',
+			earnedMs: 15 * 60_000,
+			nextWorkPosition: { round: 1, block: 0, cycle: 0 }
+		});
+	});
+
+	it('ends a break early and starts the next work period, losing the time left', () => {
+		const onBreak = next(play(createRun(plan('infinite', 1)), 0), 25 * 60_000);
+
+		expect(next(onBreak, 26 * 60_000)).toMatchObject({
+			status: 'working',
+			position: { round: 1, block: 0, cycle: 0 },
+			runningSince: 26 * 60_000
+		});
+	});
+
+	it('earns no break for a few seconds of work, so the break is over at once', () => {
+		const onBreak = inStatus(next(play(createRun(plan('infinite', 1)), 0), 2_000), 'break');
+
+		expect(onBreak.earnedMs).toBe(0);
+		expect(breakRemainingMs(onBreak, 2_000)).toBe(0);
+	});
+
+	it("completes a finite routine at its last work period, without that period's break", () => {
+		const firstBreak = next(play(createRun(plan(1, 2)), 0), 25 * 60_000);
+		const lastWork = next(firstBreak, 30 * 60_000);
+
+		const ended = inStatus(next(lastWork, 55 * 60_000), 'ended');
+
+		expect(ended.outcome).toBe('completed');
+		expect(ended.endedPeriods.map((period) => period.position)).toEqual([
+			{ round: 0, block: 0, cycle: 0 },
+			{ round: 0, block: 0, cycle: 1 }
+		]);
+	});
+
+	it('leaves a run not yet started, and an ended run, as they were', () => {
+		const ready = createRun(plan(1, 1));
+		const ended = next(play(ready, 0), 25 * 60_000);
+
+		expect(next(ready, 0)).toBe(ready);
+		expect(next(ended, 30 * 60_000)).toBe(ended);
+	});
+});
+
+describe('breakRemainingMs', () => {
+	it('counts down while the break runs, and stops at 0', () => {
+		const onBreak = inStatus(next(play(createRun(plan('infinite', 1)), 0), 25 * 60_000), 'break');
+
+		expect(breakRemainingMs(onBreak, 25 * 60_000)).toBe(5 * 60_000);
+		expect(breakRemainingMs(onBreak, 28 * 60_000)).toBe(2 * 60_000);
+		expect(breakRemainingMs(onBreak, 40 * 60_000)).toBe(0);
 	});
 });
