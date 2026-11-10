@@ -12,7 +12,7 @@ This plan was written when the spec (`docs/SPEC.md`) was finished and before any
 - Within a step, logic comes before the UI that uses it: a pure function with its unit tests, then the component, then the Playwright journey.
 - Every change reaches `main` through a pull request, from the first one. Claude merges, with a rebase merge by default, only when you ask, and once CI exists, only when it passes.
 - From the first deploy in milestone 3, every pull request that changes the app bumps the version, and its merged commit is tagged and released.
-- A milestone is done when its steps are merged, its concepts have been covered, and `docs/PROGRESS.md` is updated.
+- A milestone is done when its steps are merged, its concepts have been covered, and `docs/PROGRESS.md` and `docs/DECISIONS.md` are up to date.
 - Tests are written after the code, once its behaviour is right, to guard against regressions. A bug fix starts with a regression test that's seen to fail. There are no coverage targets.
 - Commands on the homelab, in the optional milestone 11, are yours to run. Claude provides each step and explains it.
 
@@ -40,7 +40,7 @@ This plan was written when the spec (`docs/SPEC.md`) was finished and before any
 
 ## Before milestone 1
 
-- Merge this docs pull request, which holds the spec, the plan, the progress log and the project's `CLAUDE.md`.
+- Merge this docs pull request, which holds the spec, the plan, the progress and decision logs, and the project's `CLAUDE.md`.
 
 ## Milestones
 
