@@ -1,5 +1,14 @@
 // Formatting durations for the timer: `m:ss` under an hour and `h:mm:ss` from an hour.
 
+/** The milliseconds in one second. */
+export const MS_PER_SECOND = 1000;
+
+/** The seconds in one minute. */
+const SECONDS_PER_MINUTE = 60;
+
+/** The seconds in one hour. */
+const SECONDS_PER_HOUR = 60 * SECONDS_PER_MINUTE;
+
 /**
  * Formats time that has passed, such as work done so far.
  *
@@ -12,7 +21,8 @@
  * `1:02:03`.
  */
 export function formatElapsed(ms: number): string {
-	return formatSeconds(Math.floor(ms / 1000));
+	const wholeSeconds = Math.floor(ms / MS_PER_SECOND);
+	return formatSeconds(wholeSeconds);
 }
 
 /**
@@ -26,7 +36,8 @@ export function formatElapsed(ms: number): string {
  * @returns The time as `m:ss` under an hour, such as `4:59`, or `h:mm:ss` from an hour.
  */
 export function formatRemaining(ms: number): string {
-	return formatSeconds(Math.ceil(ms / 1000));
+	const wholeSeconds = Math.ceil(ms / MS_PER_SECOND);
+	return formatSeconds(wholeSeconds);
 }
 
 /**
@@ -36,12 +47,16 @@ export function formatRemaining(ms: number): string {
  * @returns The seconds as `m:ss` under an hour, or `h:mm:ss` from an hour.
  */
 function formatSeconds(totalSeconds: number): string {
-	const seconds = Math.max(0, totalSeconds);
-	const hours = Math.floor(seconds / 3600);
-	const minutes = Math.floor((seconds % 3600) / 60);
-	const ss = twoDigits(seconds % 60);
+	const shownSeconds = Math.max(0, totalSeconds);
 
-	return hours > 0 ? `${hours}:${twoDigits(minutes)}:${ss}` : `${minutes}:${ss}`;
+	const hours = Math.floor(shownSeconds / SECONDS_PER_HOUR);
+	const minutesPastHour = Math.floor((shownSeconds % SECONDS_PER_HOUR) / SECONDS_PER_MINUTE);
+	const secondsPastMinute = shownSeconds % SECONDS_PER_MINUTE;
+
+	if (hours === 0) {
+		return `${minutesPastHour}:${twoDigits(secondsPastMinute)}`;
+	}
+	return `${hours}:${twoDigits(minutesPastHour)}:${twoDigits(secondsPastMinute)}`;
 }
 
 /**
