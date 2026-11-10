@@ -10,7 +10,10 @@ export type Block = {
 	targetMinutes: number;
 	/** The break earned, as a whole-number percentage of the time worked, 1–100. */
 	breakPercent: number;
-	/** How many times the block's work and break repeat before the next block, 1–99. */
+	/**
+	 * How many times the block's work and break repeat before the next block, 1–99. Always 1 when
+	 * it's the routine's only block, because rounds repeat a single block.
+	 */
 	cycles: number;
 };
 
