@@ -4,7 +4,16 @@ Changes to the spec, plan and design, newest day first, each with its reason and
 
 ## 2026-11-09
 
-The spec and plan were worked out in conversation, starting from the user's sketch of the timer screen. Milestone 1's setup started the same day.
+The spec and plan were worked out in conversation, starting from the user's sketch of the timer screen. Milestone 1's setup and CI were done the same day.
+
+**CI**
+
+- `pipeline.yml` has one `Checks` job for now, running each npm script as its own step, cheapest first: lint, formatting, types, unit and component tests, the build, then the Playwright tests. The Pages jobs come in milestone 3.
+- Playwright's Chromium is installed before the unit tests, not just before the Playwright tests as in the weight tracker, because component tests run in it through Vitest's browser mode.
+- The browser is installed with the Playwright CLI. Playwright archived its GitHub Action and recommends the CLI, which installs the browser that matches the project's Playwright version. The first run spent three and a half minutes on that step, fetching Chromium's fonts from a slow Ubuntu mirror. The next run took 14 seconds, so the setup stays. Playwright's container image, with the browsers and their system libraries built in, is the fallback if slow runs keep happening.
+- The `Protect main` ruleset matches the weight tracker's. It blocks deleting and force-pushing `main`, requires a pull request with no approvals, because GitHub doesn't let you approve your own pull request, and requires the `Checks` job as reported by GitHub Actions. Branches don't need to be up to date with `main` before merging, because a pull request's run already tests it merged with `main`. Nobody can bypass it, the admin included.
+- GitHub deletes a pull request's branch once it merges.
+- The check that a failing test blocks a merge used a throwaway draft pull request with a broken component test, closed without merging. It was based on the workflow's branch, because `main` had no workflow yet.
 
 **Project setup**
 
