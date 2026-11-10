@@ -72,12 +72,12 @@ export function workedMs(
  * The break is the time worked times the block's break percentage, with no cap or minimum. It's
  * rounded once, to the nearest whole second, with halves rounded up.
  *
- * @param worked - The time worked, in milliseconds.
+ * @param workMs - The time worked, in milliseconds.
  * @param breakPercent - The block's break percentage, a whole number from 1 to 100.
  * @returns The break earned, in whole seconds, as milliseconds.
  */
-export function earnedBreakMs(worked: number, breakPercent: number): number {
-	const earnedMs = percentOf(worked, breakPercent);
+export function earnedBreakMs(workMs: number, breakPercent: number): number {
+	const earnedMs = percentOf(workMs, breakPercent);
 	const earnedSeconds = Math.round(earnedMs / MS_PER_SECOND);
 	return earnedSeconds * MS_PER_SECOND;
 }
