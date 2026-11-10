@@ -1,10 +1,10 @@
 # Progress
 
-**Current status:** The spec, plan, progress log, decision log and `CLAUDE.md` are written on the `docs/spec` branch, waiting to merge through the first pull request. The repo was renamed from `pomodoro` to `cadoro`. The project is a fresh `sv create` scaffold: SvelteKit 3, Svelte 5, strict TypeScript, Tailwind CSS 4, Vitest with browser mode, Playwright, ESLint and Prettier. There's no app code yet.
+**Current status:** The spec, plan, progress log, decision log and `CLAUDE.md` are merged to `main`. The repo was renamed from `pomodoro` to `cadoro`. The project is a fresh `sv create` scaffold: SvelteKit 3, Svelte 5, strict TypeScript, Tailwind CSS 4, Vitest with browser mode, Playwright, ESLint and Prettier. There's no app code yet.
 
-**Next:** Merge the docs pull request, then start milestone 1, project setup and CI.
+**Next:** Milestone 1's step 2, moving the end-to-end tests to `e2e/` with desktop and phone projects, then step 3, the checks workflow.
 
-**In progress:** The docs pull request.
+**In progress:** Milestone 1, project setup and CI. Step 1, setting up the static single-page app, is on the `build/static-spa-setup` branch.
 
 Decisions and their reasons are in `docs/DECISIONS.md`.
 
