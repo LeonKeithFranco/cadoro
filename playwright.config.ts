@@ -1,6 +1,32 @@
-import { defineConfig } from '@playwright/test';
+import { defineConfig, devices } from '@playwright/test';
+
+const isCi = !!process.env.CI;
+
+// The dev server's address. 5173 is Vite's default port.
+const devUrl = 'http://localhost:5173';
 
 export default defineConfig({
-	webServer: { command: 'npm run build && npm run preview', port: 4173 },
-	testMatch: '**/*.e2e.{ts,js}'
+	testDir: './e2e',
+	fullyParallel: true,
+	// Fails the CI run if a `test.only` was left in by mistake.
+	forbidOnly: isCi,
+	retries: isCi ? 2 : 0,
+	reporter: isCi ? [['github'], ['html', { open: 'never' }]] : 'list',
+	use: {
+		baseURL: devUrl,
+		// Keeps a trace only for tests that fail, so passing runs stay small.
+		trace: 'retain-on-failure'
+	},
+	// Both run every test against the dev server. Milestone 3 adds a project against a
+	// production build, for what only it has, such as the service worker.
+	projects: [
+		{ name: 'desktop', use: { ...devices['Desktop Chrome'] } },
+		{ name: 'phone', use: { ...devices['Pixel 7'] } }
+	],
+	webServer: {
+		command: 'npm run dev',
+		url: devUrl,
+		// Locally, reuses a dev server that's already running.
+		reuseExistingServer: !isCi
+	}
 });
