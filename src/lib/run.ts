@@ -98,14 +98,17 @@ export const firstPosition: Position = { round: 0, block: 0, cycle: 0 };
  */
 export function nextPosition(plan: RoutinePlan, position: Position): Position | null {
 	const { round, block, cycle } = position;
+	const blockHasNextCycle = cycle + 1 < plan.blocks[block].cycles;
+	const roundHasNextBlock = block + 1 < plan.blocks.length;
+	const routineHasNextRound = plan.rounds === 'infinite' || round + 1 < plan.rounds;
 
-	if (cycle + 1 < plan.blocks[block].cycles) {
+	if (blockHasNextCycle) {
 		return { round, block, cycle: cycle + 1 };
 	}
-	if (block + 1 < plan.blocks.length) {
+	if (roundHasNextBlock) {
 		return { round, block: block + 1, cycle: 0 };
 	}
-	if (plan.rounds === 'infinite' || round + 1 < plan.rounds) {
+	if (routineHasNextRound) {
 		return { round: round + 1, block: 0, cycle: 0 };
 	}
 	return null;
