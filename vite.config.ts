@@ -4,6 +4,7 @@ import tailwindcss from '@tailwindcss/vite';
 import adapter from '@sveltejs/adapter-static';
 import { sveltekit } from '@sveltejs/kit/vite';
 
+/** How Vite builds and serves the app, with SvelteKit's config and Vitest's test projects. */
 export default defineConfig({
 	plugins: [
 		tailwindcss(),
