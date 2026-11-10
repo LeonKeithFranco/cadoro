@@ -70,7 +70,7 @@ type Block = {
 	title: string; // 1–50 characters.
 	targetMinutes: number; // Whole minutes, 1–240.
 	breakPercent: number; // Whole number, 1–100.
-	cycles: number; // 1–99.
+	cycles: number; // 1–99. Always 1 when it's the routine's only block.
 };
 
 type Run = {
@@ -117,6 +117,7 @@ type RoutineSort =
 - A routine has a title, a number of rounds (1–99, or infinite) and 1–20 blocks.
 - A block has a title, a work target in whole minutes (1–240), a break percentage (a whole number, 1–100) and a number of cycles (1–99).
 - Only a routine can repeat forever. Every block has a set number of cycles.
+- A routine with one block has 1 cycle. With one block, cycles and rounds do the same job, since 3 cycles of 2 rounds is the same run as 6 rounds, so rounds repeat a single block. Cycles only matter with two or more blocks.
 - A run goes through block 1's cycles, then block 2's, and so on to the last block, which makes one round. Then the next round starts at block 1.
 - Every work period is followed by its break, including at the boundary between two blocks, except the routine's very last work period. A finite routine's run ends as soon as its last work period ends, and that period's break doesn't run.
 
@@ -201,6 +202,7 @@ Closing the dialog returns the routine to its starting state, ready for another 
 - The form edits the routine's title and rounds, and each block's title, target, break percentage and cycles.
 - Each block has a drag handle, Move up and Move down buttons, Duplicate, which inserts a copy below it, and Delete, which asks for confirmation. Delete is disabled when only one block is left.
 - An "Add block" button below the blocks adds a new block at the end.
+- While a routine has one block, its cycles field shows 1 and is disabled, with a hint that rounds repeat a single block. Deleting blocks down to one resets the remaining block's cycles to 1, and rounds stay as they were.
 - Every field is validated against the limits in the data model before Save is allowed.
 - Renaming a routine keeps its history attached.
 
