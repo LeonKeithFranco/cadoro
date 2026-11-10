@@ -1,56 +1,41 @@
-# sv
+# Cadoro
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+A self-hostable timer for focused work, built as a SvelteKit PWA. Routines are made of blocks; work counts up past its target, and each break is earned as a percentage of the time worked. Data stays in the browser, and there's no backend.
 
-## Creating a project
+**Status:** in development. There's no usable app yet. [`docs/PROGRESS.md`](docs/PROGRESS.md) has the current state.
 
-If you're seeing this, you've probably already done this step. Congrats!
+## Docs
 
-```sh
-# create a new project
-npx sv create my-app
-```
+- [`docs/SPEC.md`](docs/SPEC.md): what the app does
+- [`docs/PLAN.md`](docs/PLAN.md): the stack and the milestones
+- [`docs/DECISIONS.md`](docs/DECISIONS.md): every decision, with its reasons
 
-To recreate this project with the same configuration:
+## Stack
 
-```sh
-# recreate this project
-npx sv@1.3.0 create --template minimal --types ts --add prettier playwright="demo:no" tailwindcss="plugins:none" vitest="usages:unit,component" eslint --install npm ./
-```
+SvelteKit with `adapter-static`, Svelte 5, strict TypeScript, Tailwind CSS 4, Vitest with browser mode, and Playwright.
 
-## Adding features
+## Development
 
-Add features to your project with `sv add`:
+Needs the Node version in [`.nvmrc`](.nvmrc).
 
 ```sh
-npx sv add
+npm ci                            # install the exact versions in the lockfile
+npx playwright install chromium   # once, for the browser tests
+npm run dev                       # dev server at http://localhost:5173
 ```
 
-For example, to add Tailwind CSS:
+| Command                | What it does                                           |
+| ---------------------- | ------------------------------------------------------ |
+| `npm test`             | Unit and component tests, once                         |
+| `npm run test:watch`   | The same, rerunning on every save                      |
+| `npm run test:e2e`     | Playwright tests, desktop and phone, on the dev server |
+| `npm run typecheck`    | Types and Svelte warnings, with svelte-check           |
+| `npm run lint`         | ESLint                                                 |
+| `npm run format`       | Formats every file with Prettier                       |
+| `npm run format:check` | Checks the formatting without changing anything        |
+| `npm run build`        | Builds the static site into `build/`                   |
+| `npm run preview`      | Serves the build locally                               |
 
-```sh
-npx sv add tailwindcss
-```
+## Licence
 
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
-
-```sh
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
-
-## Building
-
-To create a production version of your app:
-
-```sh
-npm run build
-```
-
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+[MIT](LICENSE)
