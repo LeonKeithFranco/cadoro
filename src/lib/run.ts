@@ -135,7 +135,8 @@ export function positionLabel(plan: RoutinePlan, position: Position): string {
 	const roundNumber = position.round + 1;
 	const blockNumber = position.block + 1;
 	const cycleNumber = position.cycle + 1;
-	const cycles = plan.blocks[position.block].cycles;
+	const blockCount = plan.blocks.length;
+	const cycleCount = plan.blocks[position.block].cycles;
 
 	const parts: string[] = [];
 	if (plan.rounds === 'infinite') {
@@ -143,11 +144,11 @@ export function positionLabel(plan: RoutinePlan, position: Position): string {
 	} else if (plan.rounds > 1) {
 		parts.push(`Round ${roundNumber} of ${plan.rounds}`);
 	}
-	if (plan.blocks.length > 1) {
-		parts.push(`Block ${blockNumber} of ${plan.blocks.length}`);
+	if (blockCount > 1) {
+		parts.push(`Block ${blockNumber} of ${blockCount}`);
 	}
-	if (cycles > 1) {
-		parts.push(`Cycle ${cycleNumber} of ${cycles}`);
+	if (cycleCount > 1) {
+		parts.push(`Cycle ${cycleNumber} of ${cycleCount}`);
 	}
 
 	return parts.join(' · ');
