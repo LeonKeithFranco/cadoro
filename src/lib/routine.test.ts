@@ -47,7 +47,10 @@ describe('createStarterRoutines', () => {
 
 	it('takes a different id from the generator for every routine and block', () => {
 		const routines = createStarterRoutines(now, countingIds());
-		const ids = routines.flatMap((routine) => [routine.id, ...routine.blocks.map((b) => b.id)]);
+		const ids = routines.flatMap((routine) => [
+			routine.id,
+			...routine.blocks.map((block) => block.id)
+		]);
 
 		expect(new Set(ids)).toEqual(new Set(['id-1', 'id-2', 'id-3', 'id-4', 'id-5']));
 	});
