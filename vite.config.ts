@@ -11,8 +11,11 @@ export default defineConfig({
 		sveltekit({
 			compilerOptions: {
 				// Force runes mode for the project, except for libraries. Can be removed in svelte 6.
-				runes: ({ filename }) =>
-					filename.split(/[/\\]/).includes('node_modules') ? undefined : true
+				runes: ({ filename }) => {
+					// Splits on either slash, so Windows paths work too.
+					const isLibrary = filename.split(/[/\\]/).includes('node_modules');
+					return isLibrary ? undefined : true;
+				}
 			},
 
 			// Builds plain static files into `build/`, for GitHub Pages and self-hosting. Nothing is
