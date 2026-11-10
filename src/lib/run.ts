@@ -127,19 +127,23 @@ export function nextPosition(plan: RoutinePlan, position: Position): Position | 
  * round, one block and one cycle.
  */
 export function positionLabel(plan: RoutinePlan, position: Position): string {
-	const parts: string[] = [];
+	// Positions count from 0, as array indexes do, while the user counts from 1.
+	const roundNumber = position.round + 1;
+	const blockNumber = position.block + 1;
+	const cycleNumber = position.cycle + 1;
+	const cycles = plan.blocks[position.block].cycles;
 
+	const parts: string[] = [];
 	if (plan.rounds === 'infinite') {
-		parts.push(`Round ${position.round + 1}`);
+		parts.push(`Round ${roundNumber}`);
 	} else if (plan.rounds > 1) {
-		parts.push(`Round ${position.round + 1} of ${plan.rounds}`);
+		parts.push(`Round ${roundNumber} of ${plan.rounds}`);
 	}
 	if (plan.blocks.length > 1) {
-		parts.push(`Block ${position.block + 1} of ${plan.blocks.length}`);
+		parts.push(`Block ${blockNumber} of ${plan.blocks.length}`);
 	}
-	const cycles = plan.blocks[position.block].cycles;
 	if (cycles > 1) {
-		parts.push(`Cycle ${position.cycle + 1} of ${cycles}`);
+		parts.push(`Cycle ${cycleNumber} of ${cycles}`);
 	}
 
 	return parts.join(' · ');
