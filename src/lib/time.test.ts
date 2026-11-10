@@ -1,8 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { formatElapsed, formatRemaining } from './time';
+import { formatElapsed, formatRemaining, minutesToMs } from './time';
 
 /** One row of a formatting table: the rule it shows, a duration and how it should look. */
 type Case = [rule: string, ms: number, shown: string];
+
+describe('minutesToMs', () => {
+	it('converts minutes to milliseconds', () => {
+		expect(minutesToMs(25)).toBe(1_500_000);
+	});
+
+	it('converts the longest target, 240 minutes, to 4 hours', () => {
+		expect(minutesToMs(240)).toBe(14_400_000);
+	});
+});
 
 describe('formatElapsed', () => {
 	it.each<Case>([
