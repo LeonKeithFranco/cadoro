@@ -62,3 +62,7 @@ The spec and plan were worked out in conversation, starting from the user's sket
 **The docs**
 
 - Decisions live in their own file, `docs/DECISIONS.md`, rather than at the end of `docs/PROGRESS.md` as in the weight tracker. Status is rewritten constantly while the log only grows, so separate files keep each one's purpose clear, and the README can link the log directly. `CLAUDE.md` loads both into every session, because decisions carrying over between sessions is what made the weight tracker's log useful. One file per decision, as architecture decision records do, was rejected as too much structure for a solo project's many small decisions.
+
+**Planning each step**
+
+- Claude enters plan mode as soon as the user confirms the start of a milestone or a step. At a milestone's start it plans the steps and the first step's rounds, and at each later step's start it plans that step's rounds against the code as it is by then. Work starts once the user approves. Planning the whole milestone up front was rejected, because later steps would be planned before the code they build on exists. The rule lives in the user's global Claude Code instructions, so it applies to every project built this way.
