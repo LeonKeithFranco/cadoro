@@ -2,6 +2,14 @@
 
 Changes to the spec, plan and design, newest day first, each with its reason and often the options that were rejected.
 
+## 2026-11-10
+
+**Doc comments**
+
+- TypeScript files are checked for TSDoc comments with `eslint-plugin-tsdoc` and `eslint-plugin-jsdoc`, configured as in the weight tracker: a comment on every module-level declaration, type and field, and `@param` and `@returns` on every function. It came in its own pull request before the run engine, so the engine is checked from its first line, rather than as the first commit of that step.
+- JavaScript files, such as `prettier.config.js`, aren't checked, because they give values types with JSDoc tags such as `@type`, which TSDoc doesn't have.
+- Svelte components aren't checked yet. Requiring a comment on every module-level variable would mean commenting every `$state` in a component's script, so how the rules fit `.svelte` files is decided once the first real component exists.
+
 ## 2026-11-09
 
 The spec and plan were worked out in conversation, starting from the user's sketch of the timer screen. Milestone 1's setup and CI were done the same day.
