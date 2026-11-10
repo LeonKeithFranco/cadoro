@@ -16,6 +16,15 @@ jobs:
     name: Checks
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Runs the steps inside Playwright's image, which has Chromium and the
+    # system packages it needs built in, so nothing is downloaded with `apt`.
+    # Its tag must match the Playwright version in `package-lock.json`, or the
+    # tests can't find the browser, so bump both together.
+    container:
+      image: mcr.microsoft.com/playwright:v1.65.0-noble
+      # Runs as the runner's own user, which owns the checked-out files,
+      # rather than as root, as Playwright's docs advise.
+      options: --user 1001
     steps:
       - name: Check out the code
         uses: actions/checkout@v7
@@ -39,13 +48,8 @@ jobs:
       - name: Type check
         run: npm run typecheck
 
-      # Only downloads the browser; the Playwright tests still run last. It
-      # comes before the unit tests because component tests also run in this
-      # Chromium, through Vitest's browser mode. `--with-deps` adds the system
-      # libraries Chromium needs.
-      - name: Install Playwright's browser
-        run: npx playwright install --with-deps chromium
-
+      # Component tests run in the image's Chromium, through Vitest's browser
+      # mode.
       - name: Run unit and component tests
         run: npm test
 
