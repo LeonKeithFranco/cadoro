@@ -98,18 +98,22 @@ export const firstPosition: Position = { round: 0, block: 0, cycle: 0 };
  */
 export function nextPosition(plan: RoutinePlan, position: Position): Position | null {
 	const { round, block, cycle } = position;
-	const blockHasNextCycle = cycle + 1 < plan.blocks[block].cycles;
-	const roundHasNextBlock = block + 1 < plan.blocks.length;
-	const routineHasNextRound = plan.rounds === 'infinite' || round + 1 < plan.rounds;
+	const nextRound = round + 1;
+	const nextBlock = block + 1;
+	const nextCycle = cycle + 1;
+
+	const blockHasNextCycle = nextCycle < plan.blocks[block].cycles;
+	const roundHasNextBlock = nextBlock < plan.blocks.length;
+	const routineHasNextRound = plan.rounds === 'infinite' || nextRound < plan.rounds;
 
 	if (blockHasNextCycle) {
-		return { round, block, cycle: cycle + 1 };
+		return { round, block, cycle: nextCycle };
 	}
 	if (roundHasNextBlock) {
-		return { round, block: block + 1, cycle: 0 };
+		return { round, block: nextBlock, cycle: 0 };
 	}
 	if (routineHasNextRound) {
-		return { round: round + 1, block: 0, cycle: 0 };
+		return { round: nextRound, block: 0, cycle: 0 };
 	}
 	return null;
 }
