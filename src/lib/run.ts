@@ -1,7 +1,9 @@
 // The run engine: moving through a routine's rounds, blocks and cycles. Every function here is
 // pure, so the screen and the tests drive it the same way.
 
+import { percentOf } from './percent';
 import type { Routine } from './routine';
+import { MS_PER_SECOND } from './time';
 
 /** The parts of a routine that decide the order a run goes through it. */
 export type RoutinePlan = Pick<Routine, 'rounds' | 'blocks'>;
@@ -20,6 +22,65 @@ export type Position = {
 	/** The cycle within the block, from 0. */
 	readonly cycle: number;
 };
+
+/**
+ * One unpaused stretch of a work period, as moments in milliseconds since 1970 (UTC), the
+ * same as `Date.now()` gives.
+ */
+export type Segment = {
+	/** When the stretch started, by Play or by the work period starting. */
+	readonly start: number;
+	/** When the stretch ended, by Pause, Next or Finish. */
+	readonly end: number;
+};
+
+/**
+ * Works out how long a work period has been worked, from its timestamps.
+ *
+ * @remarks
+ * Time comes from the moments work started and stopped, never from counting timer ticks, so it
+ * stays exact when the browser slows or suspends the page. Paused time isn't in any segment, so
+ * it never counts as work.
+ *
+ * @param segments - The stretches already ended by Pause.
+ * @param runningSince - When the current stretch started, or `null` while paused.
+ * @param now - The current moment, in milliseconds since 1970 (UTC).
+ * @returns The time worked, in milliseconds, at full precision. A current stretch that would be
+ * negative, because the device's clock moved back, counts as 0.
+ */
+export function workedMs(
+	segments: readonly Segment[],
+	runningSince: number | null,
+	now: number
+): number {
+	let endedMs = 0;
+	for (const segment of segments) {
+		endedMs += segment.end - segment.start;
+	}
+
+	const isRunning = runningSince !== null;
+	// The device's clock can move back, such as when it syncs, which would make this negative.
+	const runningMs = isRunning ? Math.max(0, now - runningSince) : 0;
+
+	return endedMs + runningMs;
+}
+
+/**
+ * Works out the break a work period has earned.
+ *
+ * @remarks
+ * The break is the time worked times the block's break percentage, with no cap or minimum. It's
+ * rounded once, to the nearest whole second, with halves rounded up.
+ *
+ * @param worked - The time worked, in milliseconds.
+ * @param breakPercent - The block's break percentage, a whole number from 1 to 100.
+ * @returns The break earned, in whole seconds, as milliseconds.
+ */
+export function earnedBreakMs(worked: number, breakPercent: number): number {
+	const earnedMs = percentOf(worked, breakPercent);
+	const earnedSeconds = Math.round(earnedMs / MS_PER_SECOND);
+	return earnedSeconds * MS_PER_SECOND;
+}
 
 /** Where every run starts: the first cycle of the first block in the first round. */
 export const firstPosition: Position = { round: 0, block: 0, cycle: 0 };
