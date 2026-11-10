@@ -1,10 +1,12 @@
 import { defineConfig, devices } from '@playwright/test';
 
+/** Whether the tests run in CI, which sets `CI` to `true`. */
 const isCi = !!process.env.CI;
 
-// The dev server's address. 5173 is Vite's default port.
+/** The dev server's address. 5173 is Vite's default port. */
 const devUrl = 'http://localhost:5173';
 
+/** How `npm run test:e2e` runs the Playwright tests in `e2e/`, locally and in CI. */
 export default defineConfig({
 	testDir: './e2e',
 	fullyParallel: true,
