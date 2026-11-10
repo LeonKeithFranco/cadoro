@@ -15,6 +15,24 @@ Changes to the spec, plan and design, newest day first, each with its reason and
 - The position label leaves out any part whose total is 1, because it never changes during a run. Classic shows just "Round 5" rather than "Round 5 · Block 1 of 1 · Cycle 1 of 1", which matches the spec's own "Round 5" example. A routine's label keeps the same parts for the whole run, since its totals don't change mid-run. Showing all three parts on every routine was rejected as noise, and always showing the round was rejected because a one-round routine's "Round 1 of 1" never changes either. A routine of one round, one block and one cycle has an empty label.
 - A routine with one block has 1 cycle, because with one block cycles and rounds do the same job: 3 cycles of 2 rounds is the same run as 6 rounds, and an infinite routine's cycles mean nothing. The editor shows the field disabled at 1 with a hint, rather than hiding it, so the form keeps its layout and says why. Deleting blocks down to one resets the remaining block's cycles to 1, and rounds stay as they were. Folding the cycles into rounds, to keep the run the same length, was rejected because it changes a field the user didn't touch. The run engine still handles any number of cycles, and validation enforces the rule in the editor and on import.
 
+**The run engine**
+
+- Milestone 2 has four steps, each with its own branch and pull request: the run engine (`feat/run-engine`), the app shell (`feat/app-shell`), the timer screen (`feat/timer-screen`), and the Finish confirmation and run summary (`feat/run-summary`).
+- The engine works in milliseconds since 1970 (`number`), and every function takes `now` as an argument, so nothing in `src/lib` reads the clock and tests control time exactly. Converting to UTC strings for storage comes with storage in milestone 4.
+- The starter routines come from `createStarterRoutines(now, newId)` rather than plain constants, because each routine and block needs a UUID and a creation time. The clock and id generator are passed in, so the result is predictable, and milestone 4 reuses it on first launch. The spec doesn't name the starter blocks, so they're called Focus, and Focus and Long break.
+- A run is a discriminated union of four states, ready, working, break and ended, each holding only its own fields, and every button is a pure function from one state to the next. A button that does nothing in the current state, such as Pause before Play, returns the run unchanged rather than throwing, since the screen disables it anyway.
+- A break at 0:00, waiting for Play, isn't a state of its own. It's worked out from the time left, because a separate state would need a timer to switch into it, which is the tick-counting the spec rules out. It shows as not running, so the button reads Play.
+- The last work period of a finite routine ends the run inside Next, as the plan's round 5 rather than round 6, because Next has to do something at that point.
+- Times show rounded down while counting up, so `0:01` appears once a full second has passed, and rounded up while counting down, so a break reaches `0:00` exactly when it ends rather than a second early. Negative times show as `0:00`.
+- The run summary's "work periods completed" counts every saved work period, including one that Finish cut short, because stats will count it too.
+- A break's percentage is taken with the multiplication first, `(worked * percent) / 100`, rather than `worked * (percent / 100)`. Most decimal fractions can't be stored exactly in binary, and dividing the percentage first rounded 26 of 40 million exact half-second breaks the wrong way, such as 50 seconds at 29% giving 14 seconds instead of 15.
+
+**Code style**
+
+- Code follows the user's global style guide, `~/.claude/rules/style-guide.md`: self-documenting code with named intermediate results, named constants instead of magic numbers, descriptive names without abbreviations, comments that explain why, whole-number arithmetic that divides last, and modules named for what they provide. Each rule cites its source.
+- Shared logic is extracted at once into a small core with one meaning and no flags, and each slightly different need gets its own function that calls the core, as `earnedBreakMs` calls `percentOf`. The Rule of Three, which waits for a third copy, was rejected because the user doesn't want duplicated code. Merging only code that means the same thing guards against the wrong abstraction the Rule of Three exists to avoid.
+- The guide was applied to the code already written by a subagent in a git worktree, reviewed in two passes until nothing was left to fix. This project's worktrees live in `../pomodoro-worktrees/`.
+
 ## 2026-11-09
 
 The spec and plan were worked out in conversation, starting from the user's sketch of the timer screen. Milestone 1's setup and CI were done the same day.
