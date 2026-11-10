@@ -1,8 +1,8 @@
-# Pomodoro Spec
+# Cadoro Spec
 
 ## Overview
 
-A self-hostable, offline-capable SvelteKit PWA for timing focused work. It builds on the Pomodoro technique, with two changes:
+Cadoro is a self-hostable, offline-capable SvelteKit PWA for timing focused work. Its name blends cadence and Pomodoro. It builds on the Pomodoro technique, with two changes:
 
 - **Work counts up.** A work period has a target, but it keeps counting past it until you choose to stop.
 - **Breaks are earned.** A break is a percentage of the time you actually worked, so a longer work period earns a longer break.
@@ -286,14 +286,16 @@ The app is a single-page app, and each screen has its own URL. Navigation is a b
 
 ## Deployment
 
-- The source lives in the public GitHub repo `pomodoro`, under the MIT license. The app and repo may be renamed before the first deploy, because the Pages address and installed copies follow the repo's name.
+- The source lives in the public GitHub repo `cadoro`, under the MIT license. It was renamed from `pomodoro` before the first deploy, because the Pages address and installed copies follow the repo's name.
+- Every change reaches `main` through a pull request, from the very first one.
 - GitHub Actions runs checks on every push and pull request.
-- The build's base path comes from an environment variable, so the same code serves from `/<repo>/` on GitHub Pages and from `/` when self-hosted.
+- The build's base path comes from an environment variable, so the same code serves from `/cadoro/` on GitHub Pages and from `/` when self-hosted.
+- Versions follow semantic versioning from the first deploy, which is 0.1.0. Every merged pull request that changes the app bumps the version and is tagged and released. 1.0.0 is the release that completes this spec.
 
 ### GitHub Pages
 
 - A push to `main` that passes all checks builds the app and deploys it to GitHub Pages with GitHub Actions.
-- The app is served at `https://<username>.github.io/<repo>/`, with no custom domain. This is the main copy.
+- The app is served at `https://<username>.github.io/cadoro/`, with no custom domain. This is the main copy.
 - Pages has no route fallback, so the build provides a `404.html` that starts the app, and refreshing a screen's URL still works.
 - Every Pages site under one GitHub account shares the `<username>.github.io` origin, so those sites can read each other's browser storage.
 
