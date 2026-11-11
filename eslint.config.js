@@ -12,6 +12,26 @@ import ts from 'typescript-eslint';
 const gitignorePath = path.resolve(import.meta.dirname, '.gitignore');
 
 /**
+ * Where a module-level declaration sits: the file itself in a `.ts` file, or a `<script>` in a
+ * Svelte component, whose parser puts each script's code inside a `SvelteScriptElement`.
+ */
+const MODULE_LEVEL = ':matches(Program, SvelteScriptElement)';
+
+/** The names of the runes whose variables need no doc comment, as an esquery regex. */
+const RUNE_NAME = '/^\\$(state|derived|props)$/';
+
+/**
+ * A variable whose value comes from a Svelte rune, such as `let count = $state(0)` or
+ * `$derived.by(...)`. A component's state and props are named for what they hold, and its doc
+ * comment and `Props` type already describe them, so these need no comment of their own.
+ */
+// Attribute paths such as `init.callee.name`, because esquery 1.7 fails to match field
+// selectors such as `CallExpression.init` inside `:has(> ...)`.
+const RUNE_DECLARATION =
+	'VariableDeclaration:has(> VariableDeclarator:matches(' +
+	`[init.callee.name=${RUNE_NAME}], [init.callee.object.name=${RUNE_NAME}]))`;
+
+/**
  * The rules `npm run lint` checks, which CI runs on every pull request. Each object applies to
  * the files its `files` pattern matches, and one without a pattern applies to every file. See
  * {@link https://eslint.org/docs/latest/use/configure/ | ESLint's guide}.
@@ -42,10 +62,10 @@ export default defineConfig(
 		}
 	},
 	{
-		// Doc comments in TypeScript files. JavaScript files, such as the configs, keep JSDoc,
-		// which gives them types with tags such as `@type` that TSDoc doesn't have. Svelte
-		// components come later, once there's a real one to decide how the rules fit.
-		files: ['**/*.ts'],
+		// Doc comments in TypeScript files and Svelte components. JavaScript files, such as the
+		// configs, keep JSDoc, which gives them types with tags such as `@type` that TSDoc
+		// doesn't have.
+		files: ['**/*.ts', '**/*.svelte'],
 		extends: [jsdoc.configs['flat/recommended-tsdoc-error']],
 		plugins: { tsdoc },
 		settings: {
@@ -55,18 +75,18 @@ export default defineConfig(
 		rules: {
 			// Checks doc comments are valid TSDoc, such as a hyphen after a `@param` name.
 			'tsdoc/syntax': 'error',
-			// Checks each module-level declaration, type and field has a doc comment. Functions
-			// inside other functions and `describe` blocks don't need one.
+			// Checks each module-level declaration, type and field has a doc comment, apart from
+			// rune variables. Functions inside other functions and `describe` blocks don't need one.
 			'jsdoc/require-jsdoc': [
 				'error',
 				{
 					require: { FunctionDeclaration: false },
 					contexts: [
-						'Program > FunctionDeclaration',
-						'Program > VariableDeclaration',
-						'Program > TSTypeAliasDeclaration',
-						'Program > TSInterfaceDeclaration',
-						'Program > ClassDeclaration',
+						`${MODULE_LEVEL} > FunctionDeclaration`,
+						`${MODULE_LEVEL} > VariableDeclaration:not(${RUNE_DECLARATION})`,
+						`${MODULE_LEVEL} > TSTypeAliasDeclaration`,
+						`${MODULE_LEVEL} > TSInterfaceDeclaration`,
+						`${MODULE_LEVEL} > ClassDeclaration`,
 						// An exported item's comment sits on the `export`. Re-exports, which have no
 						// declaration, keep their source's comment.
 						'ExportNamedDeclaration[declaration]',
@@ -106,6 +126,20 @@ export default defineConfig(
 			// A blank line between the summary and the tags, as TSDoc's examples have, and none
 			// needed between tags.
 			'jsdoc/tag-lines': ['error', 'any', { startLines: 1 }]
+		}
+	},
+	{
+		// A component's own doc comment is an HTML comment starting `@component`, which editors
+		// show when hovering over the component where it's used.
+		files: ['**/*.svelte'],
+		rules: {
+			'no-restricted-syntax': [
+				'error',
+				{
+					selector: 'Program:not(:has(> SvelteHTMLComment[value=/^\\s*@component\\s/]))',
+					message: 'Start the component with a `<!-- @component -->` comment saying what it is.'
+				}
+			]
 		}
 	}
 );

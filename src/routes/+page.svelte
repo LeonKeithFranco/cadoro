@@ -1,3 +1,7 @@
+<!--
+  @component
+  The home page, a placeholder until the timer screen arrives.
+-->
 <svelte:head>
 	<title>Cadoro</title>
 </svelte:head>
