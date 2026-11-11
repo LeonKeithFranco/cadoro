@@ -16,7 +16,9 @@ Step 2 is done: the production build is installable and works offline. `@vite-pw
 
 Step 3 is done: when a new version is waiting, a card above the tab bar offers Reload and Later. It stays hidden while a run is in progress, and a tab that's mid-run when another tab reloads keeps going until its run ends. Component tests fake the plugin's `useRegisterSW`. A small server in `e2e/update-server.ts` serves the production build with a changed `sw.js` to browsers carrying a cookie, so a new `updates` Playwright project checks real updates, including two tabs.
 
-**Next:** step 4, `ci/pages-deploy`: deploying `main` to GitHub Pages with the `404.html` fallback, and releasing 0.1.0. It starts with planning its rounds. Milestone 6 also gains pinned timer controls for long routines, as planned in `docs/DECISIONS.md`.
+Before step 4, a `Taskfile.yml` for go-task took over the workflows that took several commands: setup, every CI check in order, flakiness repeats, a production preview, the phone over USB, ports, branches, worktrees, watching CI, reading its failures, and merging. Each task checks what it needs first, and branches and worktrees are only deleted once their commits are on `main`. The README lists the tasks.
+
+**Next:** step 4, `ci/pages-deploy`: deploying `main` to GitHub Pages with the `404.html` fallback, and releasing 0.1.0, with the release steps written as tasks. It starts with planning its rounds. Milestone 6 also gains pinned timer controls for long routines, as planned in `docs/DECISIONS.md`.
 
 **In progress:** Milestone 3, PWA and GitHub Pages:
 
