@@ -8,7 +8,7 @@ A self-hostable timer for focused work, built as a SvelteKit PWA. Routines are m
 
 - [`docs/SPEC.md`](docs/SPEC.md): what the app does
 - [`docs/PLAN.md`](docs/PLAN.md): the stack and the milestones
-- [`docs/DECISIONS.md`](docs/DECISIONS.md): every decision, with its reasons
+- [`docs/decisions/`](docs/decisions/): every decision, with its reasons, one file per milestone
 
 ## Stack
 
