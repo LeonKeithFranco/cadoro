@@ -1,0 +1,79 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+#
+# Workflows that would otherwise be typed by hand, one command at a time. Run `task` to list them,
+# or `go-task` where it's installed under that name, as on Fedora.
+#
+# Tasks call the npm scripts in package.json rather than repeating their commands. CI calls those
+# npm scripts itself, one step each, so it never needs go-task.
+
+version: '3'
+
+tasks:
+  default:
+    desc: List the tasks
+    silent: true
+    cmds:
+      # `TASK_EXE` is the name go-task was started with, `task` or `go-task`.
+      - '{{.TASK_EXE}} --list'
+
+  setup:
+    desc: Install the locked dependencies and Playwright's Chromium, in a fresh clone or worktree
+    cmds:
+      - npm ci
+      - npx playwright install chromium
+
+  check:
+    desc: Run every check CI runs, in the same order, stopping at the first failure
+    # The npm scripts after the CI image's check must match the steps of the `Checks` job in
+    # .github/workflows/pipeline.yml, cheapest first.
+    cmds:
+      - task: check:ci-image
+      - task: check:quick
+      - npm run build
+      - npm run test:e2e
+
+  check:quick:
+    desc: Run the checks that take seconds, leaving out the build and the Playwright tests
+    cmds:
+      - npm run lint
+      - npm run format:check
+      - npm run typecheck
+      - npm test
+
+  check:ci-image:
+    desc: Check that CI's Playwright image matches the Playwright version in the lockfile
+    vars:
+      LOCKED_VERSION:
+        sh: >-
+          node -p "require('./package-lock.json').packages['node_modules/@playwright/test'].version"
+      IMAGE_VERSION:
+        sh: >-
+          node -p "require('node:fs').readFileSync('.github/workflows/pipeline.yml', 'utf8')
+          .match(/playwright:v([0-9.]+)-/)[1]"
+    # The image's browsers are built for one Playwright version, so the two are bumped together.
+    preconditions:
+      - sh: '[ "{{.IMAGE_VERSION}}" = "{{.LOCKED_VERSION}}" ]'
+        msg: >-
+          CI's Playwright image is v{{.IMAGE_VERSION}}, but the lockfile has Playwright
+          {{.LOCKED_VERSION}}. Change the image's tag in .github/workflows/pipeline.yml to match.
+    cmds:
+      - echo "CI's Playwright image matches Playwright {{.LOCKED_VERSION}}."
+
+  fix:
+    desc: Format every file and fix what ESLint can, then list the files with changes
+    cmds:
+      # Runs last, even when ESLint finds something it can't fix, so the changes made so far still
+      # show. A `defer` only counts once go-task reaches it, so it comes first.
+      - defer: git status --short
+      - npm run format
+      - npm run lint -- --fix
+
+  audit:
+    desc: List known vulnerabilities in the packages the app ships, leaving out development tools
+    cmds:
+      - npm audit --omit=dev
+
+  clean:
+    desc: Delete the build and the test results, which the build and the tests make again
+    cmds:
+      - rm -rf build test-results playwright-report
