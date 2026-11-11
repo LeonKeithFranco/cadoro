@@ -13,3 +13,17 @@ export function percentOf(value: number, percent: number): number {
 	// once is rounded only once, so it's as exact as the result can be stored.
 	return (value * percent) / 100;
 }
+
+/**
+ * Works out what percentage one value is of another.
+ *
+ * @param part - The value to express as a percentage.
+ * @param whole - The value that counts as 100%. It mustn't be 0, since nothing is a percentage
+ * of 0.
+ * @returns `part` as a percentage of `whole`, such as `50` when it's half. It's over 100 when
+ * `part` is bigger than `whole`.
+ */
+export function asPercentOf(part: number, whole: number): number {
+	// Multiply before dividing, as in `percentOf`, so an exact result stays exact.
+	return (part * 100) / whole;
+}
