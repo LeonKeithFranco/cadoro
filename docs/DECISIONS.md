@@ -4,6 +4,39 @@ Changes to the spec, plan and design, newest day first, each with its reason and
 
 ## 2026-11-10
 
+**The service worker**
+
+- The service worker comes from `@vite-pwa/sveltekit`, the SvelteKit plugin from the same family as the weight tracker's `vite-plugin-pwa`, with Workbox writing the whole worker (`strategies: 'generateSW'`). Only its 2.x line supports SvelteKit 3, and 2.x is a rewrite first released on 2026-11-01, built on `@unplugin-pwa/core` 0.0.x, whose docs still describe 1.x. SvelteKit's own service worker support (`src/service-worker.ts` with `$app/manifest`), with about 40 lines of hand-written caching, was recommended for that reason and rejected in favour of Workbox's tried caching and the plugin's update prompt. The plugin was configured from its type definitions and its SvelteKit 3 example rather than its docs.
+- It's pinned to exactly `2.0.2`, rather than a caret range, while the rewrite is new.
+- `withPwa(kitConfig, pwaOptions)` replaces the `sveltekit()` call and runs SvelteKit's plugin itself.
+- `generateSW` needs `magicast`, which the plugin lists as an optional peer dependency, but the code that writes the worker imports it directly. It's a dev dependency.
+- The plugin always looks for prerendered pages, and the app prerenders none, so `globStrict: false` makes that empty pattern a warning rather than a failed build. The offline test catches a file the worker misses.
+- The fallback page is kept under the folder's own address, `./`, through `spa.fallbackMapping` and `navigateFallback`, rather than as `index.html`. SvelteKit's preview server returns 404 for `/cadoro/index.html`, and one file a worker can't fetch stops it installing. Every server, GitHub Pages included, answers the folder's address with the fallback page.
+- The plugin gets the absolute base path, such as `/cadoro/`. SvelteKit gives it a relative `./`, so it registered `./sw.js` with the scope `./`, which follow the page's address: opening a deeper screen first, such as milestone 8's activity log, would have looked for `/cadoro/settings/sw.js`. This also makes the manifest's `start_url` and `scope` absolute. The plugin's open issue #110 suggests the same.
+- `registerSW()` from `virtual:pwa-register` registers the worker in the root layout's `onMount`, because the plugin doesn't add a script to the HTML under SvelteKit. It does nothing on the dev server, so development never runs an old cached copy. Step 3 replaces it with the Svelte version and the reload prompt.
+- `registerType: 'prompt'` keeps a new version waiting until the user agrees to reload.
+- The manifest link and the icon links are in `app.html` with `%sveltekit.assets%`, which follows the base path. The plugin's example adds the manifest link with `{@html}` from `virtual:pwa-info`, which needs a lint exception.
+- The manifest's theme and background colours are `zinc-950`, the fixed dark theme's background, and `<meta name="theme-color">` colours the browser's bars to match.
+- Checked in the build output: the worker keeps every built file, the icons, the manifest and the fallback page, and answers every page address with the fallback page. Chromium's DevTools protocol reports the production build installable, with no manifest errors.
+
+**The app's icon**
+
+- The icon is Lucide's `timer` (ISC licence) in white on a rounded `rose-700` square, the light theme's Play button colours. Brighter `rose-600`, the dark Play button's `rose-400` with a near-black timer, and a `zinc-950` square with a `rose-400` timer were compared in screenshots at real sizes. The dark square nearly vanished on dark tab bars and home screens.
+- The timer is centred on a 32-unit square, so its farthest point is 35% of the width from the centre. That's inside the 40% radius Android never crops from a maskable icon.
+- `npm run generate-icons` makes every size from `static/favicon.svg` with `@vite-pwa/assets-generator`, configured as in the weight tracker. The maskable and Apple icons fill the whole square. The generated files are committed. The scaffold's Svelte logo is gone.
+- The icons' source and licence are in a new Credits section of the README, where milestone 5's chimes will go too.
+
+**The offline test**
+
+- `e2e/production/offline.spec.ts` opens the production build once, waits for an active service worker, goes offline, reloads, runs Play, then opens Stats from its link and Settings from its address. Turning off the navigation fallback failed the address step, while the reload of the folder's address still passed, because that address is kept as a file. Skipping registration failed the wait.
+- The wait is an `expect.poll` on the worker's state with its own message, so a missing worker fails in 5 seconds and says so, rather than hanging until the test times out.
+
+**Long routines and the timer's controls**
+
+- With enough blocks, Play, Next and Finish are pushed below the screen. The fix is planned for milestone 6, when routines long enough to show it can first be built. Both starter routines have one or two blocks.
+- The controls will be pinned at the bottom with `position: sticky`, above the phone's tab bar, so they look as they do now when everything fits. Moving them to the top was rejected, because scrolling to a later block would push them off the top instead. A bar that also shows the active time was rejected as more work, showing the time twice.
+- When the run moves to a block that's out of view, the page scrolls it into view with `scrollIntoView({ block: 'nearest' })`, which does nothing when every block fits, with a `scroll-margin` clearing the pinned controls. It moves only when the block changes, not every second. The user asked about a scrollable box around the blocks. Page scrolling was recommended instead, because a scroll area inside a scrolling page is awkward on phones.
+
 **Milestone 3's steps**
 
 - Milestone 3 has five steps, each with its own branch and pull request: the base path and a production build test (`build/base-path`), installable and offline (`feat/offline`), the reload prompt (`feat/update-prompt`), the Pages deploy as 0.1.0 (`ci/pages-deploy`), and the version in Settings as 0.1.1 (`feat/app-version`).
