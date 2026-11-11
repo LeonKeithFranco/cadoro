@@ -4,6 +4,27 @@ Changes to the spec, plan and design, newest day first, each with its reason and
 
 ## 2026-11-10
 
+**The reload prompt**
+
+- A new version waits for the run. The card is hidden while a run is in progress and shows once it ends, or before Play, since until milestone 4 saves runs a reload would throw the run away. Showing it at once and asking for confirmation on Reload during a run was rejected, as was showing it with Reload disabled. Either would interrupt focused work with something that can't be acted on yet.
+- It's a card at the bottom, as in the weight tracker: above the phone's tab bar, in the bottom-right corner from 48rem up, in the page's opposite colours, with Reload and Later. Reload uses the other theme's Play button colours, a pair already checked for contrast. A banner under the header, pushing the screen down, was rejected.
+- The browser only looks for a new version when the app opens or reloads. An hourly check while the app stays open, as the plugin's docs suggest, was offered and declined.
+- `UpdatePrompt` uses `useRegisterSW` from `virtual:pwa-register/svelte`, the plugin's Svelte helper, as step 2 expected. Its `needRefresh` is a Svelte store, read with `$needRefresh`. Wrapping the plain `registerSW` in a runes class was considered, but it's more code for the same thing. `app.d.ts` now loads the Svelte module's types in place of the plain one's.
+- The root layout renders the prompt with `runInProgress={timerSession.view.isInProgress}`, and the prompt registers the worker as it starts, in place of the layout's `onMount`.
+- When the new version takes over, the plugin reloads every tab the app has open, not only the one where Reload was pressed, which would throw away a run in another tab. So the prompt passes `onNeedReload`, which reloads only when no run is in progress. A tab that's mid-run remembers that the new version is in control, shows the card once its run ends, and its Reload then just reloads, as no version is left waiting.
+- `src/lib/page-reload.ts` holds a one-line `reloadPage()`, so component tests can replace it with `vi.mock`. Chromium doesn't let `location.reload` be replaced: assigning to it is silently ignored, and `Object.defineProperty` throws "Cannot redefine property", which was checked.
+
+**Testing updates**
+
+- The component tests fake `useRegisterSW` with real `writable` stores, which a test sets as the plugin would, and keep the options it was given, so a test can call `onNeedReload` itself.
+- The planned Playwright journey served a changed `sw.js` through `context.route()`, but Playwright's routing never sees the browser's own update check for the worker's script, which a spike showed. Relying on the component tests and step 5's check on Pages was offered as the alternative and rejected. `@vite-pwa/sveltekit` 2.x is a new rewrite, and only a real browser would catch a change in its update behaviour.
+- So `e2e/update-server.ts`, a small Node server, serves the production build at `/cadoro/` on port 4176, and adds a comment to the end of `sw.js` for a browser that sends a `version=next` cookie. Any change to the worker's bytes makes it a new version, so no second build is needed. Node 22.22 runs it straight from TypeScript. Playwright starts it as a third web server, after the production build's, and a fourth project, `updates`, runs `e2e/production/update.spec.ts` against it, which the `production` project ignores.
+- The version is chosen per browser context by the cookie, rather than by a switch on the server. A global switch made the copies of `--repeat-each`, which run side by side, flip it on each other.
+- A journey first reloads once after the worker installs. On a first visit the page isn't controlled by the worker, which doesn't claim open pages, so a new version activates at once rather than waiting.
+- The journeys check that the card shows before Play, goes during the run, and comes back after Finish, then that Reload hands over; that Later puts it off until the next load; and that with two tabs, Reload in one leaves the other's run going until it ends. Checking that the card stayed hidden while a run found the new version was dropped, because Workbox reports a waiting worker 200 ms after it installs, and the check passed before the card could appear even with the rule broken.
+- Breaking each rule on purpose failed the journey that guards it: the card ignoring the run, a tab mid-run reloading, and Reload ignoring a version already in control. A Reload that does nothing fails after 5 seconds, as `expect` would, rather than at the test's 30-second timeout. The production and update journeys passed 60 runs at ten repeats each.
+- The offline test's wait for an active worker moved to `e2e/service-worker.ts`, which both use.
+
 **The service worker**
 
 - The service worker comes from `@vite-pwa/sveltekit`, the SvelteKit plugin from the same family as the weight tracker's `vite-plugin-pwa`, with Workbox writing the whole worker (`strategies: 'generateSW'`). Only its 2.x line supports SvelteKit 3, and 2.x is a rewrite first released on 2026-11-01, built on `@unplugin-pwa/core` 0.0.x, whose docs still describe 1.x. SvelteKit's own service worker support (`src/service-worker.ts` with `$app/manifest`), with about 40 lines of hand-written caching, was recommended for that reason and rejected in favour of Workbox's tried caching and the plugin's update prompt. The plugin was configured from its type definitions and its SvelteKit 3 example rather than its docs.
