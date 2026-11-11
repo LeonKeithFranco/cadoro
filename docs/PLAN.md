@@ -88,7 +88,7 @@ The app goes online and becomes installable, as version 0.1.0.
 - Take the base path from a build environment variable, so one codebase serves from `/cadoro/` and from `/`
 - Deploy to GitHub Pages from `pipeline.yml` after `Checks` passes on `main`, with the fallback page as `404.html`
 - Add a Playwright project that builds for production at `/cadoro/` and checks offline use
-- Show the version in the app, add the release steps to the README, and release 0.1.0
+- Add the release steps to the README and release 0.1.0, then show the version in Settings and release it as 0.2.0
 - Check install, offline use and updates on your desktop and phone
 
 **Learn:** SvelteKit's `paths.base` and building links that follow it, how `@vite-pwa/sveltekit` fits SvelteKit's build, semantic versioning in the 0.x range
