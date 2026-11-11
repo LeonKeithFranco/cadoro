@@ -12,6 +12,7 @@
 		"build": "vite build",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
+		"dependencies": "svelte-kit sync",
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"test:e2e": "playwright test",
