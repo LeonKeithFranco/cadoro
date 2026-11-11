@@ -1,4 +1,4 @@
-import { page } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { createStarterRoutines } from '../routine';
@@ -34,6 +34,21 @@ function createSession(): TimerSession {
 function elapse(durationMs: number): void {
 	nowMs += durationMs;
 	vi.advanceTimersToNextTimer();
+}
+
+/**
+ * Presses Finish, then confirms it in the dialog that asks, as a user ending a run does.
+ *
+ * @remarks
+ * The confirmation's own Finish button is found inside the dialog, since the screen's Finish
+ * button behind it has the same name.
+ */
+async function finishRun(): Promise<void> {
+	await page.getByRole('button', { name: 'Finish' }).click();
+	await page
+		.getByRole('dialog', { name: 'Finish this run?' })
+		.getByRole('button', { name: 'Finish' })
+		.click();
 }
 
 beforeEach(() => {
@@ -241,19 +256,71 @@ describe('running a routine from the Timer screen', () => {
 			.not.toHaveAttribute('aria-current');
 	});
 
-	it('shows the run summary after Finish, and stops ticking', async () => {
+	it('asks before Finish ends the run, and keeps counting while it asks', async () => {
+		render(TimerScreen, { session: createSession() });
+		await page.getByRole('button', { name: 'Play' }).click();
+		elapse(minutes(4));
+
+		await page.getByRole('button', { name: 'Finish' }).click();
+		elapse(minutes(1));
+
+		await expect.element(page.getByRole('dialog', { name: 'Finish this run?' })).toBeVisible();
+		await expect.element(page.getByRole('dialog', { name: 'Run summary' })).not.toBeInTheDocument();
+		await expect
+			.element(page.getByRole('group', { name: 'Work' }))
+			.toHaveTextContent('5:00 / 25:00');
+	});
+
+	it('keeps the run going, as if Finish had not been pressed, when the user cancels', async () => {
+		render(TimerScreen, { session: createSession() });
+		await page.getByRole('button', { name: 'Play' }).click();
+		elapse(minutes(4));
+		await page.getByRole('button', { name: 'Finish' }).click();
+
+		await page.getByRole('button', { name: 'Cancel' }).click();
+		elapse(minutes(1));
+
+		await expect.element(page.getByRole('dialog')).not.toBeInTheDocument();
+		await expect.element(page.getByRole('button', { name: 'Pause' })).toBeVisible();
+		await expect
+			.element(page.getByRole('group', { name: 'Work' }))
+			.toHaveTextContent('5:00 / 25:00');
+	});
+
+	it('keeps the run going when the user presses Escape at the question', async () => {
+		render(TimerScreen, { session: createSession() });
+		await page.getByRole('button', { name: 'Play' }).click();
+		elapse(minutes(4));
+		await page.getByRole('button', { name: 'Finish' }).click();
+		await expect.element(page.getByRole('dialog', { name: 'Finish this run?' })).toBeVisible();
+
+		await userEvent.keyboard('{Escape}');
+
+		await expect.element(page.getByRole('dialog')).not.toBeInTheDocument();
+		await expect.element(page.getByRole('button', { name: 'Pause' })).toBeVisible();
+	});
+
+	it('ends the run when Finish is confirmed, counting the time spent deciding, and shows its summary', async () => {
 		render(TimerScreen, { session: createSession() });
 		await page.getByRole('combobox', { name: 'Routine' }).selectOptions('Classic with long break');
 		await page.getByRole('button', { name: 'Play' }).click();
 		elapse(minutes(7));
-
 		await page.getByRole('button', { name: 'Finish' }).click();
+		elapse(minutes(1));
 
+		await page
+			.getByRole('dialog', { name: 'Finish this run?' })
+			.getByRole('button', { name: 'Finish' })
+			.click();
+
+		await expect
+			.element(page.getByRole('dialog', { name: 'Finish this run?' }))
+			.not.toBeInTheDocument();
 		const summary = page.getByRole('dialog', { name: 'Run summary' });
 		await expect.element(summary).toBeVisible();
 		await expect.element(summary.getByText('Classic with long break')).toBeVisible();
 		expect(shownTotals(summary)).toEqual([
-			['Total work time', '7:00'],
+			['Total work time', '8:00'],
 			['Work periods completed', '1'],
 			['Rounds reached', '1'],
 			['Total overtime', '0:00']
@@ -284,7 +351,7 @@ describe('running a routine from the Timer screen', () => {
 		const screen = render(TimerScreen, { session });
 		await page.getByRole('button', { name: 'Play' }).click();
 		elapse(minutes(3));
-		await page.getByRole('button', { name: 'Finish' }).click();
+		await finishRun();
 		await expect.element(page.getByRole('dialog', { name: 'Run summary' })).toBeVisible();
 
 		screen.unmount();
@@ -298,7 +365,7 @@ describe('running a routine from the Timer screen', () => {
 		await page.getByRole('combobox', { name: 'Routine' }).selectOptions('Classic with long break');
 		await page.getByRole('button', { name: 'Play' }).click();
 		elapse(minutes(7));
-		await page.getByRole('button', { name: 'Finish' }).click();
+		await finishRun();
 
 		await page.getByRole('button', { name: 'Done' }).click();
 

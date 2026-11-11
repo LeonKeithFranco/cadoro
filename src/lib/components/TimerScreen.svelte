@@ -2,7 +2,8 @@
   @component
   The Timer screen: the routine picker, where the run is in the routine, a card for each of the
   routine's blocks, and the buttons that run it. While a timer is counting, the screen updates
-  every second. Leaving the screen pauses the run, so time spent on another screen isn't counted.
+  every second. Finish asks first, and a run that ends shows its summary. Leaving the screen
+  pauses the run, so time spent on another screen isn't counted.
 -->
 <script module lang="ts">
 	import { MS_PER_SECOND } from '../time';
@@ -16,6 +17,7 @@
 	import { viewBlock } from '../block-view';
 	import type { TimerSession } from '../timer.svelte';
 	import BlockCard from './BlockCard.svelte';
+	import FinishConfirmation from './FinishConfirmation.svelte';
 	import RoutinePicker from './RoutinePicker.svelte';
 	import RunSummary from './RunSummary.svelte';
 	import ScreenHeading from './ScreenHeading.svelte';
@@ -49,6 +51,16 @@
 
 	// SvelteKit removes the screen when another one opens, and the session outlives it.
 	onDestroy(() => session.pause());
+
+	// Whether Finish is waiting for the user to confirm. It belongs to this screen rather than the
+	// session, so leaving the screen drops the question, while the run itself is kept.
+	let isConfirmingFinish = $state(false);
+
+	/** Ends the run once the user confirms Finish, at the moment they confirm. */
+	function confirmFinish(): void {
+		session.finish();
+		isConfirmingFinish = false;
+	}
 
 	/** Presses Play or Pause, whichever the button shows. */
 	function playOrPause(): void {
@@ -88,9 +100,14 @@
 		isInProgress={session.view.isInProgress}
 		onplaypause={playOrPause}
 		onnext={() => session.next()}
-		onfinish={() => session.finish()}
+		onfinish={() => (isConfirmingFinish = true)}
 	/>
 </div>
+
+<!-- The run keeps counting behind the question, so Cancel changes nothing. -->
+{#if isConfirmingFinish}
+	<FinishConfirmation onconfirm={confirmFinish} oncancel={() => (isConfirmingFinish = false)} />
+{/if}
 
 <!-- Shown for as long as the run has ended, so it opens whenever a run ends, by Finish or by its
      last work period, and is still there after a trip to another screen. Closing it readies a new
