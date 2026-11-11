@@ -176,6 +176,7 @@ Done or Escape closes the dialog and returns the routine to its starting state, 
 - If the app is closed, reloaded, or stopped by the phone mid-run, reopening it restores the run, paused at the last heartbeat. Time after that doesn't count as work.
 - While the app stays open in a background tab, the timer keeps running and stays accurate.
 - Opening another screen in the app, such as Stats, pauses the run, work or break, and Play resumes it on the way back. Switching screens counts as stepping away, unlike a background tab.
+- With the app open in several tabs, or installed and in a browser tab too, every tab shows the same run. A press in one shows in the others, and each work period is recorded once.
 
 ### Alerts
 
@@ -298,8 +299,7 @@ The app is a single-page app, and each screen has its own URL. Navigation is a b
 
 ## Deployment
 
-- The source lives in the public GitHub repo `cadoro`, under the MIT license. It was renamed from `pomodoro` before the first deploy, because the Pages address and installed copies follow the repo's name.
-- Every change reaches `main` through a pull request, from the very first one.
+- The source lives in the public GitHub repo `cadoro`, under the MIT license.
 - GitHub Actions runs checks on every push and pull request.
 - The build's base path comes from an environment variable, so the same code serves from `/cadoro/` on GitHub Pages and from `/` when self-hosted.
 - Versions follow semantic versioning from the first deploy, which is 0.1.0. Every merged pull request that changes the app bumps the version and is tagged and released. 1.0.0 is the release that completes this spec.
