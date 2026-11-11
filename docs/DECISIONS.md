@@ -4,6 +4,33 @@ Changes to the spec, plan and design, newest day first, each with its reason and
 
 ## 2026-11-10
 
+**The Finish confirmation**
+
+- The run keeps counting while Finish asks "Finish this run?". Confirming ends it at that moment, so the seconds spent deciding count as work, as the spec's "saved up to that moment" says. Cancel and Escape leave the run exactly as if Finish hadn't been pressed. Pausing while asking was rejected, because Cancel would then leave the run paused, a hidden change the user didn't ask for. Ending the run at the moment Finish was first pressed was rejected as a time the screen never showed.
+- Cancel comes before Finish, so `showModal()` focuses it and a stray Enter keeps the run going.
+- Whether the question is open is the Timer screen's own `$state`, not the session's, because it's about the screen rather than the run. Leaving the screen drops the question and pauses the run, as leaving always does.
+
+**The run summary**
+
+- The summary is headed "Run summary", names the routine under the heading, and lists the four totals as labels and values in a `<dl>`, with one Done button. A heading that says how the run ended, such as "Routine complete" or "Run finished", was rejected as a distinction the totals don't need. Leaving out the routine's name was rejected, because the summary should say what was run.
+- Escape closes it like Done, readying a new run. The screen shows it for as long as the session holds an ended run, so it opens however the run ends, by Finish or a finite routine's last work period, and is still there after a visit to another screen.
+- `TimerSession.finish()` keeps the ended run, and a new `readyNewRun()` replaces it once the summary closes. `readyNewRun()` does nothing during a run, so a stray call can't throw away work in progress.
+
+**Dialogs**
+
+- Both dialogs are native `<dialog>` elements opened with `showModal()`, built on one small `ModalDialog` component. It takes the content as `children`, the buttons as an `actions` snippet laid out in a row, and reports Escape through `onclose`. It has no flags or modes.
+- A dialog opens as soon as it mounts, through an `{@attach}` attachment, since `showModal()` needs the element in the document. The screen shows each dialog inside an `{#if}` and closes it by removing it. An `open` prop kept in step with the element by an `$effect` was rejected as two copies of the same state that could drift apart.
+- Tailwind's base styles set every margin to 0, which removes the browser's `margin: auto` that centres a modal dialog, so the dialog has `m-auto`. It leaves a 1rem gutter on each side of a phone and is at most 24rem (`max-w-sm`) wide.
+- In dark, the dialog is `zinc-800` with a `zinc-700` border, a step lighter than the `zinc-900` cards behind it. Screenshots showed a `zinc-900` dialog's edge blending into the cards. A darker backdrop was considered instead, but a lighter surface is how dark themes usually show something raised. Its text stays above 5:1.
+- The colours of the main button and the outlined ones moved to `button-colours.ts`, so the timer's controls and the dialogs share them. Tailwind still builds class names kept in a `.ts` file, because it scans every source file, which was checked in the built CSS.
+
+**Playwright on a controlled clock**
+
+- The journeys that run the timer open the app on Playwright's fake clock with `openOnPausedClock` in `e2e/clock.ts`. The clock is installed before the page loads and paused once it has loaded, as Playwright's docs advise, so nothing waits forever on a stopped timer while loading. Tests then move it with `fastForward`, which fires each due timer at most once. One tick is enough, since every time comes from timestamps. `runFor`, which fires every tick on the way, wasn't needed.
+- On a paused clock, SvelteKit never follows a link. Before navigating, it waits for the browser to repaint, with `requestAnimationFrame` then `setTimeout`, or a 100 ms `setTimeout` at most, and the fake clock fakes both. `followLink` clicks a link and runs the clock for those 100 ms. A run counting meanwhile gains 100 ms, which whole seconds don't show.
+- A new journey runs Classic with long break through overtime, a break, the next cycle, a cancelled and a confirmed Finish, and the summary's exact totals. The pause-on-leave journey now checks exact times, and its summary shows the 10 minutes away weren't counted. Both passed 40 runs in a row, across the desktop and phone projects.
+- A finite routine ending on its own is checked in component tests with a one-round routine, since both starter routines repeat forever.
+
 **The dev server's port**
 
 - The dev server and Playwright take their port from `PORT`, defaulting to Vite's 5173, through one shared `dev-server.ts`. Vite's `strictPort` makes the server fail on a busy port rather than move to the next free one. Before this, Playwright silently reused a dev server already on 5173 from another git worktree, and a second server quietly moved to 5174. Checking it showed exactly that: a stand-in server moved to 5174 and Playwright tested it. A second worktree now runs its commands with its own port, such as `PORT=5174 npm run test:e2e`. Turning off `reuseExistingServer` was rejected, because it would also refuse the worktree's own dev server while you're using it.
