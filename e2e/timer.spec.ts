@@ -26,6 +26,10 @@ test('a run pauses when the user leaves the Timer screen, and Finish ends it', a
 
 	await test.step('Finish ends the run, and closing its summary readies a new one', async () => {
 		await page.getByRole('button', { name: 'Finish' }).click();
+		await page
+			.getByRole('dialog', { name: 'Finish this run?' })
+			.getByRole('button', { name: 'Finish' })
+			.click();
 		await expect(page.getByRole('dialog', { name: 'Run summary' })).toBeVisible();
 		await page.getByRole('button', { name: 'Done' }).click();
 
