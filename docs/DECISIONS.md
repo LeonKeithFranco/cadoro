@@ -2,6 +2,26 @@
 
 Changes to the spec, plan and design, newest day first, each with its reason and often the options that were rejected.
 
+## 2026-11-11
+
+**0.1.0 on real devices**
+
+- [v0.1.0](https://github.com/LeonKeithFranco/cadoro/releases/tag/v0.1.0) was released from `main`'s commit `9d53654`, once its run had deployed. Both of `release:publish`'s refusals left over from step 4, a version already tagged and `main` behind GitHub, were seen for real.
+- The user installed it from Pages on the desktop and on the phone, and it worked offline on both.
+
+**The version in Settings**
+
+- Settings shows a muted "Version 0.2.0" line under its placeholder, in the placeholder's colours, smaller and spaced off, as the user chose when the step was planned.
+- The version comes from `package.json` through Vite's `define`, as in the weight tracker: `vite.config.ts` imports the file and replaces every `__APP_VERSION__` with the version as a quoted string, and `app.d.ts` declares the name for TypeScript inside `declare global`. SvelteKit's own `version` from `$app/environment` was rejected. It's a build id, the build's timestamp by default, and `@vite-pwa/sveltekit` hashes it, through `_app/version.json`, as the kept fallback page's revision, which was read in its source. Set to the release number, a build whose page changed without a version bump would keep the old page offline, pointing at script files the new worker has deleted.
+- The component test renders the Settings page and expects the version read from `package.json` itself, so it doesn't take its expected value from the `define` it checks, and stays right after every bump. Removing the line failed it.
+- A dev server started before the config change kept the old `define`, so the page threw on `__APP_VERSION__` and Playwright, reusing it, failed the Settings journeys. The tests passed on a fresh server. A config change like this needs the dev server restarted.
+
+**0.2.0**
+
+- The step is released as 0.2.0, where the plan said 0.1.1. Semantic versioning makes a new feature a minor bump, as the README's release steps say.
+- The README's status line no longer names a version, so it doesn't need changing at every release.
+- Milestone 3's last check is the user's: the installed 0.1.0 should offer to reload once 0.2.0 is live, and then show 0.2.0 in Settings. If it doesn't, the fix is its own pull request.
+
 ## 2026-11-10
 
 **The Pages deploy**
