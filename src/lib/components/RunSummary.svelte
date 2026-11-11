@@ -6,6 +6,7 @@
 <script lang="ts">
 	import type { RunSummary } from '../run';
 	import { formatElapsed } from '../time';
+	import { PRIMARY_BUTTON_COLOURS } from './button-colours';
 	import ModalDialog from './ModalDialog.svelte';
 
 	/** The props the run summary takes. */
@@ -38,13 +39,7 @@
 		{@render total('Rounds reached', summary.roundsReached)}
 		{@render total('Total overtime', formatElapsed(summary.overtimeMs))}
 	</dl>
-	<div class="mt-6 flex justify-end">
-		<button
-			type="button"
-			onclick={ondone}
-			class="rounded-lg bg-rose-700 px-6 py-2 font-medium text-white hover:bg-rose-800 dark:bg-rose-400 dark:text-zinc-950 dark:hover:bg-rose-300"
-		>
-			Done
-		</button>
-	</div>
+	{#snippet actions()}
+		<button type="button" onclick={ondone} class={PRIMARY_BUTTON_COLOURS}>Done</button>
+	{/snippet}
 </ModalDialog>

@@ -14,11 +14,13 @@
 		title: string;
 		/** Called when the browser closes the dialog, as it does on Escape. */
 		onclose: () => void;
-		/** What the dialog shows under its heading, including its buttons. */
+		/** What the dialog shows under its heading. */
 		children: Snippet;
+		/** The dialog's buttons, laid out in a row at its foot, the main one last. */
+		actions: Snippet;
 	};
 
-	let { title, onclose, children }: Props = $props();
+	let { title, onclose, children, actions }: Props = $props();
 
 	const titleId = $props.id();
 
@@ -48,4 +50,9 @@
 >
 	<h2 id={titleId} class="text-lg font-semibold">{title}</h2>
 	{@render children()}
+	<!-- The `*:` classes give every button the same shape, and each dialog gives them their
+	     colours. -->
+	<div class="mt-6 flex justify-end gap-3 *:rounded-lg *:px-6 *:py-2 *:font-medium">
+		{@render actions()}
+	</div>
 </dialog>
