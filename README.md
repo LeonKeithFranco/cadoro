@@ -2,7 +2,7 @@
 
 A self-hostable timer for focused work, built as a SvelteKit PWA. Routines are made of blocks; work counts up past its target, and each break is earned as a percentage of the time worked. Data stays in the browser, and there's no backend.
 
-**Status:** in development. There's no usable app yet. [`docs/PROGRESS.md`](docs/PROGRESS.md) has the current state.
+**Status:** in development. Version 0.1.0 runs the two starter routines, installs as an app and works offline, at **[leonkeithfranco.github.io/cadoro](https://leonkeithfranco.github.io/cadoro/)**. Nothing is saved yet. [`docs/PROGRESS.md`](docs/PROGRESS.md) has the current state.
 
 ## Docs
 
@@ -77,6 +77,18 @@ BASE_PATH=/cadoro npm run build
 | `task release:publish`                        | Tags `main` with the version and publishes the release, once `main`'s CI/CD run has passed      |
 
 Each task checks what it needs before doing anything, such as a free port or no uncommitted work, and says what's wrong if it can't go ahead.
+
+## Releasing
+
+Every push to `main` that passes the checks deploys the app to GitHub Pages. So every pull request that changes the app bumps the version once, and its merged commit is tagged and released. A pull request that only changes docs or tests doesn't, since it deploys the same app.
+
+Versions follow [semantic versioning](https://semver.org/). Until 1.0.0, a new feature bumps the minor number and anything else, such as a fix or a dependency update, the patch number. From 1.0.0, a change that stops old data or backups working bumps the major number.
+
+1. On the pull request's branch, once its other commits are in, bump the version, such as `task release:bump LEVEL=minor`. It commits `package.json` and `package-lock.json` as `chore(release): 0.2.0`.
+2. Merge the pull request once its checks pass, with `task ci:watch` then `task pr:merge`.
+3. Wait for the `CI/CD` run on `main` to pass and deploy, with `task ci:watch-main`. If it fails, fix it in a new pull request without bumping the version again, since that version never went live, and release the fix's merged commit instead.
+4. Check the live site with `task pages:check`.
+5. Tag `main` and publish the release with `task release:publish`. It refuses unless `main`'s run for that commit passed and the version isn't tagged yet, so every tag names code that passed its checks and is live.
 
 ## Credits
 
