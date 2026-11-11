@@ -25,6 +25,18 @@ const productionUrl = `http://localhost:${PRODUCTION_PORT}${PRODUCTION_BASE_PATH
 /** Which tests run against the production build rather than the dev server. */
 const PRODUCTION_TESTS = 'production/**';
 
+/**
+ * The update server's port, beside the production build's. It serves the same build, and serves a
+ * new version of its service worker to a test that asks for one.
+ */
+const UPDATE_PORT = 4176;
+
+/** The update server's address, with the same base path as the production build's. */
+const updateUrl = `http://localhost:${UPDATE_PORT}${PRODUCTION_BASE_PATH}/`;
+
+/** The production tests that find a new version, which need the update server. */
+const UPDATE_TESTS = 'production/update.spec.ts';
+
 /** How `npm run test:e2e` runs the Playwright tests in `e2e/`, locally and in CI. */
 export default defineConfig({
 	testDir: './e2e',
@@ -47,7 +59,13 @@ export default defineConfig({
 		{
 			name: 'production',
 			testMatch: PRODUCTION_TESTS,
+			testIgnore: UPDATE_TESTS,
 			use: { ...devices['Desktop Chrome'], baseURL: productionUrl }
+		},
+		{
+			name: 'updates',
+			testMatch: UPDATE_TESTS,
+			use: { ...devices['Desktop Chrome'], baseURL: updateUrl }
 		}
 	],
 	webServer: [
@@ -65,6 +83,14 @@ export default defineConfig({
 			env: { BASE_PATH: PRODUCTION_BASE_PATH },
 			url: productionUrl,
 			// Never reused, because a server left running could be serving an older build.
+			reuseExistingServer: false
+		},
+		{
+			// Serves the build the server above makes. Until it exists, its address answers with an
+			// error, and Playwright keeps waiting.
+			command: `node e2e/update-server.ts ${UPDATE_PORT} ${PRODUCTION_BASE_PATH}`,
+			url: updateUrl,
+			// Never reused, because a server left running could be serving a newer version.
 			reuseExistingServer: false
 		}
 	]
