@@ -16,6 +16,17 @@ vars:
   # The dev server's port, from `PORT` as dev-server.ts reads it, or Vite's 5173.
   DEV_PORT:
     sh: echo "${PORT:-5173}"
+  # A branch name as the git rules want it: a Conventional Commits type, a slash, then words in
+  # lower case joined by hyphens, optionally starting with an issue number.
+  BRANCH_PATTERN: ^(feat|fix|docs|style|refactor|perf|test|build|ci|ops|chore|revert)/[a-z0-9]+(-[a-z0-9]+)*$
+  # The main checkout, which every worktree shares, found from inside any of them.
+  MAIN_CHECKOUT:
+    sh: dirname "$(git rev-parse --path-format=absolute --git-common-dir)"
+  # Worktrees sit beside the repo, in `../<repo>-worktrees/`.
+  WORKTREES_FOLDER: '{{dir .MAIN_CHECKOUT}}/{{base .MAIN_CHECKOUT}}-worktrees'
+  # Git-ignored files a worktree needs copied from the main checkout: Claude's and the editors'
+  # local settings.
+  LOCAL_SETTINGS: .claude .zed .vscode CLAUDE.local.md
 
 tasks:
   default:
@@ -152,3 +163,113 @@ tasks:
         cmd: |
           listener="$(ss -Hltnp "sport = :{{.ITEM}}")"
           echo "{{.ITEM}}: ${listener:-free}"
+
+  branch:new:
+    desc: Start a branch named BRANCH, such as feat/run-history, from the latest main
+    requires:
+      vars: [BRANCH]
+    preconditions:
+      - sh: '[[ "{{.BRANCH}}" =~ {{.BRANCH_PATTERN}} ]]'
+        msg: >-
+          "{{.BRANCH}}" isn't a type and a short description, such as feat/run-history or
+          fix/123-break-rounding. The types are those of Conventional Commits.
+      # Uncommitted changes would come along to the new branch.
+      - sh: '[ -z "$(git status --porcelain)" ]'
+        msg: >-
+          This branch has uncommitted changes. Leave them here and start the other work in a
+          worktree, with `task worktree:new`.
+    cmds:
+      - git fetch origin
+      # Without --no-track, the new branch would treat origin/main as its upstream, and a plain
+      # `git push` would push to main.
+      - git switch --no-track -c {{.BRANCH}} origin/main
+
+  branch:delete:
+    desc: Delete the local branch BRANCH, once all its commits are on main
+    requires:
+      vars: [BRANCH]
+    preconditions:
+      - sh: '[ "$(git branch --show-current)" != "{{.BRANCH}}" ]'
+        msg: You're on {{.BRANCH}}. Switch to main first.
+    cmds:
+      - task: branch:check-merged
+        vars: { BRANCH: '{{.BRANCH}}' }
+      # Forced, because `-d` only knows about merges, and branch:check-merged has already found
+      # every commit on main, whichever way it got there.
+      - git branch -D {{.BRANCH}}
+
+  branch:check-merged:
+    desc: Fail unless every commit on BRANCH is on main, merged as it is or by a rebase merge
+    internal: true
+    requires:
+      vars: [BRANCH]
+    preconditions:
+      - sh: git show-ref --verify --quiet refs/heads/{{.BRANCH}}
+        msg: There's no local branch called {{.BRANCH}}.
+    cmds:
+      - git fetch --quiet origin
+      # A branch merged as it is sits inside main's history. A rebase merge gives its commits new
+      # hashes, so `git cherry` compares their changes instead, marking with + each commit whose
+      # change isn't on main.
+      - silent: true
+        cmd: |
+          if git merge-base --is-ancestor {{.BRANCH}} origin/main; then
+            exit 0
+          fi
+          unmerged="$(git cherry origin/main {{.BRANCH}} | sed -n 's/^+ //p')"
+          if [ -n "$unmerged" ]; then
+            echo "{{.BRANCH}} has commits that aren't on main, so it's kept:" >&2
+            git log --oneline --no-walk $unmerged >&2
+            exit 1
+          fi
+
+  worktree:new:
+    desc: Make a worktree called NAME beside the repo, on a new branch BRANCH from main or BASE, and set it up
+    requires:
+      vars: [NAME, BRANCH]
+    vars:
+      BASE: '{{.BASE | default "origin/main"}}'
+      FOLDER: '{{.WORKTREES_FOLDER}}/{{.NAME}}'
+    preconditions:
+      - sh: '[[ "{{.BRANCH}}" =~ {{.BRANCH_PATTERN}} ]]'
+        msg: >-
+          "{{.BRANCH}}" isn't a type and a short description, such as feat/run-history or
+          fix/123-break-rounding. The types are those of Conventional Commits.
+      - sh: '[ ! -e "{{.FOLDER}}" ]'
+        msg: '{{.FOLDER}} already exists.'
+    cmds:
+      - git fetch origin
+      # Always with -b, since without it git names the branch after the folder.
+      - git worktree add --no-track -b {{.BRANCH}} "{{.FOLDER}}" {{.BASE}}
+      - for: { var: LOCAL_SETTINGS }
+        cmd: '[ ! -e "{{.MAIN_CHECKOUT}}/{{.ITEM}}" ] || cp -r "{{.MAIN_CHECKOUT}}/{{.ITEM}}" "{{.FOLDER}}/"'
+      # The worktree's own Taskfile, which may differ from this one on another branch.
+      - '{{.TASK_EXE}} --dir "{{.FOLDER}}" setup'
+      - >-
+        echo "Ready in {{.FOLDER}}. Give its dev server its own port, such as PORT=5174 npm run dev
+        and PORT=5174 task check, and run end-to-end tests in one worktree at a time."
+
+  worktree:done:
+    desc: Remove the worktree called NAME and delete its branch, once its work is committed and on main
+    requires:
+      vars: [NAME]
+    vars:
+      FOLDER: '{{.WORKTREES_FOLDER}}/{{.NAME}}'
+      BRANCH:
+        sh: git -C "{{.FOLDER}}" branch --show-current 2>/dev/null || true
+    preconditions:
+      - sh: '[ -d "{{.FOLDER}}" ]'
+        msg: There's no worktree at {{.FOLDER}}.
+      - sh: '[ -z "$(git -C "{{.FOLDER}}" status --porcelain)" ]'
+        msg: >-
+          {{.FOLDER}} has uncommitted changes, so it's kept. Commit them, or decide what to do with
+          them, first.
+    cmds:
+      # Checked before removing anything, so unmerged work is never left without its worktree.
+      - task: branch:check-merged
+        vars: { BRANCH: '{{.BRANCH}}' }
+      - git worktree remove "{{.FOLDER}}"
+      - git branch -D {{.BRANCH}}
+      - git worktree prune --dry-run --verbose
+      - git worktree prune
+      - git worktree list -v
