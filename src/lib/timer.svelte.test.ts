@@ -1,20 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createStarterRoutines } from './routine';
 import { minutes, seconds } from './testing/durations';
+import { numberedIds } from './testing/ids';
 import { TimerSession } from './timer.svelte';
-
-/**
- * Makes an id generator that numbers its ids, so each routine and block gets a different one.
- *
- * @returns A function giving `id-1`, then `id-2`, and so on.
- */
-function numberedIds(): () => string {
-	let count = 0;
-	return () => {
-		count += 1;
-		return `id-${count}`;
-	};
-}
 
 /** The starter routines, Classic then Classic with long break, with predictable ids. */
 const routines = createStarterRoutines(new Date(0), numberedIds());
