@@ -273,6 +273,10 @@ type LogEntry = {
 - Installable on phone and desktop.
 - Works fully offline after the first load.
 - Shows a prompt to reload when a new version is available. It never reloads on its own during a run.
+  - The prompt is a card reading "A new version is ready.", with Reload and Later. It floats above the phone's tab bar, and sits in the bottom-right corner on wider screens, in the page's opposite colours.
+  - The card stays hidden while a run is in progress, and shows once the run ends, or before Play. Reload hands over to the new version and reloads the page. Later hides the card, and the new version takes over the next time the app opens.
+  - The browser looks for a new version whenever the app opens or reloads. The app doesn't check again while it stays open.
+  - With the app open in several tabs, Reload in one reloads every tab that isn't mid-run. A tab that's mid-run carries on, and offers to reload once its run ends.
 - Requires HTTPS, except on `localhost`.
 
 ### Persistent storage
