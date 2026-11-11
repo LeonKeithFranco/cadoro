@@ -1,2 +1,8 @@
 @import 'tailwindcss';
 @plugin '@tailwindcss/forms';
+
+/*
+ * `dark:` classes follow the app's theme setting, held in `data-theme` on <html>, rather than
+ * Tailwind's default of following the system's colour scheme.
+ */
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
