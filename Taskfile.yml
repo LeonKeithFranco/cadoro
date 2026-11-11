@@ -8,6 +8,15 @@
 
 version: '3'
 
+vars:
+  # The folder GitHub Pages serves the app from, as the production Playwright tests use it.
+  PAGES_BASE_PATH: /cadoro
+  # A production preview's port, clear of the dev server's 5173 and the tests' 4175 and 4176.
+  PREVIEW_PORT: 4199
+  # The dev server's port, from `PORT` as dev-server.ts reads it, or Vite's 5173.
+  DEV_PORT:
+    sh: echo "${PORT:-5173}"
+
 tasks:
   default:
     desc: List the tasks
@@ -77,3 +86,69 @@ tasks:
     desc: Delete the build and the test results, which the build and the tests make again
     cmds:
       - rm -rf build test-results playwright-report
+
+  e2e:repeat:
+    desc: Run the Playwright tests TIMES times (10 by default) to catch flaky ones, passing on anything after --
+    summary: |
+      Runs the Playwright tests TIMES times over, side by side, to catch a test that only
+      sometimes fails. Anything after `--` goes to Playwright, such as a project or a test's name:
+
+        task e2e:repeat -- --project updates
+        task e2e:repeat TIMES=40 -- -g "another tab"
+    vars:
+      TIMES: '{{.TIMES | default 10}}'
+    cmds:
+      - npm run test:e2e -- --repeat-each {{.TIMES}} {{.CLI_ARGS}}
+
+  e2e:report:
+    desc: Open the report of the last Playwright run, with the traces of any failed tests
+    preconditions:
+      - sh: '[ -d playwright-report ]'
+        msg: There's no report yet. Run the Playwright tests first, such as with `task check`.
+    cmds:
+      - npx playwright show-report
+
+  preview:production:
+    desc: Build the app as GitHub Pages serves it, under /cadoro, and serve it on PORT (4199 by default)
+    vars:
+      PORT: '{{.PORT | default .PREVIEW_PORT}}'
+    env:
+      BASE_PATH: '{{.PAGES_BASE_PATH}}'
+    preconditions:
+      # Checked before building, rather than leaving Vite to find out after the build.
+      - sh: '[ -z "$(ss -Hltn "sport = :{{.PORT}}")" ]'
+        msg: Port {{.PORT}} is in use. Run `task ports` to see by what, or pick another with PORT=….
+    cmds:
+      - npm run build
+      - npm run preview -- --port {{.PORT}} --strictPort
+
+  dev:phone:
+    desc: Run the dev server for the phone connected over USB, which opens it at localhost
+    summary: |
+      Forwards the dev server's port from the phone to this computer with `adb reverse`, then
+      starts the dev server. The phone opens http://localhost:{{.DEV_PORT}}, which browsers treat
+      as secure, as they do a site served over HTTPS. Needs USB debugging on in the phone's
+      developer options.
+    preconditions:
+      - sh: '[ "$(adb get-state 2>/dev/null)" = device ]'
+        msg: >-
+          No phone found over USB. Connect it with USB debugging on, accept the prompt on the
+          phone, and check that `adb devices` lists it.
+    cmds:
+      - adb reverse tcp:{{.DEV_PORT}} tcp:{{.DEV_PORT}}
+      - npm run dev
+
+  ports:
+    desc: Show what's listening on each of the project's ports, and which are free
+    summary: |
+      5173 is the dev server (or PORT), 4175 the production build the Playwright tests use, 4176
+      the update tests' server, and 4199 a production preview. The test ports are set in
+      playwright.config.ts.
+    vars:
+      PROJECT_PORTS: '{{.DEV_PORT}} 4175 4176 {{.PREVIEW_PORT}}'
+    silent: true
+    cmds:
+      - for: { var: PROJECT_PORTS }
+        cmd: |
+          listener="$(ss -Hltnp "sport = :{{.ITEM}}")"
+          echo "{{.ITEM}}: ${listener:-free}"
