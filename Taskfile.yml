@@ -280,10 +280,25 @@ tasks:
 
   ci:watch:
     desc: Watch the checks on this branch's pull request until they finish, failing if one fails
+    vars:
+      # How long to wait for GitHub to start the checks after a push.
+      CHECKS_START_SECONDS: 60
     preconditions:
       - sh: gh pr view --json number > /dev/null 2>&1
         msg: This branch has no pull request yet. Push it and open one first.
     cmds:
+      # Right after a push, GitHub takes a few seconds to start the checks, and until then
+      # `--watch` stops at once with "no checks reported" rather than waiting.
+      - silent: true
+        cmd: |
+          for second in $(seq {{.CHECKS_START_SECONDS}}); do
+            if ! gh pr checks 2>&1 | grep -q "no checks reported"; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "GitHub didn't start the checks within {{.CHECKS_START_SECONDS}} seconds." >&2
+          exit 1
       - gh pr checks --watch --fail-fast
 
   ci:logs:
