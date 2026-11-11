@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { waitForActiveWorker } from '../service-worker.ts';
 
 test('after one visit, the app opens and runs with no connection', async ({ page }) => {
 	const navigation = page.getByRole('navigation', { name: 'Screens' });
@@ -7,18 +8,7 @@ test('after one visit, the app opens and runs with no connection', async ({ page
 	await test.step('the first visit installs the service worker', async () => {
 		await page.goto('');
 		await expect(page.getByRole('heading', { level: 1, name: 'Timer' })).toBeVisible();
-
-		// A service worker only becomes active once every file it keeps is cached.
-		await expect
-			.poll(
-				() =>
-					page.evaluate(async () => {
-						const registration = await navigator.serviceWorker.getRegistration();
-						return registration?.active?.state;
-					}),
-				{ message: 'a service worker becomes active' }
-			)
-			.toBe('activated');
+		await waitForActiveWorker(page);
 	});
 
 	await test.step('offline, a reload opens the app and Play counts', async () => {
