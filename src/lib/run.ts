@@ -414,6 +414,8 @@ export type BreakView = ControlsView & {
 	readonly block: number;
 	/** Where the run is: the work period this break follows. */
 	readonly label: string;
+	/** The time worked in the work period this break follows, in milliseconds. */
+	readonly workedMs: number;
 	/** The whole break earned, in whole seconds, as milliseconds. */
 	readonly earnedMs: number;
 	/** The break left, in milliseconds. */
@@ -489,10 +491,13 @@ export function viewRun(run: RunState, now: number): RunView {
 		case 'break': {
 			const isOver = isBreakOver(run, now);
 			const isPaused = run.runningSince === null;
+			// A break's ended periods always end with the one it follows.
+			const followedPeriod = run.endedPeriods[run.endedPeriods.length - 1];
 			return {
 				status: 'break',
 				block: run.position.block,
 				label: positionLabel(run.plan, run.position),
+				workedMs: followedPeriod.workedMs,
 				earnedMs: run.earnedMs,
 				remainingMs: breakRemainingMs(run, now),
 				isOver,

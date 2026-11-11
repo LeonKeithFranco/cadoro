@@ -517,13 +517,14 @@ describe('viewRun', () => {
 		});
 	});
 
-	it('shows a break counting down, on the block it follows', () => {
+	it('shows a break counting down, on the block it follows, with the time that earned it', () => {
 		const onBreak = next(workingAt({ round: 0, block: 1, cycle: 0 }), 25 * 60_000);
 
 		expect(viewRun(onBreak, 30 * 60_000)).toEqual({
 			status: 'break',
 			block: 1,
 			label: 'Round 1 · Block 2 of 2',
+			workedMs: 25 * 60_000,
 			earnedMs: 15 * 60_000,
 			remainingMs: 10 * 60_000,
 			isOver: false,
