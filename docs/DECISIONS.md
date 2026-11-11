@@ -18,6 +18,36 @@ Changes to the spec, plan and design, newest day first, each with its reason and
 - The run will live in a shared `TimerSession` class in `src/lib/timer.svelte.ts`, rather than in the Timer page, which SvelteKit removes when another screen opens. Leaving the Timer screen pauses the run, work or break, and Play resumes it. This is new to the spec: switching screens inside the app counts as stepping away, unlike a background tab, where the timer keeps running. A reload still loses the run until milestone 4 saves it.
 - Until step 4 adds its confirmation and the run summary, Finish ends the run at once and the screen returns to ready. Disabling Finish until then was rejected, because a reload would be the only way to stop a run.
 - The active box has a rose outline. Past the target, the work box's outline and time turn amber and its label reads "Work · Overtime", so the change isn't shown by colour alone. Filling the box with solid rose was rejected as the same colour as normal.
+- The blocks stack in one column on every screen size, in run order, so the screen reads top to bottom as the run goes. Cards side by side on wide screens were tried and felt wrong, because the order the run takes stopped being plain.
+- Each box has its label on the left, its time on the right, lined up on their baseline, and a progress bar below. This is new to the spec. The work bar fills towards the target and stays full, in amber, in overtime. The break bar shows the break left out of the break earned. Idle boxes have empty bars, and a work box kept during its break keeps its bar as it was. The bars are hidden from screen readers, which read the times.
+- Each box is a `role="group"` named by its label, so a screen reader says "Work" or "Break earned" before the time, and tests find boxes by role and name. Each card is a `<section>` named by its title, which makes it a region.
+- The routine picker is disabled during a run, rather than hidden, so the screen keeps its layout and still shows which routine is running.
+- `ScreenHeading` gives every screen its `<h1>` and tab title from one prop, so the two can't drift apart.
+- The colours were checked against WCAG in both themes: every text pair is at least 5:1, against the 4.5:1 minimum, and every outline and bar at least 3.8:1, against 3:1.
+- Play, Next and Finish sit in a row of three equal buttons below the blocks, with Play filled in rose and the other two outlined. Play reads Pause, with its icon, while a timer is counting. Screenshots showed them clear of the phone's tab bar, so fixing them above it wasn't needed for now.
+
+**The cycle counter**
+
+- A block of two or more cycles shows its cycle across from its title, such as "Cycle 2 / 3", as a box's target sits across from its label. The user asked for it during the controls round, as the cycle belongs to the block. Putting it in the summary line under the title was rejected as easy to miss, and it would mix a live count with the block's settings.
+- The counter always matches the position label. It first showed "Cycle 0 / 3" before Play, zeroed like the idle boxes, but that disagreed with the label's "Cycle 1 of 3", which says where the run will start. So the ready view now carries the block and cycle the run will start at, and the first block counts from there. Blocks the run isn't in still show cycle 0, and the label never mentions them, so nothing disagrees.
+- A block of one cycle shows no counter, as the label leaves out any part whose total is 1. Showing "Cycle 1 / 1" for the same shape on every card was rejected as a counter that never moves.
+- The position label keeps its cycle part, so it stays a one-line summary of the whole position. Dropping it to avoid showing the cycle twice was rejected.
+
+**The live timer**
+
+- The screen ticks with a `setInterval` in an `$effect` that runs only while a timer is counting. The effect reads a `$derived` `isRunning` rather than the view, because the view changes every tick and would restart the interval each second, while a derived value only notifies when its value changes. The interval only redraws: every time still comes from timestamps, so a late tick can't make the time wrong.
+- Leaving the screen pauses the run through `onDestroy`, because SvelteKit removes the Timer page when another screen opens, while the session outlives it.
+
+**Svelte state and classes**
+
+- `TimerSession` keeps its state in JavaScript's `#` private fields rather than TypeScript's `private`. This breaks from Google's TypeScript style guide, which says not to use `#private` fields, because its reason, the code they compile to for older browsers, doesn't apply to Vite's modern target. `#` is also enforced at runtime, where `private` only exists in the type checker.
+- The run is held in `$state.raw`, not `$state`, because the engine's runs are immutable values replaced whole. Deep `$state` would wrap each run in a proxy for changes that never happen.
+- The starter routines' ids come from `() => crypto.randomUUID()`, not `crypto.randomUUID` passed as it is, because the method called away from `crypto` loses its `this` and throws "Illegal invocation" in browsers, which was confirmed in Chromium.
+
+**Testing the timer**
+
+- The screen's component tests fake only `setInterval` and `clearInterval` with `vi.useFakeTimers({ toFake: [...] })`, which works in Vitest's browser mode. A test fires the screen's tick itself, the session reads the test's own clock, and `vi.getTimerCount()` proves the interval was cleared. Faking `Date` too wasn't needed, because the session already takes its clock as a parameter, and faking only the interval leaves the test runner's own waiting on real timers.
+- One Playwright journey checks the real app: Play counts up, opening Stats and coming back finds the run paused and kept, and Finish readies a new run. It waits for one real second rather than faking the clock, which comes with step 4's journeys. It checks that the run wasn't reset rather than its exact time, which depends on real timing, and passed ten runs in a row.
 
 **Durations in tests**
 
@@ -57,7 +87,7 @@ Changes to the spec, plan and design, newest day first, each with its reason and
 
 **Routines and the position label**
 
-- The position label leaves out any part whose total is 1, because it never changes during a run. Classic shows just "Round 5" rather than "Round 5 · Block 1 of 1 · Cycle 1 of 1", which matches the spec's own "Round 5" example. A routine's label keeps the same parts for the whole run, since its totals don't change mid-run. Showing all three parts on every routine was rejected as noise, and always showing the round was rejected because a one-round routine's "Round 1 of 1" never changes either. A routine of one round, one block and one cycle has an empty label.
+- The position label leaves out any part whose total is 1, because it never changes during a run. Classic shows just "Round 5" rather than "Round 5 · Block 1 of 1 · Cycle 1 of 1", which matches the spec's own "Round 5" example. The round and block parts stay for the whole run, since their totals don't change mid-run. The cycle part follows the current block's cycles, so it's left out on a block of one cycle, such as the Long break in Classic with long break, which shows "Round 1 · Block 2 of 2". This sentence first said every part stayed for the whole run, which the timer screen's tests showed wasn't so. Showing all three parts on every routine was rejected as noise, and always showing the round was rejected because a one-round routine's "Round 1 of 1" never changes either. A routine of one round, one block and one cycle has an empty label.
 - A routine with one block has 1 cycle, because with one block cycles and rounds do the same job: 3 cycles of 2 rounds is the same run as 6 rounds, and an infinite routine's cycles mean nothing. The editor shows the field disabled at 1 with a hint, rather than hiding it, so the form keeps its layout and says why. Deleting blocks down to one resets the remaining block's cycles to 1, and rounds stay as they were. Folding the cycles into rounds, to keep the run the same length, was rejected because it changes a field the user didn't touch. The run engine still handles any number of cycles, and validation enforces the rule in the editor and on import.
 
 **The run engine**
