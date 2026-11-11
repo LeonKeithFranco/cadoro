@@ -22,6 +22,36 @@ import {
 } from './run';
 
 /**
+ * Converts whole seconds to milliseconds, the unit every time in the engine is in.
+ *
+ * @param count - The number of seconds.
+ * @returns The same length of time in milliseconds.
+ */
+function seconds(count: number): number {
+	return count * 1_000;
+}
+
+/**
+ * Converts whole minutes to milliseconds.
+ *
+ * @param count - The number of minutes.
+ * @returns The same length of time in milliseconds.
+ */
+function minutes(count: number): number {
+	return seconds(count * 60);
+}
+
+/**
+ * Converts whole hours to milliseconds.
+ *
+ * @param count - The number of hours.
+ * @returns The same length of time in milliseconds.
+ */
+function hours(count: number): number {
+	return minutes(count * 60);
+}
+
+/**
  * Builds a routine plan with blocks that differ only in their number of cycles, which is all
  * that decides the order of a run.
  *
@@ -132,9 +162,14 @@ describe('workedMs', () => {
 
 describe('earnedBreakMs', () => {
 	it.each<[rule: string, worked: number, breakPercent: number, earned: number]>([
-		['earns 5 minutes for 25 minutes at 20%', 25 * 60_000, 20, 5 * 60_000],
-		['earns 15 minutes for 25 minutes at 60%', 25 * 60_000, 60, 15 * 60_000],
-		['earns from the time worked, past the target', 31 * 60_000 + 40_000, 20, 6 * 60_000 + 20_000],
+		['earns 5 minutes for 25 minutes at 20%', minutes(25), 20, minutes(5)],
+		['earns 15 minutes for 25 minutes at 60%', minutes(25), 60, minutes(15)],
+		[
+			'earns from the time worked, past the target',
+			minutes(31) + seconds(40),
+			20,
+			minutes(6) + seconds(20)
+		],
 		['rounds an exact half second up', 2_500, 20, 1_000],
 		['rounds just below a half second down', 2_499, 20, 0],
 		['earns no break for a few seconds of work', 1_000, 20, 0],
@@ -146,7 +181,7 @@ describe('earnedBreakMs', () => {
 			15_000
 		],
 		['gives the time worked, rounded, at 100%', 61_500, 100, 62_000],
-		['has no cap', 4 * 3_600_000, 100, 4 * 3_600_000]
+		['has no cap', hours(4), 100, hours(4)]
 	])('%s', (_rule, worked, breakPercent, earned) => {
 		expect(earnedBreakMs(worked, breakPercent)).toBe(earned);
 	});
@@ -260,33 +295,33 @@ describe('play', () => {
 	});
 
 	it('resumes a paused break with the time it had left', () => {
-		const onBreak = next(play(createRun(plan('infinite', 1)), 0), 25 * 60_000);
-		const paused = pause(onBreak, 27 * 60_000);
+		const onBreak = next(play(createRun(plan('infinite', 1)), 0), minutes(25));
+		const paused = pause(onBreak, minutes(27));
 
-		const resumed = inStatus(play(paused, 37 * 60_000), 'break');
+		const resumed = inStatus(play(paused, minutes(37)), 'break');
 
-		expect(breakRemainingMs(resumed, 38 * 60_000)).toBe(2 * 60_000);
+		expect(breakRemainingMs(resumed, minutes(38))).toBe(minutes(2));
 	});
 
 	it('starts the next work period once the break is over', () => {
-		const onBreak = next(play(createRun(plan('infinite', 1)), 0), 25 * 60_000);
+		const onBreak = next(play(createRun(plan('infinite', 1)), 0), minutes(25));
 
-		expect(play(onBreak, 31 * 60_000)).toMatchObject({
+		expect(play(onBreak, minutes(31))).toMatchObject({
 			status: 'working',
 			position: { round: 1, block: 0, cycle: 0 },
 			segments: [],
-			runningSince: 31 * 60_000
+			runningSince: minutes(31)
 		});
 	});
 
 	it('leaves running work, a running break and an ended run as they were', () => {
 		const working = play(createRun(plan('infinite', 1)), 0);
-		const onBreak = next(working, 25 * 60_000);
-		const ended = next(play(createRun(plan(1, 1)), 0), 25 * 60_000);
+		const onBreak = next(working, minutes(25));
+		const ended = next(play(createRun(plan(1, 1)), 0), minutes(25));
 
 		expect(play(working, 5_000)).toBe(working);
-		expect(play(onBreak, 26 * 60_000)).toBe(onBreak);
-		expect(play(ended, 30 * 60_000)).toBe(ended);
+		expect(play(onBreak, minutes(26))).toBe(onBreak);
+		expect(play(ended, minutes(30))).toBe(ended);
 	});
 });
 
@@ -302,21 +337,21 @@ describe('pause', () => {
 	});
 
 	it('keeps the time a paused break had left, however long the pause', () => {
-		const onBreak = next(play(createRun(plan('infinite', 1)), 0), 25 * 60_000);
+		const onBreak = next(play(createRun(plan('infinite', 1)), 0), minutes(25));
 
-		const paused = inStatus(pause(onBreak, 27 * 60_000), 'break');
+		const paused = inStatus(pause(onBreak, minutes(27)), 'break');
 
-		expect(breakRemainingMs(paused, 27 * 60_000)).toBe(3 * 60_000);
-		expect(breakRemainingMs(paused, 90 * 60_000)).toBe(3 * 60_000);
+		expect(breakRemainingMs(paused, minutes(27))).toBe(minutes(3));
+		expect(breakRemainingMs(paused, minutes(90))).toBe(minutes(3));
 	});
 
 	it('leaves paused work, a break that is over and a run not yet started as they were', () => {
 		const ready = createRun(plan('infinite', 1));
 		const paused = pause(play(ready, 0), 10_000);
-		const onBreak = next(play(ready, 0), 25 * 60_000);
+		const onBreak = next(play(ready, 0), minutes(25));
 
 		expect(pause(paused, 20_000)).toBe(paused);
-		expect(pause(onBreak, 31 * 60_000)).toBe(onBreak);
+		expect(pause(onBreak, minutes(31))).toBe(onBreak);
 		expect(pause(ready, 0)).toBe(ready);
 	});
 });
@@ -326,54 +361,54 @@ describe('next', () => {
 		const routine = plan('infinite', 1);
 		const working = play(createRun(routine), 0);
 
-		expect(next(working, 25 * 60_000)).toEqual({
+		expect(next(working, minutes(25))).toEqual({
 			status: 'break',
 			plan: routine,
 			endedPeriods: [
 				{
 					position: firstPosition,
 					targetMinutes: 25,
-					segments: [{ start: 0, end: 25 * 60_000 }],
-					workedMs: 25 * 60_000
+					segments: [{ start: 0, end: minutes(25) }],
+					workedMs: minutes(25)
 				}
 			],
 			position: firstPosition,
 			nextWorkPosition: { round: 1, block: 0, cycle: 0 },
-			earnedMs: 5 * 60_000,
-			remainingMs: 5 * 60_000,
-			runningSince: 25 * 60_000
+			earnedMs: minutes(5),
+			remainingMs: minutes(5),
+			runningSince: minutes(25)
 		});
 	});
 
 	it('earns the break from the time worked, leaving out paused time', () => {
-		const working = play(pause(play(createRun(plan('infinite', 1)), 0), 10 * 60_000), 20 * 60_000);
+		const working = play(pause(play(createRun(plan('infinite', 1)), 0), minutes(10)), minutes(20));
 
-		expect(next(working, 30 * 60_000)).toMatchObject({ status: 'break', earnedMs: 4 * 60_000 });
+		expect(next(working, minutes(30))).toMatchObject({ status: 'break', earnedMs: minutes(4) });
 	});
 
 	it("earns each break at the percentage of the block just worked, across a block's end", () => {
-		const lastShortCycle = next(workingAt({ round: 0, block: 0, cycle: 2 }), 25 * 60_000);
-		const longBreakCycle = next(workingAt({ round: 0, block: 1, cycle: 0 }), 25 * 60_000);
+		const lastShortCycle = next(workingAt({ round: 0, block: 0, cycle: 2 }), minutes(25));
+		const longBreakCycle = next(workingAt({ round: 0, block: 1, cycle: 0 }), minutes(25));
 
 		expect(lastShortCycle).toMatchObject({
 			status: 'break',
-			earnedMs: 5 * 60_000,
+			earnedMs: minutes(5),
 			nextWorkPosition: { round: 0, block: 1, cycle: 0 }
 		});
 		expect(longBreakCycle).toMatchObject({
 			status: 'break',
-			earnedMs: 15 * 60_000,
+			earnedMs: minutes(15),
 			nextWorkPosition: { round: 1, block: 0, cycle: 0 }
 		});
 	});
 
 	it('ends a break early and starts the next work period, losing the time left', () => {
-		const onBreak = next(play(createRun(plan('infinite', 1)), 0), 25 * 60_000);
+		const onBreak = next(play(createRun(plan('infinite', 1)), 0), minutes(25));
 
-		expect(next(onBreak, 26 * 60_000)).toMatchObject({
+		expect(next(onBreak, minutes(26))).toMatchObject({
 			status: 'working',
 			position: { round: 1, block: 0, cycle: 0 },
-			runningSince: 26 * 60_000
+			runningSince: minutes(26)
 		});
 	});
 
@@ -385,10 +420,10 @@ describe('next', () => {
 	});
 
 	it("completes a finite routine at its last work period, without that period's break", () => {
-		const firstBreak = next(play(createRun(plan(1, 2)), 0), 25 * 60_000);
-		const lastWork = next(firstBreak, 30 * 60_000);
+		const firstBreak = next(play(createRun(plan(1, 2)), 0), minutes(25));
+		const lastWork = next(firstBreak, minutes(30));
 
-		const ended = inStatus(next(lastWork, 55 * 60_000), 'ended');
+		const ended = inStatus(next(lastWork, minutes(55)), 'ended');
 
 		expect(ended.outcome).toBe('completed');
 		expect(ended.endedPeriods.map((period) => period.position)).toEqual([
@@ -399,20 +434,20 @@ describe('next', () => {
 
 	it('leaves a run not yet started, and an ended run, as they were', () => {
 		const ready = createRun(plan(1, 1));
-		const ended = next(play(ready, 0), 25 * 60_000);
+		const ended = next(play(ready, 0), minutes(25));
 
 		expect(next(ready, 0)).toBe(ready);
-		expect(next(ended, 30 * 60_000)).toBe(ended);
+		expect(next(ended, minutes(30))).toBe(ended);
 	});
 });
 
 describe('breakRemainingMs', () => {
 	it('counts down while the break runs, and stops at 0', () => {
-		const onBreak = inStatus(next(play(createRun(plan('infinite', 1)), 0), 25 * 60_000), 'break');
+		const onBreak = inStatus(next(play(createRun(plan('infinite', 1)), 0), minutes(25)), 'break');
 
-		expect(breakRemainingMs(onBreak, 25 * 60_000)).toBe(5 * 60_000);
-		expect(breakRemainingMs(onBreak, 28 * 60_000)).toBe(2 * 60_000);
-		expect(breakRemainingMs(onBreak, 40 * 60_000)).toBe(0);
+		expect(breakRemainingMs(onBreak, minutes(25))).toBe(minutes(5));
+		expect(breakRemainingMs(onBreak, minutes(28))).toBe(minutes(2));
+		expect(breakRemainingMs(onBreak, minutes(40))).toBe(0);
 	});
 });
 
@@ -421,15 +456,15 @@ describe('finish', () => {
 		const routine = plan('infinite', 1);
 		const working = play(createRun(routine), 0);
 
-		expect(finish(working, 10 * 60_000)).toEqual({
+		expect(finish(working, minutes(10))).toEqual({
 			status: 'ended',
 			plan: routine,
 			endedPeriods: [
 				{
 					position: firstPosition,
 					targetMinutes: 25,
-					segments: [{ start: 0, end: 10 * 60_000 }],
-					workedMs: 10 * 60_000
+					segments: [{ start: 0, end: minutes(10) }],
+					workedMs: minutes(10)
 				}
 			],
 			outcome: 'finished'
@@ -437,12 +472,12 @@ describe('finish', () => {
 	});
 
 	it('saves paused work without its paused time', () => {
-		const paused = pause(play(createRun(plan('infinite', 1)), 0), 5 * 60_000);
+		const paused = pause(play(createRun(plan('infinite', 1)), 0), minutes(5));
 
-		const ended = inStatus(finish(paused, 20 * 60_000), 'ended');
+		const ended = inStatus(finish(paused, minutes(20)), 'ended');
 
-		expect(ended.endedPeriods[0].segments).toEqual([{ start: 0, end: 5 * 60_000 }]);
-		expect(ended.endedPeriods[0].workedMs).toBe(5 * 60_000);
+		expect(ended.endedPeriods[0].segments).toEqual([{ start: 0, end: minutes(5) }]);
+		expect(ended.endedPeriods[0].workedMs).toBe(minutes(5));
 	});
 
 	it('saves a work period of only a few seconds', () => {
@@ -452,20 +487,20 @@ describe('finish', () => {
 	});
 
 	it('drops a break in progress, keeping the work periods already ended', () => {
-		const onBreak = next(play(createRun(plan('infinite', 1)), 0), 25 * 60_000);
+		const onBreak = next(play(createRun(plan('infinite', 1)), 0), minutes(25));
 
-		const ended = inStatus(finish(onBreak, 27 * 60_000), 'ended');
+		const ended = inStatus(finish(onBreak, minutes(27)), 'ended');
 
 		expect(ended.outcome).toBe('finished');
-		expect(ended.endedPeriods.map((period) => period.workedMs)).toEqual([25 * 60_000]);
+		expect(ended.endedPeriods.map((period) => period.workedMs)).toEqual([minutes(25)]);
 	});
 
 	it('leaves a run not yet started, and an ended run, as they were', () => {
 		const ready = createRun(plan('infinite', 1));
-		const ended = finish(play(ready, 0), 10 * 60_000);
+		const ended = finish(play(ready, 0), minutes(10));
 
 		expect(finish(ready, 0)).toBe(ready);
-		expect(finish(ended, 20 * 60_000)).toBe(ended);
+		expect(finish(ended, minutes(20))).toBe(ended);
 	});
 });
 
@@ -482,14 +517,14 @@ describe('viewRun', () => {
 	it('shows a work period counting up, with its target and the break earned so far', () => {
 		const working = workingAt({ round: 0, block: 0, cycle: 1 });
 
-		expect(viewRun(working, 10 * 60_000)).toEqual({
+		expect(viewRun(working, minutes(10))).toEqual({
 			status: 'working',
 			block: 0,
 			label: 'Round 1 · Block 1 of 2 · Cycle 2 of 3',
-			workedMs: 10 * 60_000,
-			targetMs: 25 * 60_000,
+			workedMs: minutes(10),
+			targetMs: minutes(25),
 			isOvertime: false,
-			breakEarnedMs: 2 * 60_000,
+			breakEarnedMs: minutes(2),
 			isRunning: true,
 			isInProgress: true
 		});
@@ -498,35 +533,35 @@ describe('viewRun', () => {
 	it('shows overtime from the moment work reaches its target, while it keeps counting', () => {
 		const working = workingAt(firstPosition);
 
-		expect(viewRun(working, 25 * 60_000 - 1)).toMatchObject({ isOvertime: false });
-		expect(viewRun(working, 25 * 60_000)).toMatchObject({ isOvertime: true });
-		expect(viewRun(working, 31 * 60_000 + 40_000)).toMatchObject({
-			workedMs: 31 * 60_000 + 40_000,
+		expect(viewRun(working, minutes(25) - 1)).toMatchObject({ isOvertime: false });
+		expect(viewRun(working, minutes(25))).toMatchObject({ isOvertime: true });
+		expect(viewRun(working, minutes(31) + seconds(40))).toMatchObject({
+			workedMs: minutes(31) + seconds(40),
 			isOvertime: true,
-			breakEarnedMs: 6 * 60_000 + 20_000
+			breakEarnedMs: minutes(6) + seconds(20)
 		});
 	});
 
 	it('shows paused work as not running, with Next and Finish still available', () => {
-		const paused = pause(workingAt(firstPosition), 10 * 60_000);
+		const paused = pause(workingAt(firstPosition), minutes(10));
 
-		expect(viewRun(paused, 20 * 60_000)).toMatchObject({
-			workedMs: 10 * 60_000,
+		expect(viewRun(paused, minutes(20))).toMatchObject({
+			workedMs: minutes(10),
 			isRunning: false,
 			isInProgress: true
 		});
 	});
 
 	it('shows a break counting down, on the block it follows, with the time that earned it', () => {
-		const onBreak = next(workingAt({ round: 0, block: 1, cycle: 0 }), 25 * 60_000);
+		const onBreak = next(workingAt({ round: 0, block: 1, cycle: 0 }), minutes(25));
 
-		expect(viewRun(onBreak, 30 * 60_000)).toEqual({
+		expect(viewRun(onBreak, minutes(30))).toEqual({
 			status: 'break',
 			block: 1,
 			label: 'Round 1 · Block 2 of 2',
-			workedMs: 25 * 60_000,
-			earnedMs: 15 * 60_000,
-			remainingMs: 10 * 60_000,
+			workedMs: minutes(25),
+			earnedMs: minutes(15),
+			remainingMs: minutes(10),
 			isOver: false,
 			isRunning: true,
 			isInProgress: true
@@ -534,9 +569,9 @@ describe('viewRun', () => {
 	});
 
 	it('shows a break at 0:00 as over and not running, waiting for Play', () => {
-		const onBreak = next(workingAt(firstPosition), 25 * 60_000);
+		const onBreak = next(workingAt(firstPosition), minutes(25));
 
-		expect(viewRun(onBreak, 40 * 60_000)).toMatchObject({
+		expect(viewRun(onBreak, minutes(40))).toMatchObject({
 			remainingMs: 0,
 			isOver: true,
 			isRunning: false
@@ -544,19 +579,19 @@ describe('viewRun', () => {
 	});
 
 	it('shows a paused break as not running', () => {
-		const paused = pause(next(workingAt(firstPosition), 25 * 60_000), 27 * 60_000);
+		const paused = pause(next(workingAt(firstPosition), minutes(25)), minutes(27));
 
-		expect(viewRun(paused, 35 * 60_000)).toMatchObject({
-			remainingMs: 3 * 60_000,
+		expect(viewRun(paused, minutes(35))).toMatchObject({
+			remainingMs: minutes(3),
 			isOver: false,
 			isRunning: false
 		});
 	});
 
 	it('shows the summary once the run has ended, with Next and Finish no longer available', () => {
-		const ended = inStatus(finish(workingAt(firstPosition), 10 * 60_000), 'ended');
+		const ended = inStatus(finish(workingAt(firstPosition), minutes(10)), 'ended');
 
-		expect(viewRun(ended, 15 * 60_000)).toEqual({
+		expect(viewRun(ended, minutes(15))).toEqual({
 			status: 'ended',
 			summary: summarizeRun(ended),
 			isRunning: false,
@@ -567,15 +602,15 @@ describe('viewRun', () => {
 
 describe('summarizeRun', () => {
 	it('adds up the work, the work periods, the rounds reached and the overtime', () => {
-		const firstBreak = next(play(createRun(plan('infinite', 1)), 0), 31 * 60_000);
-		const secondWork = next(firstBreak, 37 * 60_000);
-		const ended = inStatus(finish(secondWork, 47 * 60_000), 'ended');
+		const firstBreak = next(play(createRun(plan('infinite', 1)), 0), minutes(31));
+		const secondWork = next(firstBreak, minutes(37));
+		const ended = inStatus(finish(secondWork, minutes(47)), 'ended');
 
 		expect(summarizeRun(ended)).toEqual({
-			totalWorkMs: 41 * 60_000,
+			totalWorkMs: minutes(41),
 			periodsCompleted: 2,
 			roundsReached: 2,
-			overtimeMs: 6 * 60_000
+			overtimeMs: minutes(6)
 		});
 	});
 
