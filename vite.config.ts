@@ -24,6 +24,13 @@ export default defineConfig({
 				}
 			},
 
+			// The folder the app is served from, such as `/cadoro` on GitHub Pages, or the site's root
+			// when `BASE_PATH` isn't set. SvelteKit puts it in front of every link built with
+			// `resolve()` and every file it loads, and stops with an error unless it starts with `/`
+			// and doesn't end with one. That check is why the variable's plain `string` can be
+			// asserted to the type SvelteKit expects.
+			paths: { base: (process.env.BASE_PATH ?? '') as '' | `/${string}` },
+
 			// Builds plain static files into `build/`, for GitHub Pages and self-hosting. Nothing is
 			// prerendered, so the fallback page starts the app for every route, and the client-side
 			// router then shows the right screen.
