@@ -28,16 +28,18 @@ const breakEarnedBox: TimerBoxView = {
  * Makes a card's view for the Focus block, written by hand because the card only lays out what
  * it's given. `viewBlock`'s own tests cover what it's given.
  *
- * @param boxes - The boxes to show, in place of a work box at 12:30 and the break earned.
+ * @param changes - What to show in place of the second of three cycles, a work box at 12:30 and
+ * the break earned.
  * @returns The block's view.
  */
-function focusBlock(boxes: Partial<Pick<BlockView, 'work' | 'break'>> = {}): BlockView {
+function focusBlock(changes: Partial<Pick<BlockView, 'cycle' | 'work' | 'break'>> = {}): BlockView {
 	return {
 		title: 'Focus',
 		summary: '25 min · 20% break',
+		cycle: 'Cycle 2 / 3',
 		work: workingBox,
 		break: breakEarnedBox,
-		...boxes
+		...changes
 	};
 }
 
@@ -48,6 +50,21 @@ describe('a block card', () => {
 		const card = page.getByRole('region', { name: 'Focus' });
 		await expect.element(card.getByRole('heading', { level: 2, name: 'Focus' })).toBeVisible();
 		await expect.element(card.getByText('25 min · 20% break')).toBeVisible();
+	});
+
+	it('shows the cycle the run is on', async () => {
+		render(BlockCard, { block: focusBlock() });
+
+		await expect
+			.element(page.getByRole('region', { name: 'Focus' }).getByText('Cycle 2 / 3'))
+			.toBeVisible();
+	});
+
+	it('shows no cycle counter for a block of one cycle', async () => {
+		render(BlockCard, { block: focusBlock({ cycle: null }) });
+
+		await expect.element(page.getByRole('heading', { name: 'Focus' })).toBeVisible();
+		await expect.element(page.getByText(/Cycle/)).not.toBeInTheDocument();
 	});
 
 	it('shows the work box with its target, and the break box below it', async () => {

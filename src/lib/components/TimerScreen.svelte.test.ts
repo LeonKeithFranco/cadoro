@@ -78,6 +78,22 @@ describe('the Timer screen', () => {
 		expect(cardNames).toEqual(['Focus', 'Long break']);
 	});
 
+	it("shows the same cycle on the block's card as in the position, before and during the run", async () => {
+		render(TimerScreen, { session: createSession() });
+		await page.getByRole('combobox', { name: 'Routine' }).selectOptions('Classic with long break');
+		const focusCard = page.getByRole('region', { name: 'Focus' });
+
+		await expect.element(page.getByText('Round 1 · Block 1 of 2 · Cycle 1 of 3')).toBeVisible();
+		await expect.element(focusCard.getByText('Cycle 1 / 3')).toBeVisible();
+
+		await page.getByRole('button', { name: 'Play' }).click();
+		await page.getByRole('button', { name: 'Next' }).click();
+		await page.getByRole('button', { name: 'Next' }).click();
+
+		await expect.element(page.getByText('Round 1 · Block 1 of 2 · Cycle 2 of 3')).toBeVisible();
+		await expect.element(focusCard.getByText('Cycle 2 / 3')).toBeVisible();
+	});
+
 	it('follows the run as the session moves on', async () => {
 		const session = createSession();
 		render(TimerScreen, { session });

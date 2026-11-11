@@ -1,7 +1,7 @@
 <!--
   @component
-  One block of the chosen routine: its title, its target and break percentage, and its work box
-  above its break box. Each box shows its time with a progress bar below it. The box whose timer
+  One block of the chosen routine: its title with its cycle counter, its target and break
+  percentage, and its work box above its break box. Each box shows its time with a progress bar below it. The box whose timer
   is in use is outlined in rose, or in amber once the work reaches its target.
 -->
 <script module lang="ts">
@@ -66,7 +66,16 @@
 	aria-labelledby={titleId}
 	class="rounded-xl border border-zinc-200 bg-white p-4 md:p-6 dark:border-zinc-800 dark:bg-zinc-900"
 >
-	<h2 id={titleId} class="font-semibold md:text-lg">{block.title}</h2>
+	<!-- The cycle counter sits across from the title, as a box's target sits across from its
+	     label. -->
+	<div class="flex items-baseline justify-between gap-4">
+		<h2 id={titleId} class="font-semibold md:text-lg">{block.title}</h2>
+		{#if block.cycle !== null}
+			<p class="text-sm font-medium text-zinc-600 tabular-nums md:text-base dark:text-zinc-400">
+				{block.cycle}
+			</p>
+		{/if}
+	</div>
 	<p class="text-sm text-zinc-600 md:text-base dark:text-zinc-400">{block.summary}</p>
 	<div class="mt-3 grid gap-3 md:mt-4 md:gap-4">
 		{@render timerBox(block.work, `${titleId}-work`)}
