@@ -12,12 +12,14 @@ Step 4 is done: Finish asks "Finish this run?" while the run keeps counting, and
 
 Milestone 3, PWA and GitHub Pages, is in progress: the app goes online and becomes installable as 0.1.0, then 0.1.1 shows its version in Settings, which checks that an installed copy updates. Step 1 is done: `BASE_PATH` sets SvelteKit's base path, such as `/cadoro` for Pages, and a third Playwright project, `production`, builds the app at `/cadoro` and checks every screen's link and address there.
 
-**Next:** step 2, `feat/offline`: the manifest, the app icon and the service worker. It starts with planning its rounds.
+Step 2 is done: the production build is installable and works offline. `@vite-pwa/sveltekit` 2.0.2 has Workbox write a service worker that keeps every file and answers every address with the app's page. A new version waits for the reload prompt that step 3 adds. The app's icon is Lucide's timer on a rose square, made into every size by `npm run generate-icons`. A Playwright journey reloads the production build offline, runs the timer and opens other screens.
+
+**Next:** step 3, `feat/update-prompt`: offering to reload when a new version is ready, never by itself during a run. It starts with planning its rounds. Milestone 6 also gains pinned timer controls for long routines, as planned in `docs/DECISIONS.md`.
 
 **In progress:** Milestone 3, PWA and GitHub Pages:
 
 1. [x] Base path and a production build test (`build/base-path`)
-2. [ ] Installable and offline (`feat/offline`): the manifest, an open-licensed icon, and a service worker that keeps the app for offline use, with an offline test on the production build
+2. [x] Installable and offline (`feat/offline`): the manifest, an open-licensed icon, and a service worker that keeps the app for offline use, with an offline test on the production build
 3. [ ] Reload prompt (`feat/update-prompt`): offers to reload when a new version is ready, and never reloads by itself during a run
 4. [ ] Pages deploy and 0.1.0 (`ci/pages-deploy`): deploying `main` to GitHub Pages with the `404.html` fallback, and the first release
 5. [ ] Version in Settings and 0.1.1 (`feat/app-version`): the version in Settings, the README's release steps, and checking that the installed 0.1.0 updates
