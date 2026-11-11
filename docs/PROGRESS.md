@@ -10,7 +10,7 @@ Step 3 is done: the timer screen runs both starter routines. A shared `TimerSess
 
 Step 4 is done: Finish asks "Finish this run?" while the run keeps counting, and a run that ends, by Finish or a finite routine's last work period, shows its summary until Done or Escape readies a new run. Both are native modal dialogs built on a shared `ModalDialog`, and the buttons share their colours through `button-colours.ts`. The Playwright journeys run on a paused fake clock from `e2e/clock.ts`, checking exact times through overtime, a break, the next cycle, Finish and the summary.
 
-Milestone 3, PWA and GitHub Pages, is in progress: the app goes online and becomes installable as 0.1.0, then 0.1.1 shows its version in Settings, which checks that an installed copy updates. Step 1 is done: `BASE_PATH` sets SvelteKit's base path, such as `/cadoro` for Pages, and a third Playwright project, `production`, builds the app at `/cadoro` and checks every screen's link and address there.
+Milestone 3, PWA and GitHub Pages, is in progress: the app goes online and becomes installable as 0.1.0, then the next version shows its version in Settings, which checks that an installed copy updates. Step 1 is done: `BASE_PATH` sets SvelteKit's base path, such as `/cadoro` for Pages, and a third Playwright project, `production`, builds the app at `/cadoro` and checks every screen's link and address there.
 
 Step 2 is done: the production build is installable and works offline. `@vite-pwa/sveltekit` 2.0.2 has Workbox write a service worker that keeps every file and answers every address with the app's page. The app's icon is Lucide's timer on a rose square, made into every size by `npm run generate-icons`. A Playwright journey reloads the production build offline, runs the timer and opens other screens.
 
@@ -18,15 +18,17 @@ Step 3 is done: when a new version is waiting, a card above the tab bar offers R
 
 Before step 4, a `Taskfile.yml` for go-task took over the workflows that took several commands: setup, every CI check in order, flakiness repeats, a production preview, the phone over USB, ports, branches, worktrees, watching CI, reading its failures, and merging. Each task checks what it needs first, and branches and worktrees are only deleted once their commits are on `main`. The README lists the tasks.
 
-**Next:** step 4, `ci/pages-deploy`: deploying `main` to GitHub Pages with the `404.html` fallback, and releasing 0.1.0, with the release steps written as tasks. It starts with planning its rounds. Milestone 6 also gains pinned timer controls for long routines, as planned in `docs/DECISIONS.md`.
+Step 4 is done: every push to `main` that passes `Checks` builds the app at `/cadoro` and deploys it to GitHub Pages, with a copy of the fallback page as `404.html`, so a screen's address works on a first visit. The release steps are tasks: `release:bump` on the pull request, then `ci:watch-main`, `pages:check` and `release:publish` on `main` after the merge. The README's Releasing section lists them. The version is 0.1.0, tagged and released once its run on `main` deploys.
+
+**Next:** step 5, `feat/app-version`: the version in Settings, released as the next version, and checking that the installed 0.1.0 offers to reload and updates. Semantic versioning makes a new feature a minor bump, 0.2.0, where the plan said 0.1.1, so that's settled when the step is planned. It starts with planning its rounds, after 0.1.0 is released and tried on the phone. Milestone 6 also gains pinned timer controls for long routines, as planned in `docs/DECISIONS.md`.
 
 **In progress:** Milestone 3, PWA and GitHub Pages:
 
 1. [x] Base path and a production build test (`build/base-path`)
 2. [x] Installable and offline (`feat/offline`): the manifest, an open-licensed icon, and a service worker that keeps the app for offline use, with an offline test on the production build
 3. [x] Reload prompt (`feat/update-prompt`): offers to reload when a new version is ready, and never reloads by itself during a run, with Playwright journeys against a server that serves a new version
-4. [ ] Pages deploy and 0.1.0 (`ci/pages-deploy`): deploying `main` to GitHub Pages with the `404.html` fallback, and the first release
-5. [ ] Version in Settings and 0.1.1 (`feat/app-version`): the version in Settings, the README's release steps, and checking that the installed 0.1.0 updates
+4. [x] Pages deploy and 0.1.0 (`ci/pages-deploy`): deploying `main` to GitHub Pages with the `404.html` fallback, the release tasks and the README's release steps, and the first release
+5. [ ] Version in Settings (`feat/app-version`): the version in Settings, released as the next version, and checking that the installed 0.1.0 updates
 
 **Done:** Milestone 2, run a routine:
 
