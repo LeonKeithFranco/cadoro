@@ -1,12 +1,12 @@
 <!--
   @component
-  The home page, a placeholder until the timer screen arrives.
+  The Timer screen, the app's home, a placeholder until the timer is built.
 -->
-<svelte:head>
-	<title>Cadoro</title>
-</svelte:head>
+<script lang="ts">
+	import ScreenPlaceholder from '#lib/components/ScreenPlaceholder.svelte';
+</script>
 
-<main class="grid min-h-dvh place-content-center gap-2 p-4 text-center">
-	<h1 class="text-4xl font-semibold tracking-tight">Cadoro</h1>
-	<p class="text-zinc-600 dark:text-zinc-400">A timer for focused work is on its way.</p>
-</main>
+<ScreenPlaceholder
+	title="Timer"
+	message="Pick a routine and run it here. The timer is coming next."
+/>

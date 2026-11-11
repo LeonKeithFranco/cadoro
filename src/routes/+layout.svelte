@@ -1,7 +1,7 @@
 <!--
   @component
   The frame every screen is drawn in. It loads the global styles and the favicon, then renders
-  the current page.
+  the current screen in the page's `<main>`.
 -->
 <script lang="ts">
 	import './layout.css';
@@ -15,4 +15,6 @@
 	<link rel="icon" href={favicon} />
 </svelte:head>
 
-{@render children()}
+<main class="p-4">
+	{@render children()}
+</main>
