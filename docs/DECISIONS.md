@@ -4,6 +4,20 @@ Changes to the spec, plan and design, newest day first, each with its reason and
 
 ## 2026-11-10
 
+**Milestone 3's steps**
+
+- Milestone 3 has five steps, each with its own branch and pull request: the base path and a production build test (`build/base-path`), installable and offline (`feat/offline`), the reload prompt (`feat/update-prompt`), the Pages deploy as 0.1.0 (`ci/pages-deploy`), and the version in Settings as 0.1.1 (`feat/app-version`).
+- The milestone's update check uses a real change: 0.1.1 adds the version to Settings, so an installed 0.1.0 offers to reload and then shows 0.1.1. Putting everything in 0.1.0 and checking updates with milestone 4's first release was rejected, because milestone 3 would close with its own check still open. A cosmetic 0.1.1 made only to test the update was rejected as a release with nothing in it.
+- Pull requests before 0.1.0 don't bump the version, because nothing is deployed yet.
+
+**The base path**
+
+- `vite.config.ts` reads SvelteKit's `paths.base` from `BASE_PATH`, or the site's root when it isn't set. It's written as SvelteKit wants it, `/cadoro`, with a leading slash and no trailing one, unlike Vite's `base: '/cadoro/'` in the weight tracker. SvelteKit checks the format itself when it loads the config and stops with a clear error, so the config has no check of its own. A `readBasePath` function with its own check and tests, like `readDevPort`, was planned and dropped as the same rule written twice. The variable's plain `string` is asserted to SvelteKit's `'' | `/${string}`` type, which that check makes safe.
+- A third Playwright project, `production`, builds the app at `/cadoro` and serves it with `vite preview` on port 4175, so it never meets an `npm run preview` on 4173. Its server is never reused, so it can't test an old build. It runs only `e2e/production/`, which the desktop and phone projects ignore. Its tests open every screen from its link and from its own address, after a reload too, and fail on any response with an error status. Breaking `resolve()` in `ScreenNav` on purpose failed the link test.
+- Its tests navigate with paths relative to `baseURL`, such as `goto('stats')`, because Playwright resolves `/stats` against the host and drops the folder.
+- `vite preview` answers every address under the base path with the app, while Pages only serves files, so these tests don't cover Pages' `404.html` fallback. That's checked on Pages itself in step 4.
+- The production port is fixed rather than taken from an environment variable like `PORT`, so two worktrees can't run the end-to-end tests at the same time. `strictPort` makes the second one fail loudly rather than test the wrong build, and the README says so.
+
 **The Finish confirmation**
 
 - The run keeps counting while Finish asks "Finish this run?". Confirming ends it at that moment, so the seconds spent deciding count as work, as the spec's "saved up to that moment" says. Cancel and Escape leave the run exactly as if Finish hadn't been pressed. Pausing while asking was rejected, because Cancel would then leave the run paused, a hidden change the user didn't ask for. Ending the run at the moment Finish was first pressed was rejected as a time the screen never showed.
