@@ -4,6 +4,25 @@ Changes to the spec, plan and design, newest day first, each with its reason and
 
 ## 2026-11-10
 
+**The Pages deploy**
+
+- `pipeline.yml` deploys `main` to GitHub Pages in two jobs after `Checks`, as in the weight tracker. `Build for Pages` runs only on a push, so pull requests never deploy. `Deploy to Pages` is the only job given `pages: write` and `id-token: write`, so the job that runs the build's packages never holds the right to publish. It uses the `github-pages` environment, and `concurrency` makes a newer deploy wait rather than cancel one partway through.
+- The Pages build runs on the plain runner rather than in Playwright's image, since it needs no browser. It builds again, because `Checks` builds at the site's root, and the production Playwright project builds its own copy inside the tests.
+- `BASE_PATH` is `/${{ github.event.repository.name }}`, so a fork gets its own folder, written as SvelteKit wants it, with no trailing slash.
+- `404.html` is a copy of the fallback page, since Pages has no route fallback, and serves it for any missing path. SvelteKit's fallback page links its files by absolute paths, such as `/cadoro/_app/…`, which is what lets the copy work at any depth. `vite preview` answers every address itself, so this was checked on a Pages-like Node server in the scratchpad: `/cadoro/stats` came back with status 404 and the Stats screen, and registered the service worker.
+- No workflow linter or local runner was installed, so the new jobs first run on `main` after the merge. The pull request shows them as skipped.
+- Pages is set to deploy from GitHub Actions, rather than from a branch, since the workflow uploads the site itself.
+
+**Releases**
+
+- The release steps are tasks from the start: `release:bump`, `ci:watch-main`, `pages:check` and `release:publish`. The README's Releasing section came forward from step 5, because the tasks exist now and 0.1.0 uses them. Step 5 keeps the version in Settings and the check that an installed copy updates.
+- `release:bump LEVEL=…` runs on a pull request's branch and commits `chore(release): X.Y.Z` itself, so its commits have no Claude co-author line. It refuses on `main`, with uncommitted work, or when the branch already bumps the version compared with `main`. Its refusal on `main` was checked in a throwaway worktree of `main`, with go-task's `--taskfile` and `--dir`, because `main`'s own Taskfile doesn't have the task yet.
+- `release:publish` tags only on `main`, up to date with GitHub, when the version isn't tagged yet and `main`'s own `CI/CD` run for that commit passed, deploy included. So every tag names code that passed its checks and is live. It fetches first and then calls an internal task, because a task's variables are worked out before its commands run, and its checks have to see GitHub as it is now.
+- `release:publish` wasn't run on `main` to test it. `main`'s commit had passed and had no tag, so every check would have let it through and published `v0.0.1`. Its tag check was tested on its own, and its last two refusals are checked after the merge.
+- `pages:check` asks GitHub for the site's address rather than naming the account, and takes `SITE_URL` from the environment to check another copy, such as a fork's. A screen's address must answer 404 and be the app's page, found by SvelteKit's start script in the site's folder. The status alone isn't enough, because GitHub's own error page is a 404 too. On the Pages-like server it passed with `404.html` and failed without it, and on the wrong folder.
+- `ci:watch-main` finds the run with `gh run list --branch main --event push --commit …`, which leaves out pull requests' runs, and shares `ci:watch`'s 60-second wait for GitHub to start it.
+- A pull request that only changes docs or tests doesn't bump the version, since the app it deploys is the same.
+
 **The Taskfile**
 
 - Workflows that took several commands run from `Taskfile.yml` with go-task, at the user's suggestion: setup, the checks, flakiness repeats, a production preview, the phone, ports, branches, worktrees, CI and merging. It's its own pull request before milestone 3's step 4, so the release and deploy steps there can be written as tasks from the start. Folding it into step 4 was rejected as mixing two topics, and leaving it until after milestone 3 as losing the benefit for step 4.
