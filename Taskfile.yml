@@ -27,6 +27,10 @@ vars:
   # Git-ignored files a worktree needs copied from the main checkout: Claude's and the editors'
   # local settings.
   LOCAL_SETTINGS: .claude .zed .vscode CLAUDE.local.md
+  # A command printing the id of the current branch's latest CI run, for tasks that read one.
+  LATEST_RUN_COMMAND: >-
+    gh run list --branch "$(git branch --show-current)" --limit 1 --json databaseId
+    --jq '.[0].databaseId'
 
 tasks:
   default:
@@ -273,3 +277,86 @@ tasks:
       - git worktree prune --dry-run --verbose
       - git worktree prune
       - git worktree list -v
+
+  ci:watch:
+    desc: Watch the checks on this branch's pull request until they finish, failing if one fails
+    preconditions:
+      - sh: gh pr view --json number > /dev/null 2>&1
+        msg: This branch has no pull request yet. Push it and open one first.
+    cmds:
+      - gh pr checks --watch --fail-fast
+
+  ci:logs:
+    desc: Show the failed steps' log from this branch's latest CI run, or from RUN
+    vars:
+      LATEST_RUN:
+        sh: '{{.LATEST_RUN_COMMAND}}'
+      RUN: '{{.RUN | default .LATEST_RUN}}'
+      CONCLUSION:
+        sh: '[ -z "{{.RUN}}" ] || gh run view {{.RUN}} --json conclusion --jq .conclusion'
+    preconditions:
+      - sh: '[ -n "{{.RUN}}" ]'
+        msg: This branch has no CI runs yet.
+      # Without a failure, `--log-failed` prints nothing and still succeeds.
+      - sh: '[ "{{.CONCLUSION}}" = failure ]'
+        msg: >-
+          CI run {{.RUN}} has nothing failed to show: its conclusion is
+          "{{.CONCLUSION | default "not finished"}}".
+    cmds:
+      - gh run view {{.RUN}} --log-failed
+
+  ci:report:
+    desc: Download the Playwright report from this branch's latest CI run, or from RUN, and open it
+    summary: |
+      CI keeps the Playwright report, with the traces of failed tests, for 14 days, and only when
+      a run fails. This downloads it into a temporary folder and serves it, as `task e2e:report`
+      does for a local run.
+    vars:
+      LATEST_RUN:
+        sh: '{{.LATEST_RUN_COMMAND}}'
+      RUN: '{{.RUN | default .LATEST_RUN}}'
+      ARTIFACTS:
+        sh: >-
+          [ -z "{{.RUN}}" ] || gh api "repos/{owner}/{repo}/actions/runs/{{.RUN}}/artifacts"
+          --jq '[.artifacts[] | select(.expired | not) | .name] | join(" ")'
+    preconditions:
+      - sh: '[ -n "{{.RUN}}" ]'
+        msg: This branch has no CI runs yet.
+      - sh: '[[ " {{.ARTIFACTS}} " == *" playwright-report "* ]]'
+        msg: >-
+          CI run {{.RUN}} has no Playwright report. CI keeps one only when a run fails, and only
+          for 14 days, and a run that failed before the Playwright tests has none.
+    cmds:
+      # The temporary folder is made here rather than as a variable, because variables are worked
+      # out before the preconditions, and a refused call would leave an empty folder behind.
+      - |
+        folder="$(mktemp -d)"
+        gh run download {{.RUN}} --name playwright-report --dir "$folder"
+        npx playwright show-report "$folder/playwright-report"
+
+  pr:merge:
+    desc: Rebase-merge this branch's pull request once its checks pass, then update main and delete the branch
+    summary: |
+      Merging is the reviewer's sign-off, so this only runs when they've asked for the merge.
+      The checks must already have passed: this doesn't wait for them, so run `task ci:watch`
+      first. GitHub deletes the branch on GitHub itself once it merges.
+    vars:
+      BRANCH:
+        sh: git branch --show-current
+    preconditions:
+      - sh: '[ "{{.BRANCH}}" != main ]'
+        msg: You're on main. Switch to the pull request's branch first.
+      - sh: '[ -z "$(git status --porcelain)" ]'
+        msg: This branch has uncommitted changes. Commit or push them first.
+      - sh: gh pr view --json number > /dev/null 2>&1
+        msg: This branch has no pull request.
+      # `gh pr checks` succeeds only when every check has passed.
+      - sh: gh pr checks > /dev/null 2>&1
+        msg: The pull request's checks haven't all passed. See them with `gh pr checks`.
+    cmds:
+      - gh pr merge --rebase
+      - git switch main
+      # Also forgets remote branches GitHub has deleted.
+      - git pull --ff-only --prune
+      - task: branch:delete
+        vars: { BRANCH: '{{.BRANCH}}' }
