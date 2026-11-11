@@ -6,6 +6,7 @@ import { withPwa } from '@vite-pwa/sveltekit';
 // The extension is needed because Vite plans to load its config as a native Node module, which
 // doesn't guess extensions the way a bundler does.
 import { devPort } from './dev-server.ts';
+import packageJson from './package.json' with { type: 'json' };
 
 /**
  * The folder the app is served from, such as `/cadoro` on GitHub Pages, or `''`, the site's root,
@@ -45,6 +46,10 @@ export default defineConfig({
 	// Fails rather than moving to the next free port, so the server is always where Playwright
 	// looks for it.
 	server: { port: devPort, strictPort: true },
+	// Replaces every `__APP_VERSION__` in the app's code with the version from `package.json`, as
+	// a quoted string, so Settings can show it. SvelteKit's own `version` is left alone, because
+	// the service worker uses it to tell when the fallback page has changed.
+	define: { __APP_VERSION__: JSON.stringify(packageJson.version) },
 	plugins: [
 		tailwindcss(),
 		// Runs SvelteKit's own plugin with the first argument, its config, and adds a service worker
