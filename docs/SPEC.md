@@ -141,7 +141,7 @@ They can be edited and deleted like any other routine, and aren't created again 
 - **Breaks count down.** At 0:00 the break chime plays, and the app waits for you to press Play before the next work period starts.
 - **Next during a break** ends it early and starts the next work period. The unused break is lost.
 - **Pause** stops the work or break timer. Paused time doesn't count as work, and a paused break keeps its remaining time.
-- **Finish** asks for confirmation, then ends the run. The current work period, if any, is saved up to that moment. This is how an infinite routine ends, and how a finite one ends early.
+- **Finish** asks for confirmation, then ends the run. The run keeps counting while it asks, so the current work period, if any, is saved up to the moment Finish is confirmed. Cancel or Escape leaves the run as it was. This is how an infinite routine ends, and how a finite one ends early.
 - Before a run starts, Next and Finish are disabled.
 - A routine can't be edited or deleted while it's running, and the routine picker is locked until the run ends.
 
@@ -161,14 +161,14 @@ They can be edited and deleted like any other routine, and aren't created again 
 
 ### Run summary
 
-When a run ends, by its last work period or by Finish, a dialog shows a summary of the run:
+When a run ends, by its last work period or by Finish, a dialog headed "Run summary" names the routine and shows the run's totals:
 
 - Total work time
 - Work periods completed
 - Rounds reached
 - Total overtime
 
-Closing the dialog returns the routine to its starting state, ready for another run. The run is already saved, so closing loses nothing.
+Done or Escape closes the dialog and returns the routine to its starting state, ready for another run. The run is already saved, so closing loses nothing. Until it's closed, the summary stays open, even after a visit to another screen.
 
 ### Leaving and returning
 
