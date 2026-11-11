@@ -4,6 +4,8 @@
   the browser tab.
 -->
 <script lang="ts">
+	import ScreenHeading from './ScreenHeading.svelte';
+
 	/** The props a placeholder screen takes. */
 	type Props = {
 		/** The screen's name, shown as its heading and in the browser tab. */
@@ -15,9 +17,5 @@
 	let { title, message }: Props = $props();
 </script>
 
-<svelte:head>
-	<title>{title} · Cadoro</title>
-</svelte:head>
-
-<h1 class="text-2xl font-semibold tracking-tight">{title}</h1>
+<ScreenHeading {title} />
 <p class="mt-2 text-zinc-600 dark:text-zinc-400">{message}</p>
