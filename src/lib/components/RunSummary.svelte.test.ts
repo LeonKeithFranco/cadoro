@@ -1,21 +1,10 @@
-import { page, userEvent, type Locator } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 import { describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import type { RunSummary as Summary } from '../run';
 import { hours, minutes, seconds } from '../testing/durations';
+import { shownTotals } from '../testing/run-summary';
 import RunSummary from './RunSummary.svelte';
-
-/**
- * Reads the totals a summary shows, as label and value pairs in the order they appear.
- *
- * @param dialog - The summary dialog.
- * @returns Each total's label and its value, such as `['Rounds reached', '1']`.
- */
-function shownTotals(dialog: Locator): string[][] {
-	const labels = dialog.getByRole('term').elements();
-	const values = dialog.getByRole('definition').elements();
-	return labels.map((label, index) => [label.textContent, values[index]?.textContent ?? '']);
-}
 
 describe('the run summary', () => {
 	it('names the routine that was run and shows its totals in order', async () => {
