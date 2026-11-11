@@ -41,12 +41,13 @@
 
 <!-- Tailwind's base styles set every margin to 0, which takes away the browser's `margin: auto`
      that centres a modal dialog, so `m-auto` puts it back. The width leaves a 1rem gutter on each
-     side of a phone's screen. -->
+     side of a phone's screen. In dark, the dialog is a step lighter than the cards behind it, as
+     dark themes show something raised, so its edge doesn't blend into theirs. -->
 <dialog
 	{@attach openAsModal}
 	aria-labelledby={titleId}
 	{onclose}
-	class="m-auto w-[calc(100%-2rem)] max-w-sm rounded-xl border border-zinc-200 bg-white p-6 text-zinc-900 shadow-xl backdrop:bg-zinc-950/60 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100"
+	class="m-auto w-[calc(100%-2rem)] max-w-sm rounded-xl border border-zinc-200 bg-white p-6 text-zinc-900 shadow-xl backdrop:bg-zinc-950/60 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
 >
 	<h2 id={titleId} class="text-lg font-semibold">{title}</h2>
 	{@render children()}
