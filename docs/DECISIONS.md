@@ -20,7 +20,8 @@ Changes to the spec, plan and design, newest day first, each with its reason and
 
 - The step is released as 0.2.0, where the plan said 0.1.1. Semantic versioning makes a new feature a minor bump, as the README's release steps say.
 - The README's status line no longer names a version, so it doesn't need changing at every release.
-- Milestone 3's last check is the user's: the installed 0.1.0 should offer to reload once 0.2.0 is live, and then show 0.2.0 in Settings. If it doesn't, the fix is its own pull request.
+- [v0.2.0](https://github.com/LeonKeithFranco/cadoro/releases/tag/v0.2.0) was released from `main`'s commit `21d8bcf` once its run had deployed and `task pages:check` passed.
+- Milestone 3's last check was the user's: the installed 0.1.0 on the desktop and the phone offered to reload once 0.2.0 was live, and then showed 0.2.0 in Settings.
 
 ## 2026-11-10
 

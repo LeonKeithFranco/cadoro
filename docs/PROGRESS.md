@@ -20,7 +20,7 @@ Before step 4, a `Taskfile.yml` for go-task took over the workflows that took se
 
 Step 4 is done: every push to `main` that passes `Checks` builds the app at `/cadoro` and deploys it to GitHub Pages, with a copy of the fallback page as `404.html`, so a screen's address works on a first visit. The release steps are tasks: `release:bump` on the pull request, then `ci:watch-main`, `pages:check` and `release:publish` on `main` after the merge. The README's Releasing section lists them. 0.1.0 was released, then installed on the desktop and the phone, and works offline on both.
 
-Step 5 is done: Settings shows the app's version, taken from `package.json` through Vite's `define`, and the step is released as 0.2.0, a minor bump for a new feature. Once 0.2.0 is live, the installed 0.1.0 should offer to reload and then show 0.2.0 in Settings, which is milestone 3's last check.
+Step 5 is done: Settings shows the app's version, taken from `package.json` through Vite's `define`, and the step is released as 0.2.0, a minor bump for a new feature. Once 0.2.0 was live, the installed 0.1.0 on the desktop and the phone offered to reload and then showed 0.2.0 in Settings, which was milestone 3's last check.
 
 **Next:** milestone 4, Keep runs, starting with planning its steps. Milestone 6 also gains pinned timer controls for long routines, as planned in `docs/DECISIONS.md`.
 
