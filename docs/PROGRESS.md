@@ -6,7 +6,9 @@ Milestone 2 has begun. Step 1 is done: the run engine in `src/lib` is pure TypeS
 
 Step 2 is done: the app shell. A header with the app's name and navigation frames every screen, with a tab bar along the bottom on phones and links in the header from 48rem up, using Lucide icons. Timer, Routines, Stats and Settings are placeholder screens with their own URLs, headings and tab titles. The theme follows `data-theme` on `<html>`, fixed to dark until Settings exists, and every element has light and dark colours. Svelte components are checked for doc comments too. Playwright walks the navigation on desktop and phone.
 
-**Next:** Step 3, the timer screen, starting in plan mode with its rounds.
+Step 3, the timer screen, is under way on `feat/timer-screen`, not yet pushed. Its plan has six rounds. Round 1 is done: a break's view keeps the time worked in the period it follows, and `viewBlock` in `src/lib/block-view.ts` works out what each block card shows. The tests' durations are written with `minutes()` and `seconds()` from `src/lib/testing/durations.ts`.
+
+**Next:** Round 2 of step 3, the shared timer session in `src/lib/timer.svelte.ts`, which holds the routines, the chosen routine and the run. Then the picker and block cards, the controls and live timer, a Playwright journey, and the docs.
 
 **In progress:** Milestone 2, run a routine:
 

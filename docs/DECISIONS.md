@@ -11,6 +11,19 @@ Changes to the spec, plan and design, newest day first, each with its reason and
 - The configs import `./dev-server.ts` with its extension, because Vite 8.3 warns that a future major version will load its config as a native Node module, which needs it.
 - This was its own pull request from `main`, made in a worktree while the timer screen step was in progress, following the worktree rules in the global git instructions.
 
+**The timer screen**
+
+- A block's boxes that aren't in use show zeroed timers, such as `0:00 / 25:00` and `0:00`, so every box keeps its shape. During a break, its block's work box stays at the time just worked, which shows what earned the break. Dashes in idle boxes were rejected.
+- What each block card shows is worked out by a pure function, `viewBlock`, from the run's view, as `viewRun` does for the screen, so the rules are unit tested and the card only lays them out.
+- The run will live in a shared `TimerSession` class in `src/lib/timer.svelte.ts`, rather than in the Timer page, which SvelteKit removes when another screen opens. Leaving the Timer screen pauses the run, work or break, and Play resumes it. This is new to the spec: switching screens inside the app counts as stepping away, unlike a background tab, where the timer keeps running. A reload still loses the run until milestone 4 saves it.
+- Until step 4 adds its confirmation and the run summary, Finish ends the run at once and the screen returns to ready. Disabling Finish until then was rejected, because a reload would be the only way to stop a run.
+- The active box has a rose outline. Past the target, the work box's outline and time turn amber and its label reads "Work · Overtime", so the change isn't shown by colour alone. Filling the box with solid rose was rejected as the same colour as normal.
+
+**Durations in tests**
+
+- Tests write lengths of time as `minutes(25)` and `seconds(40)`, from `src/lib/testing/durations.ts`, rather than `25 * 60_000`. The style guide's exception lets tests keep literal values so their data is visible, but `60_000` is a conversion, not data, and was repeated 86 times. The global style guide now says so. The helpers are separate from `time.ts`, so a test's expected values don't come from the code it checks. Importing `minutesToMs` was rejected for that reason.
+- Values already in milliseconds, such as `1_499` in the work-time tests, stay literal. So do `time.test.ts`'s, where the milliseconds are the data being formatted.
+
 **Doc comments in Svelte components**
 
 - Svelte components are now checked with the same TSDoc and JSDoc rules as TypeScript files, settling the question left open below. Each component starts with a `<!-- @component -->` comment, Svelte's own convention, which editors show when hovering over the component where it's used. Each prop has a comment on its field in the component's `Props` type. Functions, types and constants in either script need one, as in `.ts` files.
