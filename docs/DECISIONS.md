@@ -4,6 +4,21 @@ Changes to the spec, plan and design, newest day first, each with its reason and
 
 ## 2026-11-10
 
+**The Taskfile**
+
+- Workflows that took several commands run from `Taskfile.yml` with go-task, at the user's suggestion: setup, the checks, flakiness repeats, a production preview, the phone, ports, branches, worktrees, CI and merging. It's its own pull request before milestone 3's step 4, so the release and deploy steps there can be written as tasks from the start. Folding it into step 4 was rejected as mixing two topics, and leaving it until after milestone 3 as losing the benefit for step 4.
+- The user asked for as much as is logical. Wrappers that only rename an npm script, such as `dev`, `test` or `icons`, were left out as two names for one thing. So was `pr:create`, because a pull request's title and body need writing, and a preview of the update prompt, which would need a cookie set by hand. Screenshots and proving tests by breaking them stay with Claude, as they need judgement. They may become a Claude Code skill later.
+- More npm scripts were rejected because each holds one command line, with no descriptions, arguments, checks or loops. Make was rejected for its file-timestamp model and tab-sensitive syntax.
+- Tasks call the npm scripts rather than repeating their commands. CI keeps calling npm directly, one step per check, so its failures stay easy to read and it never needs go-task. `check` repeats CI's order, with a comment saying the two must match.
+- Every task checks what it needs with `preconditions` or `requires` before doing anything, and says what's wrong: a bad branch name, uncommitted work, a busy port, no phone, no pull request, checks not passed, or a CI image that doesn't match Playwright. Each refusal was triggered on purpose.
+- `check:ci-image` compares the Playwright image's tag in `pipeline.yml` with `@playwright/test` in the lockfile, which must be bumped together, and `check` runs it first.
+- `branch:delete` and `worktree:done` delete a branch only once every commit is on `main`: inside its history (`git merge-base --is-ancestor`), or, after a rebase merge gives the commits new hashes, with the same change (`git cherry`). The git rules' check, `git diff <branch> origin/main` showing nothing, stops working once `main` moves on after the merge. Recreating step 3's branch from its old tip showed `git branch -d` refusing it and the task deleting it. `worktree:done` checks before removing anything, so unmerged work is never left without its worktree.
+- `branch:new` and `worktree:new` check the name against the git rules' types, and make the branch with `--no-track`, so a branch made from `origin/main` doesn't take it as its upstream. `worktree:new` copies the git-ignored local settings (`.claude`, `.zed`, `.vscode`, `CLAUDE.local.md`) and runs the worktree's own `task setup`. Until this pull request merges, `main` has no Taskfile, so a worktree from it needed `BASE=build/taskfile`.
+- `ci:watch` waits up to 60 seconds for GitHub to start the checks, because `gh pr checks --watch` run straight after a push stopped with "no checks reported", which happened on this pull request.
+- Local Playwright runs now write the HTML report too, never opening it by itself, so `task e2e:report` has a report to open. Before, only CI wrote one, and `playwright show-report` found nothing locally yet still exited successfully.
+- `ci:report` couldn't be run all the way: CI keeps the report only when a run fails, for 14 days, and no kept run failed in the Playwright tests. Its refusal was checked on a run that failed earlier.
+- The Taskfile reads `PORT` as `dev-server.ts` does, and repeats the test ports 4175 and 4176 from `playwright.config.ts` in `ports`, with a note, since YAML can't import them.
+
 **The reload prompt**
 
 - A new version waits for the run. The card is hidden while a run is in progress and shows once it ends, or before Play, since until milestone 4 saves runs a reload would throw the run away. Showing it at once and asking for confirmation on Reload during a run was rejected, as was showing it with Reload disabled. Either would interrupt focused work with something that can't be acted on yet.
