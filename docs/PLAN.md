@@ -125,9 +125,10 @@ Routines can be created, edited, sorted and reordered.
 - Build the Routines screen: the list and its sort, a new routine, editing in place one at a time with a prompt before discarding changes, and duplicating and deleting routines
 - Build block editing: add, duplicate, delete, Move up and Move down, and dragging with svelte-dnd-action
 - Make the timer's picker follow the sort and open on the last routine used, and lock editing during a run
+- Keep long routines usable on the timer screen: pin the controls at the bottom with `position: sticky`, and scroll the active block into view when the run moves to one that's out of view
 - Record every routine change in the activity log at the storage interface, keeping the newest 5,000 entries, so a failed log write never blocks the change
 
-**Learn:** forms and `bind:` in Svelte, validation messages, keyed lists and the `flip` animation, svelte-dnd-action, warning before leaving with unsaved changes (`beforeNavigate`)
+**Learn:** forms and `bind:` in Svelte, validation messages, keyed lists and the `flip` animation, svelte-dnd-action, warning before leaving with unsaved changes (`beforeNavigate`), `position: sticky`, `scrollIntoView` and `scroll-margin`
 
 ### 7. Stats
 
