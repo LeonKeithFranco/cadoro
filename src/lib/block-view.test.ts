@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { viewBlock } from './block-view';
 import { createStarterRoutines } from './routine';
-import { createRun, finish, next, pause, play, viewRun, type WorkView } from './run';
+import { createRun, finish, next, pause, play, viewRun, type RunState, type WorkView } from './run';
 import { minutes, seconds } from './testing/durations';
 
 /** The starter routine with two different blocks: Focus at 20% for 3 cycles, then Long break at 60%. */
@@ -19,6 +19,25 @@ const working = play(createRun(classicWithLongBreak), 0);
 /** The run on the first work period's break, after 25 minutes of work, which earned 5 minutes. */
 const onBreak = next(working, minutes(25));
 
+/**
+ * Presses Next again and again at the moment the run started, ending each work period and break
+ * at once.
+ *
+ * @param run - The run to press Next on.
+ * @param presses - How many times to press it.
+ * @returns The run after the last press.
+ */
+function pressNextAtStart(run: RunState, presses: number): RunState {
+	let pressed = run;
+	for (let press = 0; press < presses; press++) {
+		pressed = next(pressed, 0);
+	}
+	return pressed;
+}
+
+/** The run in Long break's work period, after Focus's three work periods and their breaks. */
+const longBreakWorking = pressNextAtStart(working, 6);
+
 describe('viewBlock', () => {
 	it("shows the block's title, target and break percentage", () => {
 		const view = viewRun(working, 0);
@@ -33,12 +52,13 @@ describe('viewBlock', () => {
 		});
 	});
 
-	it('shows every box at 0:00, with its target, before Play', () => {
+	it('shows every box at 0:00, with its target, and the first cycle before Play', () => {
 		const view = viewRun(createRun(classicWithLongBreak), 0);
 
 		expect(viewBlock(focus, 0, view)).toEqual({
 			title: 'Focus',
 			summary: '25 min · 20% break',
+			cycle: 'Cycle 1 / 3',
 			work: {
 				label: 'Work',
 				time: '0:00',
@@ -88,6 +108,7 @@ describe('viewBlock', () => {
 		const longBreakWork: WorkView = {
 			status: 'working',
 			block: 1,
+			cycle: 0,
 			label: 'Round 1 · Block 2 of 2',
 			workedMs: minutes(10),
 			targetMs: minutes(25),
@@ -113,6 +134,7 @@ describe('viewBlock', () => {
 		expect(viewBlock(longBreak, 1, view)).toEqual({
 			title: 'Long break',
 			summary: '25 min · 60% break',
+			cycle: null,
 			work: {
 				label: 'Work',
 				time: '0:00',
@@ -235,5 +257,39 @@ describe('viewBlock', () => {
 			work: { time: '0:00', isActive: false, isOvertime: false },
 			break: { label: 'Break', time: '0:00', isActive: false }
 		});
+	});
+
+	it('counts the cycle the run is on, from 1, during its work period and its break', () => {
+		const secondCycleWork = next(onBreak, minutes(26));
+		const secondCycleBreak = next(secondCycleWork, minutes(51));
+
+		expect(viewBlock(focus, 0, viewRun(working, minutes(1))).cycle).toBe('Cycle 1 / 3');
+		expect(viewBlock(focus, 0, viewRun(onBreak, minutes(26))).cycle).toBe('Cycle 1 / 3');
+		expect(viewBlock(focus, 0, viewRun(secondCycleWork, minutes(27))).cycle).toBe('Cycle 2 / 3');
+		expect(viewBlock(focus, 0, viewRun(secondCycleBreak, minutes(52))).cycle).toBe('Cycle 2 / 3');
+	});
+
+	it('shows the cycle the run will start on before Play, as the position label does', () => {
+		const view = viewRun(createRun(classicWithLongBreak), 0);
+
+		expect(view).toMatchObject({ label: 'Round 1 · Block 1 of 2 · Cycle 1 of 3' });
+		expect(viewBlock(focus, 0, view).cycle).toBe('Cycle 1 / 3');
+	});
+
+	it('shows cycle 0 on a block the run is not in, or once it has ended', () => {
+		const twoLongBreaks = { ...longBreak, cycles: 2 };
+		const routine = { ...classicWithLongBreak, blocks: [focus, twoLongBreaks] };
+		const beforePlay = viewRun(createRun(routine), 0);
+		const inLongBreak = viewRun(longBreakWorking, 0);
+		const ended = viewRun(finish(working, minutes(10)), minutes(10));
+
+		expect(viewBlock(twoLongBreaks, 1, beforePlay).cycle).toBe('Cycle 0 / 2');
+		expect(viewBlock(focus, 0, inLongBreak).cycle).toBe('Cycle 0 / 3');
+		expect(viewBlock(focus, 0, ended).cycle).toBe('Cycle 0 / 3');
+	});
+
+	it('shows no cycle counter on a block of one cycle, even while the run is in it', () => {
+		expect(viewBlock(longBreak, 1, viewRun(working, minutes(1))).cycle).toBeNull();
+		expect(viewBlock(longBreak, 1, viewRun(longBreakWorking, 0)).cycle).toBeNull();
 	});
 });

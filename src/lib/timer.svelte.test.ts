@@ -40,6 +40,8 @@ describe('TimerSession', () => {
 		expect(session.routine).toBe(classic);
 		expect(session.view).toEqual({
 			status: 'ready',
+			block: 0,
+			cycle: 0,
 			label: 'Round 1',
 			isRunning: false,
 			isInProgress: false
@@ -226,6 +228,8 @@ describe('the controls', () => {
 		expect(session.routine).toBe(classicWithLongBreak);
 		expect(session.view).toEqual({
 			status: 'ready',
+			block: 0,
+			cycle: 0,
 			label: 'Round 1 · Block 1 of 2 · Cycle 1 of 3',
 			isRunning: false,
 			isInProgress: false

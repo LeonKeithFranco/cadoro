@@ -479,6 +479,8 @@ describe('viewRun', () => {
 	it('shows where a run will start, with Next and Finish not yet available', () => {
 		expect(viewRun(createRun(classicWithLongBreak), 0)).toEqual({
 			status: 'ready',
+			block: 0,
+			cycle: 0,
 			label: 'Round 1 · Block 1 of 2 · Cycle 1 of 3',
 			isRunning: false,
 			isInProgress: false
@@ -491,6 +493,7 @@ describe('viewRun', () => {
 		expect(viewRun(working, minutes(10))).toEqual({
 			status: 'working',
 			block: 0,
+			cycle: 1,
 			label: 'Round 1 · Block 1 of 2 · Cycle 2 of 3',
 			workedMs: minutes(10),
 			targetMs: minutes(25),
@@ -529,6 +532,7 @@ describe('viewRun', () => {
 		expect(viewRun(onBreak, minutes(30))).toEqual({
 			status: 'break',
 			block: 1,
+			cycle: 0,
 			label: 'Round 1 · Block 2 of 2',
 			workedMs: minutes(25),
 			earnedMs: minutes(15),

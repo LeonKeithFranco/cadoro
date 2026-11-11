@@ -52,6 +52,12 @@ export type BlockView = {
 	readonly title: string;
 	/** The block's target and break percentage, such as "25 min · 20% break". */
 	readonly summary: string;
+	/**
+	 * The cycle the run is on, or will start on, out of the block's cycles, such as "Cycle 2 / 3",
+	 * matching the position label. It's "Cycle 0 / 3" when the run isn't in this block, and
+	 * `null` for a block of one cycle.
+	 */
+	readonly cycle: string | null;
 	/** The work box, shown above the break box. */
 	readonly work: TimerBoxView;
 	/** The break box, shown below the work box. */
@@ -65,7 +71,8 @@ export type BlockView = {
  * During a work period, its block's work box counts up and its break box shows the break earned
  * so far. During a break, its block's break box counts down, and the work box keeps the time that
  * earned the break. Every other box shows `0:00`, as does every box before Play and after the run
- * ends.
+ * ends. The cycle counter follows the position label instead: the block the run is in, or will
+ * start in, shows its cycle, and every other block shows cycle 0.
  *
  * @param block - The block the card is for.
  * @param blockIndex - The block's place in its routine, counting from 0.
@@ -75,6 +82,7 @@ export type BlockView = {
 export function viewBlock(block: Block, blockIndex: number, view: RunView): BlockView {
 	const title = block.title;
 	const summary = `${block.targetMinutes} min · ${block.breakPercent}% break`;
+	const cycle = cycleCounter(block, blockIndex, view);
 	const targetMs = minutesToMs(block.targetMinutes);
 	const target = formatElapsed(targetMs);
 	const notInUse = formatElapsed(0);
@@ -83,6 +91,7 @@ export function viewBlock(block: Block, blockIndex: number, view: RunView): Bloc
 		return {
 			title,
 			summary,
+			cycle,
 			work: {
 				label: view.isOvertime ? 'Work · Overtime' : 'Work',
 				time: formatElapsed(view.workedMs),
@@ -100,6 +109,7 @@ export function viewBlock(block: Block, blockIndex: number, view: RunView): Bloc
 		return {
 			title,
 			summary,
+			cycle,
 			work: idleWorkBox(
 				formatElapsed(view.workedMs),
 				target,
@@ -117,9 +127,37 @@ export function viewBlock(block: Block, blockIndex: number, view: RunView): Bloc
 	return {
 		title,
 		summary,
+		cycle,
 		work: idleWorkBox(notInUse, target, 0),
 		break: breakBox('Break', notInUse, false, 0)
 	};
+}
+
+/**
+ * Works out a block's cycle counter.
+ *
+ * @remarks
+ * Before Play, the run's first block shows the cycle it will start on, as the position label
+ * does, so the two always agree. A block of one cycle has no counter, because "Cycle 1 / 1" would
+ * never change, just as the position label leaves out any part whose total is 1.
+ *
+ * @param block - The block the card is for.
+ * @param blockIndex - The block's place in its routine, counting from 0.
+ * @param view - The run's view at this moment, from `viewRun`.
+ * @returns The cycle the run is on, or will start on, out of the block's cycles, such as
+ * "Cycle 2 / 3", with cycle 0 when the run isn't in this block, or `null` for a block of one
+ * cycle.
+ */
+function cycleCounter(block: Block, blockIndex: number, view: RunView): string | null {
+	if (block.cycles === 1) {
+		return null;
+	}
+
+	// An ended run is in no block. Every other view has the block it's in or will start in.
+	const isRunInBlock = view.status !== 'ended' && view.block === blockIndex;
+	// The view counts cycles from 0, as array indexes do, while the user counts from 1.
+	const cycleNumber = isRunInBlock ? view.cycle + 1 : 0;
+	return `Cycle ${cycleNumber} / ${block.cycles}`;
 }
 
 /**

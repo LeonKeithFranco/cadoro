@@ -384,6 +384,10 @@ type ControlsView = {
 export type ReadyView = ControlsView & {
 	/** Marks the view of a run not started yet. */
 	readonly status: 'ready';
+	/** The block the run will start in, counting from 0. */
+	readonly block: number;
+	/** The cycle within that block the run will start on, counting from 0. */
+	readonly cycle: number;
 	/** Where the run will start, such as "Round 1 · Block 1 of 2 · Cycle 1 of 3". */
 	readonly label: string;
 };
@@ -394,6 +398,8 @@ export type WorkView = ControlsView & {
 	readonly status: 'working';
 	/** The block whose work timer is active, counting from 0. */
 	readonly block: number;
+	/** The cycle within that block, counting from 0. */
+	readonly cycle: number;
 	/** Where the run is, such as "Round 2 of 4 · Block 2 of 3 · Cycle 1 of 3". */
 	readonly label: string;
 	/** The time worked so far in this work period, in milliseconds. */
@@ -412,6 +418,8 @@ export type BreakView = ControlsView & {
 	readonly status: 'break';
 	/** The block whose break timer is active, counting from 0. */
 	readonly block: number;
+	/** The cycle within that block that this break ends, counting from 0. */
+	readonly cycle: number;
 	/** Where the run is: the work period this break follows. */
 	readonly label: string;
 	/** The time worked in the work period this break follows, in milliseconds. */
@@ -468,6 +476,8 @@ export function viewRun(run: RunState, now: number): RunView {
 		case 'ready':
 			return {
 				status: 'ready',
+				block: firstPosition.block,
+				cycle: firstPosition.cycle,
 				label: positionLabel(run.plan, firstPosition),
 				isRunning: false,
 				isInProgress: false
@@ -479,6 +489,7 @@ export function viewRun(run: RunState, now: number): RunView {
 			return {
 				status: 'working',
 				block: run.position.block,
+				cycle: run.position.cycle,
 				label: positionLabel(run.plan, run.position),
 				workedMs: workedSoFarMs,
 				targetMs,
@@ -496,6 +507,7 @@ export function viewRun(run: RunState, now: number): RunView {
 			return {
 				status: 'break',
 				block: run.position.block,
+				cycle: run.position.cycle,
 				label: positionLabel(run.plan, run.position),
 				workedMs: followedPeriod.workedMs,
 				earnedMs: run.earnedMs,
