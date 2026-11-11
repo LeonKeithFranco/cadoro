@@ -8,6 +8,7 @@
 	import Pause from '@lucide/svelte/icons/pause';
 	import Play from '@lucide/svelte/icons/play';
 	import SkipForward from '@lucide/svelte/icons/skip-forward';
+	import { PRIMARY_BUTTON_COLOURS, SECONDARY_BUTTON_COLOURS } from './button-colours';
 
 	/** The props the controls take. */
 	type Props = {
@@ -24,10 +25,6 @@
 	};
 
 	let { isRunning, isInProgress, onplaypause, onnext, onfinish }: Props = $props();
-
-	/** The colours of Next and Finish, outlined so Play stands out as the main button. */
-	const SECONDARY_COLOURS =
-		'border border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800';
 </script>
 
 <!-- The `*:` classes style every button alike. Disabled buttons fade and show a not-allowed
@@ -35,11 +32,8 @@
 <div
 	class="grid grid-cols-3 gap-3 *:flex *:items-center *:justify-center *:gap-2 *:rounded-lg *:py-3 *:font-medium *:disabled:cursor-not-allowed *:disabled:opacity-60 md:*:text-lg"
 >
-	<button
-		type="button"
-		onclick={onplaypause}
-		class="bg-rose-700 text-white hover:bg-rose-800 dark:bg-rose-400 dark:text-zinc-950 dark:hover:bg-rose-300"
-	>
+	<!-- Play is the main button, and Next and Finish are outlined beside it. -->
+	<button type="button" onclick={onplaypause} class={PRIMARY_BUTTON_COLOURS}>
 		{#if isRunning}
 			<Pause class="size-5" />
 			Pause
@@ -48,11 +42,16 @@
 			Play
 		{/if}
 	</button>
-	<button type="button" onclick={onnext} disabled={!isInProgress} class={SECONDARY_COLOURS}>
+	<button type="button" onclick={onnext} disabled={!isInProgress} class={SECONDARY_BUTTON_COLOURS}>
 		<SkipForward class="size-5" />
 		Next
 	</button>
-	<button type="button" onclick={onfinish} disabled={!isInProgress} class={SECONDARY_COLOURS}>
+	<button
+		type="button"
+		onclick={onfinish}
+		disabled={!isInProgress}
+		class={SECONDARY_BUTTON_COLOURS}
+	>
 		<Flag class="size-5" />
 		Finish
 	</button>
