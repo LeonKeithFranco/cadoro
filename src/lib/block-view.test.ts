@@ -39,8 +39,22 @@ describe('viewBlock', () => {
 		expect(viewBlock(focus, 0, view)).toEqual({
 			title: 'Focus',
 			summary: '25 min · 20% break',
-			work: { label: 'Work', time: '0:00', target: '25:00', isActive: false, isOvertime: false },
-			break: { label: 'Break', time: '0:00', target: null, isActive: false, isOvertime: false }
+			work: {
+				label: 'Work',
+				time: '0:00',
+				target: '25:00',
+				isActive: false,
+				isOvertime: false,
+				progressPercent: 0
+			},
+			break: {
+				label: 'Break',
+				time: '0:00',
+				target: null,
+				isActive: false,
+				isOvertime: false,
+				progressPercent: 0
+			}
 		});
 	});
 
@@ -99,8 +113,22 @@ describe('viewBlock', () => {
 		expect(viewBlock(longBreak, 1, view)).toEqual({
 			title: 'Long break',
 			summary: '25 min · 60% break',
-			work: { label: 'Work', time: '0:00', target: '25:00', isActive: false, isOvertime: false },
-			break: { label: 'Break', time: '0:00', target: null, isActive: false, isOvertime: false }
+			work: {
+				label: 'Work',
+				time: '0:00',
+				target: '25:00',
+				isActive: false,
+				isOvertime: false,
+				progressPercent: 0
+			},
+			break: {
+				label: 'Break',
+				time: '0:00',
+				target: null,
+				isActive: false,
+				isOvertime: false,
+				progressPercent: 0
+			}
 		});
 	});
 
@@ -121,7 +149,8 @@ describe('viewBlock', () => {
 			time: '30:00',
 			target: '25:00',
 			isActive: false,
-			isOvertime: false
+			isOvertime: false,
+			progressPercent: 100
 		});
 	});
 
@@ -141,7 +170,8 @@ describe('viewBlock', () => {
 			time: '3:00',
 			target: null,
 			isActive: true,
-			isOvertime: false
+			isOvertime: false,
+			progressPercent: 60
 		});
 	});
 
@@ -153,7 +183,48 @@ describe('viewBlock', () => {
 			time: '0:00',
 			target: null,
 			isActive: true,
-			isOvertime: false
+			isOvertime: false,
+			progressPercent: 0
+		});
+	});
+
+	it("fills the work box's bar towards its target, with the break earned box's bar empty", () => {
+		const view = viewRun(working, minutes(12) + seconds(30));
+
+		const { work, break: breakBox } = viewBlock(focus, 0, view);
+		expect(work.progressPercent).toBe(50);
+		expect(breakBox.progressPercent).toBe(0);
+	});
+
+	it("keeps the work box's bar full in overtime", () => {
+		const atTarget = viewRun(working, minutes(25));
+		const pastTarget = viewRun(working, minutes(31) + seconds(40));
+
+		expect(viewBlock(focus, 0, atTarget).work.progressPercent).toBe(100);
+		expect(viewBlock(focus, 0, pastTarget).work.progressPercent).toBe(100);
+	});
+
+	it("empties the break box's bar as the break counts down, keeping the work box's bar", () => {
+		const breakAfterTenMinutes = next(working, minutes(10));
+		const startOfBreak = viewRun(breakAfterTenMinutes, minutes(10));
+		const halfwayThrough = viewRun(breakAfterTenMinutes, minutes(11));
+
+		expect(viewBlock(focus, 0, startOfBreak)).toMatchObject({
+			work: { progressPercent: 40 },
+			break: { progressPercent: 100 }
+		});
+		expect(viewBlock(focus, 0, halfwayThrough)).toMatchObject({
+			work: { progressPercent: 40 },
+			break: { progressPercent: 50 }
+		});
+	});
+
+	it("leaves the break box's bar empty after work too short to earn a second of break", () => {
+		const noBreakEarned = next(working, seconds(2));
+
+		expect(viewBlock(focus, 0, viewRun(noBreakEarned, seconds(2))).break).toMatchObject({
+			label: 'Break over',
+			progressPercent: 0
 		});
 	});
 

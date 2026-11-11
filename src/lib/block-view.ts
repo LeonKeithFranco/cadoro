@@ -1,6 +1,7 @@
 // What each block card on the timer screen shows: its title, its plan, and its work and break
 // boxes. The rules live here, beside `viewRun`'s, so the card only lays out what it's given.
 
+import { asPercentOf } from './percent';
 import type { Block } from './routine';
 import type { RunView } from './run';
 import { formatElapsed, formatRemaining, minutesToMs } from './time';
@@ -34,7 +35,16 @@ export type TimerBoxView = {
 	readonly isActive: boolean;
 	/** Whether the work box has reached its target, so it shows overtime. Never true for a break. */
 	readonly isOvertime: boolean;
+	/**
+	 * How full the box's bar is, from 0 to 100: the time worked out of the target, or the break
+	 * left out of the break earned. It's 0 when the box isn't in use, and for the break box while
+	 * the work earns it.
+	 */
+	readonly progressPercent: number;
 };
+
+/** The most a box's bar can be filled, as a percentage. */
+const FULL_BAR_PERCENT = 100;
 
 /** Everything one block card shows at one moment. */
 export type BlockView = {
@@ -65,7 +75,8 @@ export type BlockView = {
 export function viewBlock(block: Block, blockIndex: number, view: RunView): BlockView {
 	const title = block.title;
 	const summary = `${block.targetMinutes} min · ${block.breakPercent}% break`;
-	const target = formatElapsed(minutesToMs(block.targetMinutes));
+	const targetMs = minutesToMs(block.targetMinutes);
+	const target = formatElapsed(targetMs);
 	const notInUse = formatElapsed(0);
 
 	if (view.status === 'working' && view.block === blockIndex) {
@@ -77,27 +88,53 @@ export function viewBlock(block: Block, blockIndex: number, view: RunView): Bloc
 				time: formatElapsed(view.workedMs),
 				target,
 				isActive: true,
-				isOvertime: view.isOvertime
+				isOvertime: view.isOvertime,
+				progressPercent: barFillPercent(view.workedMs, targetMs)
 			},
-			break: breakBox('Break earned', formatElapsed(view.breakEarnedMs), false)
+			break: breakBox('Break earned', formatElapsed(view.breakEarnedMs), false, 0)
 		};
 	}
 
 	if (view.status === 'break' && view.block === blockIndex) {
+		const breakLeftPercent = barFillPercent(view.remainingMs, view.earnedMs);
 		return {
 			title,
 			summary,
-			work: idleWorkBox(formatElapsed(view.workedMs), target),
-			break: breakBox(view.isOver ? 'Break over' : 'Break', formatRemaining(view.remainingMs), true)
+			work: idleWorkBox(
+				formatElapsed(view.workedMs),
+				target,
+				barFillPercent(view.workedMs, targetMs)
+			),
+			break: breakBox(
+				view.isOver ? 'Break over' : 'Break',
+				formatRemaining(view.remainingMs),
+				true,
+				breakLeftPercent
+			)
 		};
 	}
 
 	return {
 		title,
 		summary,
-		work: idleWorkBox(notInUse, target),
-		break: breakBox('Break', notInUse, false)
+		work: idleWorkBox(notInUse, target, 0),
+		break: breakBox('Break', notInUse, false, 0)
 	};
+}
+
+/**
+ * Works out how full a box's bar is.
+ *
+ * @param partMs - The time the bar shows, such as the time worked, in milliseconds.
+ * @param wholeMs - The time a full bar stands for, such as the target, in milliseconds.
+ * @returns The percentage filled, from 0 to 100. A part past the whole, as in overtime, fills
+ * the bar. A whole of 0, such as a break too short to earn a second, leaves it empty.
+ */
+function barFillPercent(partMs: number, wholeMs: number): number {
+	if (wholeMs === 0) {
+		return 0;
+	}
+	return Math.min(FULL_BAR_PERCENT, asPercentOf(partMs, wholeMs));
 }
 
 /**
@@ -106,10 +143,11 @@ export function viewBlock(block: Block, blockIndex: number, view: RunView): Bloc
  *
  * @param time - The time it shows, such as `25:00` or `0:00`.
  * @param target - The block's target, such as `25:00`.
+ * @param progressPercent - How full its bar is, from 0 to 100.
  * @returns The work box, not highlighted and never in overtime.
  */
-function idleWorkBox(time: string, target: string): TimerBoxView {
-	return { label: 'Work', time, target, isActive: false, isOvertime: false };
+function idleWorkBox(time: string, target: string, progressPercent: number): TimerBoxView {
+	return { label: 'Work', time, target, isActive: false, isOvertime: false, progressPercent };
 }
 
 /**
@@ -118,8 +156,14 @@ function idleWorkBox(time: string, target: string): TimerBoxView {
  * @param label - What its time means: `Break earned`, `Break` or `Break over`.
  * @param time - The time it shows, such as `5:00`.
  * @param isActive - Whether its timer is the one in use.
+ * @param progressPercent - How full its bar is, from 0 to 100.
  * @returns The break box.
  */
-function breakBox(label: BreakLabel, time: string, isActive: boolean): TimerBoxView {
-	return { label, time, target: null, isActive, isOvertime: false };
+function breakBox(
+	label: BreakLabel,
+	time: string,
+	isActive: boolean,
+	progressPercent: number
+): TimerBoxView {
+	return { label, time, target: null, isActive, isOvertime: false, progressPercent };
 }
