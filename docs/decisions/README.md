@@ -8,6 +8,7 @@ The decision log: what was decided as Cadoro was built, why, and the options rej
 - `01-project-setup-and-ci.md`: the static single-page app, test file names, the npm scripts, audit warnings, and CI in Playwright's image with the `Protect main` ruleset.
 - `02-run-a-routine.md`: doc comments, the run engine, the position label, code style, the app shell, the theme, SvelteKit's generated types, the timer screen, the cycle counter, the live timer, Svelte state, testing the timer, durations in tests, the dev server's port, the Finish confirmation, the run summary, dialogs, and Playwright on a controlled clock.
 - `03-pwa-and-github-pages.md`: milestone 3's steps, long routines, the base path, the service worker, the icon, the offline test, the reload prompt, testing updates, the Taskfile, the Pages deploy, releases, and 0.1.0 and 0.2.0 on real devices.
+- `04-keep-runs.md`: milestone 4's steps, tabs sharing one run, storage, and loading before the app renders.
 
 ## Adding a decision
 
