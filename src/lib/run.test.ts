@@ -20,36 +20,7 @@ import {
 	type RunState,
 	type WorkingRun
 } from './run';
-
-/**
- * Converts whole seconds to milliseconds, the unit every time in the engine is in.
- *
- * @param count - The number of seconds.
- * @returns The same length of time in milliseconds.
- */
-function seconds(count: number): number {
-	return count * 1_000;
-}
-
-/**
- * Converts whole minutes to milliseconds.
- *
- * @param count - The number of minutes.
- * @returns The same length of time in milliseconds.
- */
-function minutes(count: number): number {
-	return seconds(count * 60);
-}
-
-/**
- * Converts whole hours to milliseconds.
- *
- * @param count - The number of hours.
- * @returns The same length of time in milliseconds.
- */
-function hours(count: number): number {
-	return minutes(count * 60);
-}
+import { hours, minutes, seconds } from './testing/durations';
 
 /**
  * Builds a routine plan with blocks that differ only in their number of cycles, which is all
