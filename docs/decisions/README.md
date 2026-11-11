@@ -1,6 +1,6 @@
 # Decisions
 
-The decision log: what was decided as Cadoro was built, why, and the options rejected along the way. There's one file per milestone, so a session reads only the milestone it's working on, and finds older decisions by searching the folder.
+The decision log: what was decided as Cadoro was built, why, and the options rejected along the way. There's one file per milestone, so a session reads only the milestone it's working on, and finds older decisions by searching the folder. `docs/ARCHITECTURE.md` says how the code is now, and these files say how it got that way.
 
 ## Files
 
