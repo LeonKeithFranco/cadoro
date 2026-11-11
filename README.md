@@ -2,12 +2,14 @@
 
 A self-hostable timer for focused work, built as a SvelteKit PWA. Routines are made of blocks; work counts up past its target, and each break is earned as a percentage of the time worked. Data stays in the browser, and there's no backend.
 
-**Status:** in development. The app runs the two starter routines, installs as an app and works offline, at **[leonkeithfranco.github.io/cadoro](https://leonkeithfranco.github.io/cadoro/)**. Nothing is saved yet. [`docs/PROGRESS.md`](docs/PROGRESS.md) has the current state.
+**Status:** in development. The app runs routines, installs as an app and works offline, at **[leonkeithfranco.github.io/cadoro](https://leonkeithfranco.github.io/cadoro/)**. [`docs/PROGRESS.md`](docs/PROGRESS.md) has what it does so far and what's next.
 
 ## Docs
 
 - [`docs/SPEC.md`](docs/SPEC.md): what the app does
 - [`docs/PLAN.md`](docs/PLAN.md): the stack and the milestones
+- [`docs/PROGRESS.md`](docs/PROGRESS.md): where things stand and what's next
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): how the code fits together
 - [`docs/decisions/`](docs/decisions/): every decision, with its reasons, one file per milestone
 
 ## Stack
