@@ -95,7 +95,7 @@ The app goes online and becomes installable, as version 0.1.0.
 
 ### 4. Keep runs
 
-Runs survive reloads, and every work period is recorded.
+Runs survive reloads, every work period is recorded, and every open tab shows the same run.
 
 - Define the storage interface, with a Dexie backend for the app and an in-memory one for tests, sharing one test suite
 - Create the starter routines in storage on first launch
@@ -103,8 +103,9 @@ Runs survive reloads, and every work period is recorded.
 - Save the run in progress, with a heartbeat every second and when the page is hidden, and restore it paused at the last heartbeat on reopening
 - Ask for persistent storage after the first work period is saved
 - Version the Dexie schema from the start, because the app is already deployed and later milestones change what's stored
+- Share the run between open tabs, each following the saved run through a Dexie live query, so work is recorded once
 
-**Learn:** loading async data in Svelte, Dexie live queries in Svelte, Svelte's context API, the Page Visibility API and `pagehide`, IndexedDB schema versions and upgrades
+**Learn:** loading async data in SvelteKit's `load`, Dexie live queries in Svelte, Svelte's context API compared with props, the Page Visibility API and `pagehide`, IndexedDB schema versions and upgrades
 
 ### 5. Alerts and Settings
 
@@ -197,7 +198,7 @@ Every pull request must pass lint, formatting, type checks, tests and the build 
 - **Milestone 1:** a pull request with a deliberately failing test can't be merged.
 - **Milestone 2:** you can run both starter routines through work, overtime, break and Finish on the dev server, on the desktop and the phone.
 - **Milestone 3:** the app installs from Pages on your phone and desktop, opens in airplane mode, and a merged change reaches the installed copy as a new version.
-- **Milestone 4:** reloading, or the phone killing the app, mid-run restores the run paused, with the right times, and the work periods are saved.
+- **Milestone 4:** reloading, or the phone killing the app, mid-run restores the run paused, with the right times, and the work periods are saved. Two tabs show the same run, and record its work once.
 - **Milestone 5:** a chime plays on time in a background desktop tab, and the screen stays on during a run on the phone.
 - **Milestone 6:** a routine you build, reorder and edit runs exactly as configured.
 - **Milestone 7:** the stats match hand-calculated values for synthetic data, including a period across midnight and a daylight saving change.
