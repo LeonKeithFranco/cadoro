@@ -45,6 +45,35 @@ The dev server and the Playwright tests use port 5173, or `PORT` when it's set. 
 BASE_PATH=/cadoro npm run build
 ```
 
+## Tasks
+
+[`Taskfile.yml`](Taskfile.yml) runs the workflows that take several commands, with [go-task](https://taskfile.dev). Install it from your package manager. Fedora calls the command `go-task` rather than `task`, so either use that name or alias it. `task` lists every task, and `task --summary <name>` shows a task's longer help. Tasks call the npm scripts above rather than repeating them, and CI calls the npm scripts directly.
+
+| Task                                          | What it does                                                                                    |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `task setup`                                  | Installs the locked dependencies and Playwright's Chromium                                      |
+| `task check`                                  | Every check CI runs, in CI's order, plus `check:ci-image`                                       |
+| `task check:quick`                            | Lint, formatting, types, and unit and component tests, in seconds                               |
+| `task check:ci-image`                         | Checks that CI's Playwright image matches the Playwright version in the lockfile                |
+| `task fix`                                    | Formats every file, fixes what ESLint can, and lists the changed files                          |
+| `task audit`                                  | Known vulnerabilities in what the app ships                                                     |
+| `task clean`                                  | Deletes the build and the test results                                                          |
+| `task e2e:repeat TIMES=20 -- --project phone` | Runs the Playwright tests many times to catch flaky ones                                        |
+| `task e2e:report`                             | Opens the last Playwright report, with the traces of failed tests                               |
+| `task preview:production`                     | Builds the app at `/cadoro`, as Pages serves it, and serves it on port 4199                     |
+| `task dev:phone`                              | Runs the dev server for a phone on USB, through `adb reverse`                                   |
+| `task ports`                                  | Shows what's listening on each of the project's ports                                           |
+| `task branch:new BRANCH=feat/run-history`     | Starts a branch from the latest `main`, checking its name                                       |
+| `task branch:delete BRANCH=…`                 | Deletes a local branch once every commit is on `main`, including after a rebase merge           |
+| `task worktree:new NAME=… BRANCH=…`           | Makes a worktree in `../<repo>-worktrees/`, copies the local settings and sets it up            |
+| `task worktree:done NAME=…`                   | Removes a worktree and its branch, once its work is committed and on `main`                     |
+| `task ci:watch`                               | Watches the pull request's checks until they finish                                             |
+| `task ci:logs`                                | Shows the failed steps' log from the branch's latest CI run                                     |
+| `task ci:report`                              | Downloads and opens CI's Playwright report from a failed run                                    |
+| `task pr:merge`                               | Rebase-merges the pull request once its checks pass, then updates `main` and deletes the branch |
+
+Each task checks what it needs before doing anything, such as a free port or no uncommitted work, and says what's wrong if it can't go ahead.
+
 ## Credits
 
 - **Icons:** the navigation icons and the app's icon come from [Lucide](https://lucide.dev), under the [ISC licence](https://github.com/lucide-icons/lucide/blob/main/LICENSE). The app's icon is Lucide's [`timer`](https://lucide.dev/icons/timer) on a rose square.
