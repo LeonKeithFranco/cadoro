@@ -24,7 +24,7 @@ npx playwright install chromium   # once, for the browser tests
 npm run dev                       # dev server at http://localhost:5173
 ```
 
-The dev server and the Playwright tests use port 5173, or `PORT` when it's set. In a second git worktree, give each command its own port, such as `PORT=5174 npm run test:e2e`, or Playwright will test the first worktree's server. The production build that `npm run test:e2e` tests always uses port 4175, and stops with an error if it's busy, so run the end-to-end tests in one worktree at a time.
+The dev server and the Playwright tests use port 5173, or `PORT` when it's set. In a second git worktree, give each command its own port, such as `PORT=5174 npm run test:e2e`, or Playwright will test the first worktree's server. The production build that `npm run test:e2e` tests always uses port 4175, and the update tests' server, which serves the same build, uses 4176. Each stops with an error if its port is busy, so run the end-to-end tests in one worktree at a time.
 
 | Command                  | What it does                                                                                   |
 | ------------------------ | ---------------------------------------------------------------------------------------------- |
