@@ -3,9 +3,15 @@ import { playwright } from '@vitest/browser-playwright';
 import tailwindcss from '@tailwindcss/vite';
 import adapter from '@sveltejs/adapter-static';
 import { sveltekit } from '@sveltejs/kit/vite';
+// The extension is needed because Vite plans to load its config as a native Node module, which
+// doesn't guess extensions the way a bundler does.
+import { devPort } from './dev-server.ts';
 
 /** How Vite builds and serves the app, with SvelteKit's config and Vitest's test projects. */
 export default defineConfig({
+	// Fails rather than moving to the next free port, so the server is always where Playwright
+	// looks for it.
+	server: { port: devPort, strictPort: true },
 	plugins: [
 		tailwindcss(),
 		sveltekit({
@@ -46,7 +52,8 @@ export default defineConfig({
 				test: {
 					name: 'server',
 					environment: 'node',
-					include: ['src/**/*.test.ts'],
+					// The root's tests cover the config's own logic, such as the dev server's port.
+					include: ['src/**/*.test.ts', '*.test.ts'],
 					exclude: ['src/**/*.svelte.test.ts']
 				}
 			}
