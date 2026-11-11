@@ -5,29 +5,35 @@ import type { Block } from './routine';
 import type { RunView } from './run';
 import { formatElapsed, formatRemaining, minutesToMs } from './time';
 
-/** What a block's work box shows. */
-export type WorkBoxView = {
-	/** The time worked, such as `12:34`, or `0:00` when the box isn't in use. */
-	readonly time: string;
-	/** The block's target, such as `25:00`. */
-	readonly target: string;
-	/** Whether this box's timer is the one in use, so it's highlighted. */
-	readonly isActive: boolean;
-	/** Whether the work in this box has reached its target, so the box shows overtime. */
-	readonly isOvertime: boolean;
-};
+/**
+ * What a work box's time means: `Work`, or `Work · Overtime` once it reaches its target, so
+ * overtime isn't shown by colour alone.
+ */
+type WorkLabel = 'Work' | 'Work · Overtime';
 
-/** What a block's break box shows. */
-export type BreakBoxView = {
+/**
+ * What a break box's time means: `Break earned` while the block's work grows it, `Break` while
+ * it counts down or isn't in use, and `Break over` once it reaches 0:00.
+ */
+type BreakLabel = 'Break earned' | 'Break' | 'Break over';
+
+/**
+ * What one of a block's two boxes shows, the work box or the break box, which share a layout.
+ */
+export type TimerBoxView = {
+	/** What the time means, such as `Work` or `Break earned`. */
+	readonly label: WorkLabel | BreakLabel;
 	/**
-	 * What the time means: `Break earned` while the block's work grows it, `Break` while it counts
-	 * down or isn't in use, and `Break over` once it reaches 0:00.
+	 * The time worked, the break earned so far or the break left, such as `12:34`, or `0:00` when
+	 * the box isn't in use.
 	 */
-	readonly label: 'Break earned' | 'Break' | 'Break over';
-	/** The break earned so far, the break left, or `0:00` when the box isn't in use. */
 	readonly time: string;
+	/** The work box's target, such as `25:00`, shown after its time, or `null` for the break box. */
+	readonly target: string | null;
 	/** Whether this box's timer is the one in use, so it's highlighted. */
 	readonly isActive: boolean;
+	/** Whether the work box has reached its target, so it shows overtime. Never true for a break. */
+	readonly isOvertime: boolean;
 };
 
 /** Everything one block card shows at one moment. */
@@ -37,9 +43,9 @@ export type BlockView = {
 	/** The block's target and break percentage, such as "25 min · 20% break". */
 	readonly summary: string;
 	/** The work box, shown above the break box. */
-	readonly work: WorkBoxView;
+	readonly work: TimerBoxView;
 	/** The break box, shown below the work box. */
-	readonly break: BreakBoxView;
+	readonly break: TimerBoxView;
 };
 
 /**
@@ -67,12 +73,13 @@ export function viewBlock(block: Block, blockIndex: number, view: RunView): Bloc
 			title,
 			summary,
 			work: {
+				label: view.isOvertime ? 'Work · Overtime' : 'Work',
 				time: formatElapsed(view.workedMs),
 				target,
 				isActive: true,
 				isOvertime: view.isOvertime
 			},
-			break: { label: 'Break earned', time: formatElapsed(view.breakEarnedMs), isActive: false }
+			break: breakBox('Break earned', formatElapsed(view.breakEarnedMs), false)
 		};
 	}
 
@@ -80,19 +87,39 @@ export function viewBlock(block: Block, blockIndex: number, view: RunView): Bloc
 		return {
 			title,
 			summary,
-			work: { time: formatElapsed(view.workedMs), target, isActive: false, isOvertime: false },
-			break: {
-				label: view.isOver ? 'Break over' : 'Break',
-				time: formatRemaining(view.remainingMs),
-				isActive: true
-			}
+			work: idleWorkBox(formatElapsed(view.workedMs), target),
+			break: breakBox(view.isOver ? 'Break over' : 'Break', formatRemaining(view.remainingMs), true)
 		};
 	}
 
 	return {
 		title,
 		summary,
-		work: { time: notInUse, target, isActive: false, isOvertime: false },
-		break: { label: 'Break', time: notInUse, isActive: false }
+		work: idleWorkBox(notInUse, target),
+		break: breakBox('Break', notInUse, false)
 	};
+}
+
+/**
+ * Describes a work box whose timer isn't in use: one that hasn't started, or that's showing the
+ * time that earned the break after it.
+ *
+ * @param time - The time it shows, such as `25:00` or `0:00`.
+ * @param target - The block's target, such as `25:00`.
+ * @returns The work box, not highlighted and never in overtime.
+ */
+function idleWorkBox(time: string, target: string): TimerBoxView {
+	return { label: 'Work', time, target, isActive: false, isOvertime: false };
+}
+
+/**
+ * Describes a break box, which has no target and never shows overtime.
+ *
+ * @param label - What its time means: `Break earned`, `Break` or `Break over`.
+ * @param time - The time it shows, such as `5:00`.
+ * @param isActive - Whether its timer is the one in use.
+ * @returns The break box.
+ */
+function breakBox(label: BreakLabel, time: string, isActive: boolean): TimerBoxView {
+	return { label, time, target: null, isActive, isOvertime: false };
 }

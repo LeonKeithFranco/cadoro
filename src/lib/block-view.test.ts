@@ -39,8 +39,8 @@ describe('viewBlock', () => {
 		expect(viewBlock(focus, 0, view)).toEqual({
 			title: 'Focus',
 			summary: '25 min · 20% break',
-			work: { time: '0:00', target: '25:00', isActive: false, isOvertime: false },
-			break: { label: 'Break', time: '0:00', isActive: false }
+			work: { label: 'Work', time: '0:00', target: '25:00', isActive: false, isOvertime: false },
+			break: { label: 'Break', time: '0:00', target: null, isActive: false, isOvertime: false }
 		});
 	});
 
@@ -48,7 +48,7 @@ describe('viewBlock', () => {
 		const view = viewRun(working, minutes(12) + seconds(30));
 
 		expect(viewBlock(focus, 0, view)).toMatchObject({
-			work: { time: '12:30', target: '25:00', isActive: true, isOvertime: false },
+			work: { label: 'Work', time: '12:30', target: '25:00', isActive: true, isOvertime: false },
 			break: { label: 'Break earned', time: '2:30', isActive: false }
 		});
 	});
@@ -57,9 +57,17 @@ describe('viewBlock', () => {
 		const view = viewRun(working, minutes(31) + seconds(40));
 
 		expect(viewBlock(focus, 0, view)).toMatchObject({
-			work: { time: '31:40', isActive: true, isOvertime: true },
-			break: { label: 'Break earned', time: '6:20' }
+			work: { label: 'Work · Overtime', time: '31:40', isActive: true, isOvertime: true },
+			break: { label: 'Break earned', time: '6:20', isOvertime: false }
 		});
+	});
+
+	it('marks overtime from the moment the work reaches its target', () => {
+		const justBefore = viewRun(working, minutes(25) - 1);
+		const atTarget = viewRun(working, minutes(25));
+
+		expect(viewBlock(focus, 0, justBefore).work.label).toBe('Work');
+		expect(viewBlock(focus, 0, atTarget).work.label).toBe('Work · Overtime');
 	});
 
 	it('uses the boxes of the block the run is in', () => {
@@ -91,8 +99,8 @@ describe('viewBlock', () => {
 		expect(viewBlock(longBreak, 1, view)).toEqual({
 			title: 'Long break',
 			summary: '25 min · 60% break',
-			work: { time: '0:00', target: '25:00', isActive: false, isOvertime: false },
-			break: { label: 'Break', time: '0:00', isActive: false }
+			work: { label: 'Work', time: '0:00', target: '25:00', isActive: false, isOvertime: false },
+			break: { label: 'Break', time: '0:00', target: null, isActive: false, isOvertime: false }
 		});
 	});
 
@@ -100,8 +108,20 @@ describe('viewBlock', () => {
 		const view = viewRun(onBreak, minutes(27));
 
 		expect(viewBlock(focus, 0, view)).toMatchObject({
-			work: { time: '25:00', isActive: false, isOvertime: false },
+			work: { label: 'Work', time: '25:00', isActive: false, isOvertime: false },
 			break: { label: 'Break', time: '3:00', isActive: true }
+		});
+	});
+
+	it('shows the work that earned a break without overtime, even when it ran past its target', () => {
+		const breakAfterOvertime = next(working, minutes(30));
+
+		expect(viewBlock(focus, 0, viewRun(breakAfterOvertime, minutes(30))).work).toEqual({
+			label: 'Work',
+			time: '30:00',
+			target: '25:00',
+			isActive: false,
+			isOvertime: false
 		});
 	});
 
@@ -119,7 +139,9 @@ describe('viewBlock', () => {
 		expect(viewBlock(focus, 0, viewRun(paused, minutes(40))).break).toEqual({
 			label: 'Break',
 			time: '3:00',
-			isActive: true
+			target: null,
+			isActive: true,
+			isOvertime: false
 		});
 	});
 
@@ -129,7 +151,9 @@ describe('viewBlock', () => {
 		expect(viewBlock(focus, 0, view).break).toEqual({
 			label: 'Break over',
 			time: '0:00',
-			isActive: true
+			target: null,
+			isActive: true,
+			isOvertime: false
 		});
 	});
 
