@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { createStarterRoutines } from './routine';
 import { minutes, seconds } from './testing/durations';
 import { numberedIds } from './testing/ids';
+import { oneRoundRoutine } from './testing/routines';
 import { TimerSession } from './timer.svelte';
 
 /** The starter routines, Classic then Classic with long break, with predictable ids. */
@@ -216,21 +217,47 @@ describe('the controls', () => {
 		});
 	});
 
-	it('finishes the run with Finish and readies a new run of the same routine', () => {
+	it('ends the run with Finish and keeps it, with its summary', () => {
 		const session = createSession();
 		session.select(classicWithLongBreak.id);
 		session.play();
 		nowMs = minutes(25);
 		session.next();
+		nowMs = minutes(27);
+		session.next();
+		nowMs = minutes(30);
 
 		session.finish();
 
 		expect(session.routine).toBe(classicWithLongBreak);
 		expect(session.view).toEqual({
-			status: 'ready',
-			block: 0,
-			cycle: 0,
-			label: 'Round 1 · Block 1 of 2 · Cycle 1 of 3',
+			status: 'ended',
+			summary: {
+				totalWorkMs: minutes(28),
+				periodsCompleted: 2,
+				roundsReached: 1,
+				overtimeMs: 0
+			},
+			isRunning: false,
+			isInProgress: false
+		});
+	});
+
+	it('ends a finite routine with its last Next, keeping the run and its summary', () => {
+		const session = new TimerSession([oneRoundRoutine], () => nowMs);
+		session.play();
+		nowMs = minutes(26);
+
+		session.next();
+
+		expect(session.view).toEqual({
+			status: 'ended',
+			summary: {
+				totalWorkMs: minutes(26),
+				periodsCompleted: 1,
+				roundsReached: 1,
+				overtimeMs: minutes(1)
+			},
 			isRunning: false,
 			isInProgress: false
 		});
@@ -244,5 +271,57 @@ describe('the controls', () => {
 		session.finish();
 
 		expect(session.view).toMatchObject({ status: 'ready', isInProgress: false });
+	});
+});
+
+describe('readying a new run', () => {
+	it('readies a new run of the same routine once the run has ended', () => {
+		const session = createSession();
+		session.select(classicWithLongBreak.id);
+		session.play();
+		nowMs = minutes(10);
+		session.finish();
+
+		session.readyNewRun();
+
+		expect(session.routine).toBe(classicWithLongBreak);
+		expect(session.view).toEqual({
+			status: 'ready',
+			block: 0,
+			cycle: 0,
+			label: 'Round 1 · Block 1 of 2 · Cycle 1 of 3',
+			isRunning: false,
+			isInProgress: false
+		});
+	});
+
+	it('leaves a run in progress as it is', () => {
+		const session = createSession();
+		session.play();
+		nowMs = minutes(10);
+
+		session.readyNewRun();
+		session.tick();
+
+		expect(session.view).toMatchObject({
+			status: 'working',
+			workedMs: minutes(10),
+			isRunning: true
+		});
+	});
+
+	it('leaves a paused run as it is', () => {
+		const session = createSession();
+		session.play();
+		nowMs = minutes(10);
+		session.pause();
+
+		session.readyNewRun();
+
+		expect(session.view).toMatchObject({
+			status: 'working',
+			workedMs: minutes(10),
+			isInProgress: true
+		});
 	});
 });

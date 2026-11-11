@@ -17,6 +17,7 @@
 	import type { TimerSession } from '../timer.svelte';
 	import BlockCard from './BlockCard.svelte';
 	import RoutinePicker from './RoutinePicker.svelte';
+	import RunSummary from './RunSummary.svelte';
 	import ScreenHeading from './ScreenHeading.svelte';
 	import TimerControls from './TimerControls.svelte';
 
@@ -28,8 +29,8 @@
 
 	let { session }: Props = $props();
 
-	// An ended run has no position. Until the run summary exists, Finish goes straight to a new
-	// ready run, so this screen never shows one.
+	// An ended run has no position. The screen behind its summary shows no label until a new run
+	// is ready.
 	let positionLabel = $derived(session.view.status === 'ended' ? '' : session.view.label);
 
 	// A derived value tells the effect below that it changed only when its value does. The view
@@ -90,3 +91,14 @@
 		onfinish={() => session.finish()}
 	/>
 </div>
+
+<!-- Shown for as long as the run has ended, so it opens whenever a run ends, by Finish or by its
+     last work period, and is still there after a trip to another screen. Closing it readies a new
+     run, which removes it. -->
+{#if session.view.status === 'ended'}
+	<RunSummary
+		routineTitle={session.routine.title}
+		summary={session.view.summary}
+		ondone={() => session.readyNewRun()}
+	/>
+{/if}

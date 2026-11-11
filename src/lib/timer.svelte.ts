@@ -101,14 +101,27 @@ export class TimerSession {
 	}
 
 	/**
-	 * Presses Finish: ends the run, and readies a new run of the same routine.
+	 * Presses Finish: ends the run, saving the work period in progress up to this moment.
 	 *
 	 * @remarks
-	 * The run summary doesn't exist yet, so the ended run isn't kept, and the screen goes straight
-	 * back to ready.
+	 * The ended run is kept, so the screen can show its summary, until {@link TimerSession.readyNewRun}
+	 * replaces it.
 	 */
 	finish(): void {
 		this.#press(finish);
+	}
+
+	/**
+	 * Readies a new run of the same routine once the run has ended, as closing its summary does.
+	 *
+	 * @remarks
+	 * A run that hasn't ended is left as it is, so its work can't be thrown away by mistake.
+	 */
+	readyNewRun(): void {
+		if (this.#run.status !== 'ended') {
+			return;
+		}
+
 		this.#run = createRun(this.#routine);
 	}
 
