@@ -4,6 +4,31 @@ Changes to the spec, plan and design, newest day first, each with its reason and
 
 ## 2026-11-10
 
+**Doc comments in Svelte components**
+
+- Svelte components are now checked with the same TSDoc and JSDoc rules as TypeScript files, settling the question left open below. Each component starts with a `<!-- @component -->` comment, Svelte's own convention, which editors show when hovering over the component where it's used. Each prop has a comment on its field in the component's `Props` type. Functions, types and constants in either script need one, as in `.ts` files.
+- Variables declared with `$state`, `$derived` or `$props` need no comment. They're named for what they hold, and the component's comment and `Props` type already describe them. Requiring one on every declaration, as in `.ts` files, was rejected as repeating what good names say. Leaving `.svelte` files unchecked was rejected because a missing comment would only show up in review.
+- The `@component` comment is required with ESLint's `no-restricted-syntax` and a selector, since no plugin rule checks it. The rune exception uses attribute paths such as `[init.callee.name=…]`, because esquery 1.7, ESLint's selector engine, fails to match field selectors such as `CallExpression.init` inside `:has(> …)`.
+
+**The theme**
+
+- Tailwind's `dark:` variant follows a `data-theme` attribute on `<html>` instead of the system's colour scheme, so the theme setting in milestone 5 only has to change the attribute. It's fixed to `dark`, the spec's default, until then. Every element carries both its light and its dark colours from the start, and both are checked in screenshots. Naming the app's colours in `@theme`, such as `bg-surface`, was rejected as less of Tailwind's own `dark:` pattern to learn. Writing only dark colours now was rejected because milestone 5 would then revisit every class.
+- The page's colours are on `<body>`, so the whole window follows the theme, including the area shown when scrolling past the end on a phone. `color-scheme` follows the theme too, so the browser draws its own controls and scrollbars to match.
+
+**The app shell**
+
+- Navigation has icons and labels on both layouts: a tab bar fixed to the bottom on phones, and links on the right of the header from Tailwind's `md` breakpoint, 48rem, as in the weight tracker. Icons only on phones, or labels only, were rejected as harder to tell apart at a glance or less consistent between the two. The icons are Lucide's `timer`, `list`, `chart-column` and `settings`, from `@lucide/svelte` (ISC licence), imported one file per icon so the dev server doesn't load the whole set.
+- The current screen's link is marked with `aria-current="page"` and highlighted in rose, the app's first accent colour. Light uses rose-700, because rose-600 on white is only 4.51:1, just over the 4.5:1 minimum, and dark uses rose-400.
+- The header shows the app's name as plain text, and each screen has its own `<h1>` and tab title, such as "Routines · Cadoro", as in the weight tracker. Screens sit in a centred column up to `max-w-3xl` (48rem) wide.
+- The layout passes the current route's id to the navigation, rather than the URL's path, because the id stays `/routines` when milestone 3 serves the app from `/cadoro/`. Passing it as a prop also lets component tests render the navigation without faking SvelteKit's `page`. A screen also counts as current on any route under it, so the activity log page inside Settings will still highlight Settings.
+- Links are built with SvelteKit's `resolve()`, which adds the base path, as ESLint's recommended `svelte/no-navigation-without-resolve` rule requires.
+- Placeholder screens say what they'll hold "in a later version", rather than naming a milestone, which means nothing to someone using the app. They share one `ScreenPlaceholder` component.
+
+**SvelteKit's generated types**
+
+- `package.json` has a `dependencies` script that runs `svelte-kit sync`. SvelteKit 3 writes its generated types to `node_modules/$app`, which `npm install <package>` and `npm uninstall <package>` delete as an unknown package, while `prepare` only runs on a bare `npm install`. npm runs the `dependencies` script after any command that changes `node_modules`, which a `--no-save` install and uninstall confirmed.
+- Zed also needs `file_scan_inclusions` to include `node_modules/$app/**`, or its language servers keep out-of-date route types. That lives in the git-ignored `.zed/settings.json`, since editor setup is personal.
+
 **Doc comments**
 
 - TypeScript files are checked for TSDoc comments with `eslint-plugin-tsdoc` and `eslint-plugin-jsdoc`, configured as in the weight tracker: a comment on every module-level declaration, type and field, and `@param` and `@returns` on every function. It came in its own pull request before the run engine, so the engine is checked from its first line, rather than as the first commit of that step.
