@@ -69,3 +69,77 @@ jobs:
             test-results/
           if-no-files-found: ignore
           retention-days: 14
+
+  # Builds the site for GitHub Pages once the checks pass on `main`. Pull
+  # requests never deploy.
+  pages-build:
+    name: Build for Pages
+    needs: checks
+    if: github.event_name == 'push'
+    # Runs on the plain runner rather than in Playwright's image, because the
+    # build needs no browser.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Pages serves the site from a folder named after the repo, so a fork
+      # gets the right path without changes. SvelteKit wants it with a leading
+      # slash and no trailing one.
+      - name: Build
+        run: npm run build
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}
+
+      # Pages has no route fallback, so a screen's address, such as `/stats`,
+      # would get GitHub's own 404 page on a first visit, before the service
+      # worker is installed. Pages serves `404.html` for any missing path, and
+      # as a copy of the fallback page it starts the app, whose router then
+      # shows the right screen. The fallback page links its files by absolute
+      # paths, so it works at any depth.
+      - name: Add the route fallback
+        run: cp build/index.html build/404.html
+
+      - name: Upload the site
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: build
+
+  # Publishes the uploaded site. Only this job can write to Pages.
+  pages-deploy:
+    name: Deploy to Pages
+    needs: pages-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      # Publishes to Pages.
+      pages: write
+      # Proves to Pages that the request comes from this workflow run.
+      id-token: write
+    # Records each deployment in the repo's `github-pages` environment, with a
+    # link to the site.
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    # One deployment at a time. A newer one waits rather than cancelling one
+    # that's partway through.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
+      # Deploys the artifact `pages-build` uploaded. Both actions name it
+      # `github-pages` by default, and this one only looks in the current
+      # workflow run, so it always gets this run's build.
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v5
