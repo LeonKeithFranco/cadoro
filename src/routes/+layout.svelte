@@ -1,24 +1,18 @@
 <!--
   @component
-  The frame every screen is drawn in. It loads the global styles, registers the
-  service worker that keeps the app for offline use, shows the header with the app's name and
-  the navigation, then renders the current screen in the page's `<main>`.
+  The frame every screen is drawn in. It loads the global styles, shows the header with the app's
+  name and the navigation, renders the current screen in the page's `<main>`, and holds the update
+  prompt, which registers the service worker that keeps the app for offline use.
 -->
 <script lang="ts">
 	import './layout.css';
-	import { onMount } from 'svelte';
 	import { page } from '$app/state';
-	import { registerSW } from 'virtual:pwa-register';
 	import ScreenNav from '#lib/components/ScreenNav.svelte';
+	import UpdatePrompt from '#lib/components/UpdatePrompt.svelte';
+	import { timerSession } from '#lib/timer.svelte.ts';
 	import type { LayoutProps } from './$types';
 
 	let { children }: LayoutProps = $props();
-
-	// The layout mounts once, when the app opens, and stays while screens change. On the dev
-	// server the plugin makes this do nothing, so development never runs an old cached copy.
-	onMount(() => {
-		registerSW();
-	});
 </script>
 
 <!-- The header's border spans the window, while its contents line up with the screen below. -->
@@ -33,3 +27,8 @@
 <main class="mx-auto max-w-3xl p-4 pb-24 md:pb-4">
 	{@render children()}
 </main>
+
+<!-- The layout mounts once, when the app opens, and stays while screens change, so the service
+     worker is registered once. On the dev server the plugin makes registering do nothing, so
+     development never runs an old cached copy. -->
+<UpdatePrompt runInProgress={timerSession.view.isInProgress} />
