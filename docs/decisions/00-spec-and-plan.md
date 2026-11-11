@@ -60,6 +60,7 @@ The spec and plan were worked out in conversation on 2026-11-09, starting from t
 ### The docs
 
 - Decisions live in their own file, `docs/DECISIONS.md`, rather than at the end of `docs/PROGRESS.md` as in the weight tracker. Status is rewritten constantly while the log only grows, so separate files keep each one's purpose clear, and the README can link the log directly. `CLAUDE.md` loads both into every session, because decisions carrying over between sessions is what made the weight tracker's log useful. One file per decision, as architecture decision records do, was rejected as too much structure for a solo project's many small decisions.
+- **Changed later:** the log became one file per milestone in `docs/decisions/`, and `CLAUDE.md` stopped importing it, in [The docs](04-keep-runs.md#the-docs).
 
 ### Planning each step
 
