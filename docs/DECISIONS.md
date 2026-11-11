@@ -4,6 +4,13 @@ Changes to the spec, plan and design, newest day first, each with its reason and
 
 ## 2026-11-10
 
+**The dev server's port**
+
+- The dev server and Playwright take their port from `PORT`, defaulting to Vite's 5173, through one shared `dev-server.ts`. Vite's `strictPort` makes the server fail on a busy port rather than move to the next free one. Before this, Playwright silently reused a dev server already on 5173 from another git worktree, and a second server quietly moved to 5174. Checking it showed exactly that: a stand-in server moved to 5174 and Playwright tested it. A second worktree now runs its commands with its own port, such as `PORT=5174 npm run test:e2e`. Turning off `reuseExistingServer` was rejected, because it would also refuse the worktree's own dev server while you're using it.
+- An invalid `PORT` stops the config with a clear error, rather than starting Vite on a port it can't use.
+- The configs import `./dev-server.ts` with its extension, because Vite 8.3 warns that a future major version will load its config as a native Node module, which needs it.
+- This was its own pull request from `main`, made in a worktree while the timer screen step was in progress, following the worktree rules in the global git instructions.
+
 **Doc comments in Svelte components**
 
 - Svelte components are now checked with the same TSDoc and JSDoc rules as TypeScript files, settling the question left open below. Each component starts with a `<!-- @component -->` comment, Svelte's own convention, which editors show when hovering over the component where it's used. Each prop has a comment on its field in the component's `Props` type. Functions, types and constants in either script need one, as in `.ts` files.
