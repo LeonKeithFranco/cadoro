@@ -31,6 +31,12 @@ vars:
   LATEST_RUN_COMMAND: >-
     gh run list --branch "$(git branch --show-current)" --limit 1 --json databaseId
     --jq '.[0].databaseId'
+  # How long to wait for GitHub to start a CI run after a push or a merge.
+  CHECKS_START_SECONDS: 60
+  # A command listing the `CI/CD` run that a push to main started for COMMIT, which a task sets
+  # in the shell first. Pull requests' runs are left out, because they test other commits.
+  MAIN_RUN_COMMAND: >-
+    gh run list --workflow pipeline.yml --branch main --event push --commit "$COMMIT" --limit 1
 
 tasks:
   default:
@@ -280,9 +286,6 @@ tasks:
 
   ci:watch:
     desc: Watch the checks on this branch's pull request until they finish, failing if one fails
-    vars:
-      # How long to wait for GitHub to start the checks after a push.
-      CHECKS_START_SECONDS: 60
     preconditions:
       - sh: gh pr view --json number > /dev/null 2>&1
         msg: This branch has no pull request yet. Push it and open one first.
@@ -300,6 +303,27 @@ tasks:
           echo "GitHub didn't start the checks within {{.CHECKS_START_SECONDS}} seconds." >&2
           exit 1
       - gh pr checks --watch --fail-fast
+
+  ci:watch-main:
+    desc: Watch the CI/CD run on main's newest commit until it finishes, deploy included, failing if a job fails
+    cmds:
+      - git fetch --quiet origin
+      # A merge starts the run a few seconds later, so this waits for it to appear first.
+      - silent: true
+        cmd: |
+          COMMIT="$(git rev-parse origin/main)"
+          for second in $(seq {{.CHECKS_START_SECONDS}}); do
+            run="$({{.MAIN_RUN_COMMAND}} --json databaseId --jq '.[0].databaseId')"
+            if [ -n "$run" ]; then
+              break
+            fi
+            sleep 1
+          done
+          if [ -z "$run" ]; then
+            echo "GitHub didn't start a CI/CD run for main's $COMMIT within {{.CHECKS_START_SECONDS}} seconds." >&2
+            exit 1
+          fi
+          gh run watch "$run" --exit-status
 
   ci:logs:
     desc: Show the failed steps' log from this branch's latest CI run, or from RUN
@@ -375,3 +399,150 @@ tasks:
       - git pull --ff-only --prune
       - task: branch:delete
         vars: { BRANCH: '{{.BRANCH}}' }
+
+  release:bump:
+    desc: Bump the version by LEVEL (patch, minor or major) on this pull request's branch, and commit it
+    summary: |
+      Every pull request that changes the app bumps the version once, on its own branch, so the
+      merge deploys a new version. A fix is a patch, a new feature minor, and a change that stops
+      old data or backups working major. Commits package.json and package-lock.json as
+      `chore(release): X.Y.Z`:
+
+        task release:bump LEVEL=minor
+    requires:
+      vars:
+        - name: LEVEL
+          enum: [patch, minor, major]
+    vars:
+      BRANCH:
+        sh: git branch --show-current
+      BRANCH_VERSION:
+        sh: node -p "require('./package.json').version"
+      MAIN_VERSION:
+        sh: >-
+          git show origin/main:package.json | node -p
+          "JSON.parse(require('node:fs').readFileSync(0, 'utf8')).version"
+    preconditions:
+      # The version changes on the pull request, so the tag after the merge names checked code.
+      - sh: '[ "{{.BRANCH}}" != main ]'
+        msg: You're on main. Bump the version on the pull request's branch.
+      - sh: '[ -z "$(git status --porcelain)" ]'
+        msg: This branch has uncommitted changes. Commit them first, so the bump is a commit of its own.
+      - sh: '[ "{{.BRANCH_VERSION}}" = "{{.MAIN_VERSION}}" ]'
+        msg: >-
+          This branch already bumps the version, from {{.MAIN_VERSION}} to {{.BRANCH_VERSION}}. A pull
+          request bumps it once.
+    cmds:
+      # `--no-git-tag-version` leaves the commit to this task and the tag until after the merge.
+      - npm version {{.LEVEL}} --no-git-tag-version
+      - git add package.json package-lock.json
+      - |
+        new_version="$(node -p "require('./package.json').version")"
+        git commit --quiet -m "chore(release): $new_version"
+      - git log --oneline -1
+
+  pages:check:
+    desc: Check that the live site on GitHub Pages answers as it should, including a screen's address
+    summary: |
+      Asks GitHub for the site's address, then checks that the app's folder, the service worker
+      and the manifest answer 200, and that a screen's address, which has no file of its own,
+      answers 404 with the app's page, from 404.html. Pages' own 404 page would mean the route
+      fallback is missing. Run it after each deploy, before `task release:publish`.
+
+      SITE_URL in the environment checks another copy served as Pages serves it, such as a
+      fork's, ending in a slash:
+
+        SITE_URL=https://example.github.io/cadoro/ task pages:check
+    vars:
+      SITE_URL:
+        sh: echo "${SITE_URL:-$(gh api "repos/{owner}/{repo}/pages" --jq .html_url 2>/dev/null)}"
+      # A screen's address, which only the route fallback can answer.
+      SCREEN_ADDRESS: stats
+    preconditions:
+      - sh: '[ -n "{{.SITE_URL}}" ]'
+        msg: GitHub doesn't report a Pages site for this repo. Is Pages turned on, and is gh logged in?
+    cmds:
+      - silent: true
+        cmd: |
+          site="{{.SITE_URL}}"
+          # The site's folder, such as /cadoro/: the address without its scheme and host.
+          site_path="/${site#*://*/}"
+          failures=0
+
+          # Fails the check unless ADDRESS, inside the site, answers with STATUS.
+          expect_status() {
+            actual="$(curl --silent --output /dev/null --write-out '%{http_code}' "$site$1")"
+            if [ "$actual" = "$2" ]; then
+              echo "ok    $2 $site$1"
+            else
+              echo "FAIL  $site$1 answered $actual, not $2" >&2
+              failures=$((failures + 1))
+            fi
+          }
+
+          expect_status "" 200
+          expect_status sw.js 200
+          expect_status manifest.webmanifest 200
+          expect_status {{.SCREEN_ADDRESS}} 404
+
+          # Only the app's page loads SvelteKit's start script from the site's folder.
+          # The braces stop the shell reading the address as part of the variable's name.
+          screen="${site}{{.SCREEN_ADDRESS}}"
+          if curl --silent "$screen" | grep -q "${site_path}_app/immutable/entry/start\."; then
+            echo "ok    $screen is the app's page"
+          else
+            echo "FAIL  $screen isn't the app's page, so 404.html is missing" >&2
+            failures=$((failures + 1))
+          fi
+
+          if [ "$failures" -gt 0 ]; then
+            exit 1
+          fi
+
+  release:publish:
+    desc: Tag main's newest commit with package.json's version and publish it as a GitHub release
+    summary: |
+      Run on main after the version's pull request has merged, and once its CI/CD run on main has
+      passed and deployed, so the tag names code that passed its checks and is live:
+
+        task ci:watch-main
+        task pages:check
+        task release:publish
+    cmds:
+      # Fetched first, so the checks below compare main with GitHub as it is now.
+      - git fetch --quiet --tags origin
+      - task: release:create
+
+  release:create:
+    desc: Tag and publish package.json's version, once the checks on main allow it
+    internal: true
+    vars:
+      VERSION:
+        sh: node -p "require('./package.json').version"
+      TAG: v{{.VERSION}}
+      MAIN_CONCLUSION:
+        sh: >-
+          COMMIT="$(git rev-parse HEAD)"; {{.MAIN_RUN_COMMAND}} --json conclusion
+          --jq '.[0].conclusion'
+    preconditions:
+      - sh: '[ "$(git branch --show-current)" = main ]'
+        msg: You're not on main. Releases are tagged on main, after the merge.
+      - sh: '[ -z "$(git status --porcelain)" ]'
+        msg: main has uncommitted changes. Leave them in a worktree, or commit them on a branch.
+      - sh: '[ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ]'
+        msg: Your main isn't the same as GitHub's. Run `git pull --ff-only` first.
+      - sh: '! git rev-parse --quiet --verify "refs/tags/{{.TAG}}" > /dev/null'
+        msg: >-
+          {{.TAG}} is already tagged. Bump the version on a pull request with `task release:bump`
+          before releasing again.
+      - sh: '[ "{{.MAIN_CONCLUSION}}" = success ]'
+        msg: >-
+          main's CI/CD run for this commit hasn't passed: its conclusion is
+          "{{.MAIN_CONCLUSION | default "not finished, or not started"}}". Wait for it with
+          `task ci:watch-main`, and fix a failure in a new pull request without bumping the version.
+    cmds:
+      # An annotated tag, which records who tagged it and when, as releases should.
+      - git tag --annotate {{.TAG}} --message "{{.TAG}}"
+      - git push origin {{.TAG}}
+      # `--verify-tag` stops rather than making a new tag if the pushed one isn't on GitHub.
+      - gh release create {{.TAG}} --title "{{.TAG}}" --generate-notes --verify-tag
