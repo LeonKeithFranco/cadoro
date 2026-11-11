@@ -22,7 +22,7 @@ Step 4 is done: every push to `main` that passes `Checks` builds the app at `/ca
 
 Step 5 is done: Settings shows the app's version, taken from `package.json` through Vite's `define`, and the step is released as 0.2.0, a minor bump for a new feature. Once 0.2.0 was live, the installed 0.1.0 on the desktop and the phone offered to reload and then showed 0.2.0 in Settings, which was milestone 3's last check.
 
-**Next:** milestone 4, Keep runs, starting with planning its steps. Milestone 6 also gains pinned timer controls for long routines, as planned in `docs/DECISIONS.md`.
+**Next:** milestone 4, Keep runs, starting with planning its steps. Milestone 6 also gains pinned timer controls for long routines, as planned in `docs/decisions/03-pwa-and-github-pages.md`.
 
 **Done:** Milestone 3, PWA and GitHub Pages:
 
@@ -32,7 +32,7 @@ Step 5 is done: Settings shows the app's version, taken from `package.json` thro
 4. [x] Pages deploy and 0.1.0 (`ci/pages-deploy`): deploying `main` to GitHub Pages with the `404.html` fallback, the release tasks and the README's release steps, and the first release
 5. [x] Version in Settings (`feat/app-version`): the version in Settings, released as 0.2.0, and checking that the installed 0.1.0 updates
 
-Decisions and their reasons are in `docs/DECISIONS.md`.
+Decisions and their reasons are in `docs/decisions/`, one file per milestone.
 
 ## Milestones
 

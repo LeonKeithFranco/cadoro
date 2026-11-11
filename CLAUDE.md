@@ -4,14 +4,12 @@ A self-hostable SvelteKit PWA for timing focused work: routines made of blocks, 
 
 Current status: @docs/PROGRESS.md
 
-Decisions so far: @docs/DECISIONS.md
-
 ## Docs
 
 - `docs/SPEC.md`: what the app does. Its rules and data model are the source of truth.
 - `docs/PLAN.md`: stack, milestone order and what each milestone teaches.
 - `docs/PROGRESS.md`: current status and the milestone checklist. Update it when a step or milestone finishes, and before ending a session partway through one.
-- `docs/DECISIONS.md`: the decision log, newest day first. Add to it whenever a decision is made or changed, with the reason and any options rejected.
+- `docs/decisions/`: the decision log, one file per milestone, listed in its `README.md` with the rules for adding to it. Read the current milestone's file at the start of each step, and search the folder before settling something that may already be decided. Add to the current milestone's file whenever a decision is made or changed, with the reason and any options rejected. A changed decision is a new entry, and the old one gets a note pointing to it.
 
 ## Working style
 
