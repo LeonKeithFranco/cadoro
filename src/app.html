@@ -5,9 +5,17 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="text-scale" content="scale" />
-		<!-- The PWA plugin writes the manifest beside the app's files. `%sveltekit.assets%` is the
-		     path to them, which follows the base path. -->
+		<!-- `%sveltekit.assets%` is the path to the files in `static/` and those the PWA plugin
+		     writes beside them, such as the manifest. It follows the base path. -->
 		<link rel="manifest" href="%sveltekit.assets%/manifest.webmanifest" />
+		<!-- The icons come from `npm run generate-icons`. Browsers that can't show the SVG use
+		     the `.ico`, and iOS uses the touch icon on the home screen. -->
+		<link rel="icon" href="%sveltekit.assets%/favicon.ico" sizes="48x48" />
+		<link rel="icon" href="%sveltekit.assets%/favicon.svg" sizes="any" type="image/svg+xml" />
+		<link rel="apple-touch-icon" href="%sveltekit.assets%/apple-touch-icon-180x180.png" />
+		<!-- Colours the browser's own bars to match the dark theme, like the manifest's
+		     `theme_color` does for the installed app. -->
+		<meta name="theme-color" content="#09090b" />
 		%sveltekit.head%
 	</head>
 	<body
