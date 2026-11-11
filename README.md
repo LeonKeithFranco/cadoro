@@ -68,9 +68,13 @@ BASE_PATH=/cadoro npm run build
 | `task worktree:new NAME=… BRANCH=…`           | Makes a worktree in `../<repo>-worktrees/`, copies the local settings and sets it up            |
 | `task worktree:done NAME=…`                   | Removes a worktree and its branch, once its work is committed and on `main`                     |
 | `task ci:watch`                               | Watches the pull request's checks until they finish                                             |
+| `task ci:watch-main`                          | Watches the CI/CD run on `main`'s newest commit, deploy included, until it finishes             |
 | `task ci:logs`                                | Shows the failed steps' log from the branch's latest CI run                                     |
 | `task ci:report`                              | Downloads and opens CI's Playwright report from a failed run                                    |
 | `task pr:merge`                               | Rebase-merges the pull request once its checks pass, then updates `main` and deletes the branch |
+| `task release:bump LEVEL=minor`               | Bumps the version on the pull request's branch, once, and commits it                            |
+| `task pages:check`                            | Checks that the live site answers, including a screen's address through `404.html`              |
+| `task release:publish`                        | Tags `main` with the version and publishes the release, once `main`'s CI/CD run has passed      |
 
 Each task checks what it needs before doing anything, such as a free port or no uncommitted work, and says what's wrong if it can't go ahead.
 
