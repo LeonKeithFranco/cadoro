@@ -44,7 +44,9 @@ export default defineConfig({
 	// Fails the CI run if a `test.only` was left in by mistake.
 	forbidOnly: isCi,
 	retries: isCi ? 2 : 0,
-	reporter: isCi ? [['github'], ['html', { open: 'never' }]] : 'list',
+	// The HTML report, with the traces of failed tests, is written locally too, for
+	// `task e2e:report`. It never opens by itself, which would keep the command running.
+	reporter: [[isCi ? 'github' : 'list'], ['html', { open: 'never' }]],
 	use: {
 		baseURL: devUrl,
 		// Keeps a trace only for tests that fail, so passing runs stay small.
