@@ -1,12 +1,10 @@
 <!--
   @component
-  The Timer screen, the app's home, a placeholder until the timer is built.
+  The Timer screen, the app's home, showing the app's one timer session.
 -->
 <script lang="ts">
-	import ScreenPlaceholder from '#lib/components/ScreenPlaceholder.svelte';
+	import TimerScreen from '#lib/components/TimerScreen.svelte';
+	import { timerSession } from '#lib/timer.svelte.ts';
 </script>
 
-<ScreenPlaceholder
-	title="Timer"
-	message="Pick a routine and run it here. The timer is coming next."
-/>
+<TimerScreen session={timerSession} />
