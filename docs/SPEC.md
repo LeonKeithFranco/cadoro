@@ -148,11 +148,16 @@ They can be edited and deleted like any other routine, and aren't created again 
 ### The timer screen
 
 - The routine picker at the top selects which routine to run. The app opens on the last routine used.
+- The blocks stack in one column, in the order the run goes through them, on every screen size.
 - Each block shows its title, its target and break percentage, and two boxes: the work timer above the break timer, as in the original sketch.
 - The active timer is highlighted, and the screen shows exactly where the run is in both rounds and cycles, such as "Round 2 of 4 · Block 2 of 3 · Cycle 1 of 3". For an infinite routine it shows "Round 5" with no total. A part whose total is 1 never changes, so it's left out: Classic shows just "Round 5", and a block of 1 cycle shows no cycle.
-- While a work period runs, its box shows the elapsed time and the target, such as `31:40 / 25:00`, and the break box shows the break earned so far, which updates as you work.
+- A block of two or more cycles also shows its cycle across from its title, such as `Cycle 2 / 3`, matching the position above. Before Play, the first block shows the cycle the run will start on. A block the run isn't in shows `Cycle 0 / 3`.
+- Each box has its label on the left, its time on the right and a progress bar below. Boxes not in use show zeroed times, such as `0:00 / 25:00` and `0:00`, with empty bars.
+- While a work period runs, its box shows the elapsed time and the target, such as `31:40 / 25:00`, and its bar fills towards the target. The break box below is labelled "Break earned" and shows the break earned so far, which updates as you work.
+- Past the target, the work box's outline, time and bar turn amber, its bar stays full, and its label reads "Work · Overtime", so overtime isn't shown by colour alone.
+- During a break, the break box counts down, and its bar shows the break left out of the break earned. The block's work box keeps the time that earned the break, with its bar as it was. At 0:00 the break box reads "Break over".
 - Times show as `m:ss` under an hour and `h:mm:ss` from an hour.
-- Play/Pause, Next and Finish sit at the bottom of the screen.
+- Play/Pause, Next and Finish sit below the blocks.
 
 ### Run summary
 
@@ -170,6 +175,7 @@ Closing the dialog returns the routine to its starting state, ready for another 
 - The run in progress is saved whenever it changes, and a heartbeat records the time every second while the app is open, on the same tick that updates the display, and when the page is hidden.
 - If the app is closed, reloaded, or stopped by the phone mid-run, reopening it restores the run, paused at the last heartbeat. Time after that doesn't count as work.
 - While the app stays open in a background tab, the timer keeps running and stays accurate.
+- Opening another screen in the app, such as Stats, pauses the run, work or break, and Play resumes it on the way back. Switching screens counts as stepping away, unlike a background tab.
 
 ### Alerts
 
