@@ -2,7 +2,9 @@
 // in the data model in `docs/SPEC.md`. The run engine knows nothing of ids or storage, so these
 // pure functions compare a run before and after each button press to work out what to save.
 
+import { requireDefined } from './defined';
 import {
+	blockAt,
 	summarizeRun,
 	type EndedWorkPeriod,
 	type RoutinePlan,
@@ -164,7 +166,8 @@ export function workPeriodsOldestFirst(periods: WorkPeriod[]): WorkPeriod[] {
  * @returns When its first segment started, in milliseconds since 1970 (UTC).
  */
 function startOf(period: WorkPeriod): number {
-	return Date.parse(period.segments[0].start);
+	const firstSegment = requireDefined(period.segments[0], "the work period's first segment");
+	return Date.parse(firstSegment.start);
 }
 
 /**
@@ -231,7 +234,7 @@ function workPeriodRecord(
 		id,
 		runId: run.id,
 		routineId: run.routineId,
-		blockId: plan.blocks[period.position.block].id,
+		blockId: blockAt(plan, period.position).id,
 		targetMinutes: period.targetMinutes,
 		segments: period.segments.map(storedSegment),
 		workedMs: period.workedMs

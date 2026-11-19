@@ -1,17 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import { viewBlock } from './block-view';
+import { requireDefined } from './defined';
 import { createStarterRoutines } from './routine';
 import { createRun, finish, next, pause, play, viewRun, type RunState, type WorkView } from './run';
 import { minutes, seconds } from './testing/durations';
 
 /** The starter routine with two different blocks: Focus at 20% for 3 cycles, then Long break at 60%. */
-const [, classicWithLongBreak] = createStarterRoutines(new Date(0), () => 'id');
+const classicWithLongBreak = requireDefined(
+	createStarterRoutines(new Date(0), () => 'id')[1],
+	'the Classic with long break routine'
+);
 
 /** The routine's first block, Focus. */
-const focus = classicWithLongBreak.blocks[0];
+const focus = requireDefined(classicWithLongBreak.blocks[0], 'the Focus block');
 
 /** The routine's second block, Long break. */
-const longBreak = classicWithLongBreak.blocks[1];
+const longBreak = requireDefined(classicWithLongBreak.blocks[1], 'the Long break block');
 
 /** A run of the routine, with its first work period started at 0. */
 const working = play(createRun(classicWithLongBreak), 0);

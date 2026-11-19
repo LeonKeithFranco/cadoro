@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { requireDefined } from './defined';
 import { createStarterRoutines, type Block } from './routine';
 import {
+	blockAt,
 	breakRemainingMs,
 	createRun,
 	earnedBreakMs,
@@ -81,7 +83,10 @@ function inStatus<Status extends RunState['status']>(
 }
 
 /** The starter routine whose blocks earn different breaks: 3 cycles at 20%, then 1 at 60%. */
-const [, classicWithLongBreak] = createStarterRoutines(new Date(0), () => 'id');
+const classicWithLongBreak = requireDefined(
+	createStarterRoutines(new Date(0), () => 'id')[1],
+	'the Classic with long break routine'
+);
 
 /**
  * Puts a run straight into a work period of Classic with long break, running from 0.
@@ -447,8 +452,9 @@ describe('finish', () => {
 
 		const ended = inStatus(finish(paused, minutes(20)), 'ended');
 
-		expect(ended.endedPeriods[0].segments).toEqual([{ start: 0, end: minutes(5) }]);
-		expect(ended.endedPeriods[0].workedMs).toBe(minutes(5));
+		const [endedPeriod] = ended.endedPeriods;
+		expect(endedPeriod?.segments).toEqual([{ start: 0, end: minutes(5) }]);
+		expect(endedPeriod?.workedMs).toBe(minutes(5));
 	});
 
 	it('saves a work period of only a few seconds', () => {
@@ -603,5 +609,19 @@ describe('summarizeRun', () => {
 			roundsReached: 0,
 			overtimeMs: 0
 		});
+	});
+});
+
+describe('blockAt', () => {
+	it('finds the block at the position', () => {
+		const second = blockAt(classicWithLongBreak, { round: 0, block: 1, cycle: 0 });
+
+		expect(second.title).toBe('Long break');
+	});
+
+	it('throws when the position is outside the routine, which is a bug in the caller', () => {
+		expect(() => blockAt(classicWithLongBreak, { round: 0, block: 5, cycle: 0 })).toThrow(
+			'Expected the block at index 5 to exist'
+		);
 	});
 });
