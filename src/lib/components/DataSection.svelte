@@ -187,7 +187,7 @@
 			accept=".json,application/json"
 			aria-describedby="{fileInputId}-hint"
 			onchange={chooseFile}
-			class="mt-2 block w-full text-sm text-zinc-700 dark:text-zinc-300"
+			class="mt-2 block w-full text-sm text-zinc-700 file:mr-3 file:cursor-pointer file:rounded-lg file:border file:border-zinc-300 file:bg-white file:px-4 file:py-2 file:font-medium file:text-zinc-900 hover:file:bg-zinc-100 dark:text-zinc-300 dark:file:border-zinc-700 dark:file:bg-zinc-900 dark:file:text-zinc-100 dark:hover:file:bg-zinc-800"
 		/>
 	</div>
 
