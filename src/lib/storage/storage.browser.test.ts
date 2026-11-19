@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { requireDefined } from '../defined';
 import type { StoredRunInProgress } from '../run-in-progress';
+import { DEFAULT_SETTINGS, type Settings } from '../settings';
 import { minutes } from '../testing/durations';
 import { routineWith } from '../testing/routines';
 import { runInProgressWith, savedRunInProgress } from '../testing/run-in-progress';
@@ -567,6 +568,136 @@ describe.each(backends)('$name', ({ create }) => {
 
 			expect(cleared).toBe(false);
 			expect(await storage.getRunInProgress()).toEqual(savedRunInProgress);
+		});
+	});
+
+	describe('getSettings', () => {
+		it('returns every default from empty storage', async () => {
+			const storage = create();
+
+			expect(await storage.getSettings()).toEqual(DEFAULT_SETTINGS);
+		});
+
+		it('returns what was saved, with the defaults for the rest', async () => {
+			const storage = create();
+			await storage.saveSettings({ theme: 'light', volume: 30 });
+
+			expect(await storage.getSettings()).toEqual({
+				...DEFAULT_SETTINGS,
+				theme: 'light',
+				volume: 30
+			});
+		});
+
+		it('returns a copy, so changing it leaves the saved settings unchanged', async () => {
+			const storage = create();
+			await storage.saveSettings({ volume: 30 });
+			(await storage.getSettings()).volume = 99;
+
+			expect((await storage.getSettings()).volume).toBe(30);
+		});
+	});
+
+	describe('saveSettings', () => {
+		it('keeps the settings it is not changing, across saves', async () => {
+			const storage = create();
+			await storage.saveSettings({ theme: 'light' });
+
+			await storage.saveSettings({ volume: 10 });
+
+			const settings = await storage.getSettings();
+			expect(settings.theme).toBe('light');
+			expect(settings.volume).toBe(10);
+		});
+
+		it('saves a false and a null as they are, not as the defaults', async () => {
+			const storage = create();
+			await storage.saveSettings({ keepScreenAwake: false, lastRoutineId: 'a-routine' });
+
+			await storage.saveSettings({ lastRoutineId: null });
+
+			const settings = await storage.getSettings();
+			expect(settings.keepScreenAwake).toBe(false);
+			expect(settings.lastRoutineId).toBeNull();
+		});
+
+		it('leaves a setting as it is when its change is undefined', async () => {
+			const storage = create();
+			await storage.saveSettings({ theme: 'light' });
+
+			await storage.saveSettings({ theme: undefined });
+
+			expect((await storage.getSettings()).theme).toBe('light');
+		});
+	});
+
+	describe('watchSettings', () => {
+		/**
+		 * Follows a storage's settings, keeping each report.
+		 *
+		 * @param storage - The storage to follow.
+		 * @returns The settings reported so far, which grow, and the way to stop.
+		 */
+		function followSettings(storage: CadoroStorage): {
+			changes: Settings[];
+			stop: () => void;
+		} {
+			const changes: Settings[] = [];
+			const stop = storage.watchSettings(
+				(settings) => {
+					changes.push(settings);
+				},
+				(error: unknown) => {
+					throw new Error('Following the settings failed.', { cause: error });
+				}
+			);
+			return { changes, stop };
+		}
+
+		it('reports the defaults soon after following starts, and not during the call', async () => {
+			const storage = create();
+
+			const reports = followSettings(storage);
+
+			expect(reports.changes).toEqual([]);
+			await expect.poll(() => reports.changes).toEqual([DEFAULT_SETTINGS]);
+		});
+
+		it('reports each save, with every setting', async () => {
+			const storage = create();
+			const reports = followSettings(storage);
+			await expect.poll(() => reports.changes).toHaveLength(1);
+
+			await storage.saveSettings({ theme: 'system' });
+
+			await expect
+				.poll(() => reports.changes.at(-1))
+				.toEqual({ ...DEFAULT_SETTINGS, theme: 'system' });
+		});
+
+		it('reports to everything following, as each open tab follows', async () => {
+			const storage = create();
+			const first = followSettings(storage);
+			const second = followSettings(storage);
+
+			await storage.saveSettings({ volume: 5 });
+
+			await expect.poll(() => first.changes.at(-1)?.volume).toBe(5);
+			await expect.poll(() => second.changes.at(-1)?.volume).toBe(5);
+		});
+
+		it('reports nothing more once stopped', async () => {
+			const storage = create();
+			const stopped = followSettings(storage);
+			const still = followSettings(storage);
+			await expect.poll(() => stopped.changes).toHaveLength(1);
+
+			stopped.stop();
+			await storage.saveSettings({ volume: 5 });
+
+			// Reports go out together, so once the one still following hears, the other would have.
+			await expect.poll(() => still.changes.at(-1)?.volume).toBe(5);
+			expect(stopped.changes).toHaveLength(1);
 		});
 	});
 

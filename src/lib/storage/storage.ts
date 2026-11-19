@@ -4,6 +4,7 @@
 import type { Routine } from '../routine';
 import type { StoredRunInProgress } from '../run-in-progress';
 import type { Run, RunRecords, WorkPeriod } from '../run-records';
+import type { Settings } from '../settings';
 
 /**
  * Where the app keeps its data. Every method returns a promise, because the browser's database
@@ -124,6 +125,47 @@ export interface CadoroStorage {
 	 * @throws Rejects with the backend's own error when the data can't be saved.
 	 */
 	clearRunInProgress(basedOn: string): Promise<boolean>;
+
+	/**
+	 * Reads the settings.
+	 *
+	 * @returns Every setting, with the default for any the user hasn't changed, or that a saved
+	 * row from an earlier version of the app doesn't hold.
+	 * @throws Rejects with the backend's own error when its data can't be read.
+	 */
+	getSettings(): Promise<Settings>;
+
+	/**
+	 * Saves changes to the settings, leaving the others as they are.
+	 *
+	 * @remarks
+	 * It merges the changes into what is saved in one step, so two tabs changing different
+	 * settings at the same moment keep both. A field that is `undefined` is left as it is.
+	 *
+	 * @param changes - The settings to change, with their new values.
+	 * @throws Rejects with the backend's own error when the data can't be saved, and then nothing
+	 * is.
+	 */
+	saveSettings(changes: Partial<Settings>): Promise<void>;
+
+	/**
+	 * Follows the settings: calls `onChange` with them soon after this is called, and again after
+	 * every save that changes them, from this storage object or any other on the same data, as
+	 * another tab's is.
+	 *
+	 * @remarks
+	 * It reports the same way {@link CadoroStorage.watchRunInProgress} does: always later, never
+	 * during this call or a save, with changes in quick succession possibly reported once. Each
+	 * report is a complete copy.
+	 *
+	 * @param onChange - Called with the settings as saved.
+	 * @param onError - Called if the settings can't be read.
+	 * @returns A function that stops following, after which neither callback is called.
+	 */
+	watchSettings(
+		onChange: (settings: Settings) => void,
+		onError: (error: unknown) => void
+	): () => void;
 
 	/**
 	 * Reads every run, in progress or ended.

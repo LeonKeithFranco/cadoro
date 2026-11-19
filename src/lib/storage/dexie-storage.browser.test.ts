@@ -3,7 +3,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { routineWith } from '../testing/routines';
 import { runInProgressWith, savedRunInProgress } from '../testing/run-in-progress';
 import { firstWorkPeriod, runInProgress, workPeriodWith } from '../testing/run-records';
+import { DEFAULT_SETTINGS, type Settings } from '../settings';
 import { DexieStorage } from './dexie-storage';
+import { THEME_MIRROR_KEY } from './theme-mirror';
 
 /**
  * Makes a database name no other test uses.
@@ -56,7 +58,34 @@ describe('DexieStorage', () => {
 		expect(await firstTab.getRoutines()).toHaveLength(1);
 	});
 
-	it('creates schema version 2, with every table the spec defines, each with its key', async () => {
+	it('upgrades a version-2 database, adding the settings table and keeping every row', async () => {
+		const name = newDatabaseName();
+		const version2 = new Dexie(name);
+		// Version 2's schema as 0.6 declared it, written out here so a change to the app's can't
+		// change what this test starts from.
+		version2
+			.version(1)
+			.stores({ routines: 'id', runs: 'id', workPeriods: 'id', runInProgress: '' });
+		version2.version(2).stores({});
+		await version2.table('routines').add(routineWith({ id: 'kept' }));
+		await version2.table('runs').add(runInProgress);
+		await version2.table('workPeriods').add(firstWorkPeriod);
+		await version2.table('runInProgress').put(savedRunInProgress, 'current');
+		version2.close();
+
+		const upgraded = new DexieStorage(name);
+
+		expect(await upgraded.getSettings()).toEqual(DEFAULT_SETTINGS);
+		await upgraded.saveSettings({ volume: 10 });
+		expect((await upgraded.getSettings()).volume).toBe(10);
+		expect(await upgraded.getRoutines()).toEqual([routineWith({ id: 'kept' })]);
+		expect(await upgraded.getRuns()).toEqual([runInProgress]);
+		expect(await upgraded.getWorkPeriods()).toEqual([firstWorkPeriod]);
+		expect(await upgraded.getRunInProgress()).toEqual(savedRunInProgress);
+		expect((await openAsSaved(name)).verno).toBe(3);
+	});
+
+	it('creates schema version 3, with every table the spec defines, each with its key', async () => {
 		const name = newDatabaseName();
 		await new DexieStorage(name).getRoutines();
 
@@ -68,11 +97,12 @@ describe('DexieStorage', () => {
 		const transaction = database.transaction(storeNames);
 		const keyPaths = storeNames.map((store) => [store, transaction.objectStore(store).keyPath]);
 
-		expect(saved.verno).toBe(2);
+		expect(saved.verno).toBe(3);
 		expect(keyPaths).toEqual([
 			['routines', 'id'],
 			['runInProgress', null],
 			['runs', 'id'],
+			['settings', null],
 			['workPeriods', 'id']
 		]);
 	});
@@ -103,7 +133,7 @@ describe('DexieStorage', () => {
 		expect(await upgraded.getRoutines()).toEqual([routineWith({ id: 'kept' })]);
 		expect(await upgraded.getRuns()).toEqual([runInProgress]);
 		expect(await upgraded.getWorkPeriods()).toEqual([firstWorkPeriod]);
-		expect((await openAsSaved(name)).verno).toBe(2);
+		expect((await openAsSaved(name)).verno).toBe(3);
 	});
 
 	it('upgrades a version-1 database with no run in progress, leaving it with none', async () => {
@@ -195,6 +225,134 @@ describe('DexieStorage', () => {
 
 		await expect.poll(() => onError).toHaveBeenCalledOnce();
 		expect(onChange).not.toHaveBeenCalled();
+	});
+
+	it('reports a settings save made through another connection, as another tab’s', async () => {
+		const name = newDatabaseName();
+		const firstTab = new DexieStorage(name);
+		const secondTab = new DexieStorage(name);
+		const reports: Settings[] = [];
+		firstTab.watchSettings(
+			(settings) => reports.push(settings),
+			() => {}
+		);
+		await expect.poll(() => reports).toHaveLength(1);
+
+		await secondTab.saveSettings({ volume: 5 });
+
+		await expect.poll(() => reports.at(-1)?.volume).toBe(5);
+	});
+
+	it('reports an error, and no settings, when the settings can’t be read', async () => {
+		const storage = new DexieStorage(newDatabaseName());
+		await storage.getSettings();
+		vi.spyOn(IDBObjectStore.prototype, 'get').mockImplementation(() => {
+			throw new DOMException('The disk could not be read.', 'UnknownError');
+		});
+		const onChange = vi.fn();
+		const onError = vi.fn();
+
+		storage.watchSettings(onChange, onError);
+
+		await expect.poll(() => onError).toHaveBeenCalledOnce();
+		expect(onChange).not.toHaveBeenCalled();
+	});
+
+	it('keeps one row of only the changed settings under the key current', async () => {
+		const name = newDatabaseName();
+		const storage = new DexieStorage(name);
+		await storage.saveSettings({ theme: 'light' });
+		await storage.saveSettings({ volume: 10 });
+
+		const saved = await openAsSaved(name);
+
+		expect(await saved.table('settings').toArray()).toEqual([{ theme: 'light', volume: 10 }]);
+		expect(await saved.table('settings').toCollection().primaryKeys()).toEqual(['current']);
+	});
+
+	it('fills in a setting a saved row lacks, as a row saved before the setting existed does', async () => {
+		const name = newDatabaseName();
+		const storage = new DexieStorage(name);
+		await storage.getSettings();
+		const saved = await openAsSaved(name);
+		await saved.table('settings').put({ theme: 'system' }, 'current');
+		saved.close();
+
+		expect(await new DexieStorage(name).getSettings()).toEqual({
+			...DEFAULT_SETTINGS,
+			theme: 'system'
+		});
+	});
+
+	describe('the theme mirror in localStorage', () => {
+		// Leaves no mirror for the next test.
+		afterEach(() => {
+			localStorage.removeItem(THEME_MIRROR_KEY);
+		});
+
+		it('is written when the theme is saved', async () => {
+			await new DexieStorage(newDatabaseName()).saveSettings({ theme: 'light' });
+
+			expect(localStorage.getItem(THEME_MIRROR_KEY)).toBe('light');
+		});
+
+		it('is left alone when another setting is saved', async () => {
+			const storage = new DexieStorage(newDatabaseName());
+			await storage.saveSettings({ theme: 'light' });
+
+			await storage.saveSettings({ volume: 10 });
+
+			expect(localStorage.getItem(THEME_MIRROR_KEY)).toBe('light');
+		});
+
+		it('is written when the settings are read, so a user saved before the mirror existed gets one', async () => {
+			const name = newDatabaseName();
+			const storage = new DexieStorage(name);
+			await storage.getSettings();
+			const saved = await openAsSaved(name);
+			await saved.table('settings').put({ theme: 'system' }, 'current');
+			saved.close();
+			localStorage.removeItem(THEME_MIRROR_KEY);
+
+			await new DexieStorage(name).getSettings();
+
+			expect(localStorage.getItem(THEME_MIRROR_KEY)).toBe('system');
+		});
+
+		it('is the default theme when nothing is saved', async () => {
+			await new DexieStorage(newDatabaseName()).getSettings();
+
+			expect(localStorage.getItem(THEME_MIRROR_KEY)).toBe('dark');
+		});
+
+		it('is written when another tab changes the theme', async () => {
+			const name = newDatabaseName();
+			const firstTab = new DexieStorage(name);
+			const reports: Settings[] = [];
+			firstTab.watchSettings(
+				(settings) => reports.push(settings),
+				() => {}
+			);
+			await expect.poll(() => reports).toHaveLength(1);
+			localStorage.removeItem(THEME_MIRROR_KEY);
+
+			await new DexieStorage(name).saveSettings({ theme: 'light' });
+
+			await expect.poll(() => reports.at(-1)?.theme).toBe('light');
+			expect(localStorage.getItem(THEME_MIRROR_KEY)).toBe('light');
+		});
+
+		it('is not written when the save fails', async () => {
+			const storage = new DexieStorage(newDatabaseName());
+			await storage.saveSettings({ theme: 'light' });
+			vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(() => {
+				throw new DOMException('The disk is full.', 'QuotaExceededError');
+			});
+
+			await expect(storage.saveSettings({ theme: 'system' })).rejects.toThrow();
+
+			expect(localStorage.getItem(THEME_MIRROR_KEY)).toBe('light');
+		});
 	});
 
 	it('keeps the app’s data in the database named cadoro', async () => {
