@@ -11,6 +11,7 @@ The decision log: what was decided as Cadoro was built, why, and the options rej
 - `04-keep-runs.md`: milestone 4's steps, tabs sharing one run, storage, loading before the app renders, the docs' layout, the workflow against agentic engineering guides, the storage interface's first methods, the Dexie backend, testing storage, loading the routines, the records each press saves, saving runs and work periods together, the session saving each press, asking for persistent storage, the stored run in progress, restoring paused at the heartbeat, saving the run in progress, hidden pages and background tabs, the reload journey, the autonomous replan with its guardrails, and step 4's stale presses, open-tab lock, work recorded once and known limit.
 
 - `05-alerts-and-settings.md`: milestone 5, the chime files, settings in storage, the theme without a flash, the chimes' schedule and the one tab that sounds them, the wake lock, the Settings screen, testing the chimes, and the milestone review's fixes.
+- `06-routines.md`: milestone 6, the routine rules in pure logic, storage and the activity log, the Routines screen, locking the running routine, the Timer's sorted picker and pinned controls, pre-bundled libraries, and the journeys.
 
 ## Adding a decision
 

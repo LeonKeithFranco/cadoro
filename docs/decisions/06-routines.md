@@ -1,0 +1,56 @@
+# Decisions: milestone 6, Routines
+
+The Routines screen, editing routines and blocks in place, the activity log of routine changes, and the Timer following the sort and pinning its controls. One branch, released as 0.8.0, built in packages. The rules themselves are in `docs/SPEC.md`, and the plan in `docs/PLAN.md`.
+
+## Routines (`feat/routines`), 2026-11-19
+
+### Pure logic
+
+- Titles are trimmed before the 1 to 50 check, and a title of only spaces is blank. They're saved trimmed.
+- A routine's only block must have 1 cycle, and `validateRoutine` reports it, rather than the form silently fixing it. Deleting blocks down to one resets the cycles to 1 through `resetSingleBlockCycles`.
+- Sort ties fall back to custom order, so every sort is a total order and the list never jumps between renders. Last used is the latest run's `startedAt`, with never-used routines last. Most work sums `workedMs`.
+- A copy's title is cut to fit 50 characters with the suffix, so a duplicate is always valid.
+- A block's copy keeps every field and goes just below the original. A new block is titled "Focus", the same 25 minutes at 20% for 1 cycle as a new routine's block.
+- `insertRoutine` renumbers every position to 0 to n-1, with a new routine at 0 and a copy at the original's position plus 1, so gaps never build up.
+- The moves of a list are one generic `list-order.ts`, and routines and blocks call it, so dragging and the Move buttons share one rule.
+
+### Storage and the log
+
+- Dexie schema version 4 adds the `log` table. It starts empty, so there's no data-moving upgrade function, as with version 3.
+- `routine-changes.ts` plans each change as a pure function, the routines to write and the log entry, and both backends apply the plan, so the rules are written once.
+- A log entry is `{ id, timestamp, type: 'change', message, details }`, with `details.action` one of create, edit, duplicate, delete or reorder, and the old and new values for an edit.
+- The entry is written in its own transaction after the change, so a failed log write is reported with `console.error` and can't undo the change. The spec says a log failure never blocks a data change, which one shared transaction couldn't promise.
+- `getAllRoutines` reads the deleted routines too, since Stats needs their names, which `getRoutines` leaves out. `watchRoutines` follows the routines not deleted.
+- `saveRoutine` keeps the saved position, creation date and deletion, so an edit made before another tab reordered can't undo the reorder.
+- `deleteRoutine` returns `false` for the last routine, and `reorderRoutines` returns `false` when nothing would change, so neither logs. `duplicateRoutine` takes the original's id, so storage places the copy.
+- This settles the open item about deleting every routine: the last one can't be deleted, in storage and in the UI, so `TimerSession` always has one.
+- `TimerSession` follows `watchRoutines`. A ready run takes its routine's new version, or the first routine if it was deleted. A run that has started keeps the routine it started with, which it carries in its plan.
+- `RoutineUsage` needs only the runs and work periods, not a whole storage, so the sorts are pure and tests build it by hand.
+
+### The Routines screen
+
+- Save on an unchanged routine closes the form and writes nothing, so it adds no log entry.
+- While a routine is open, the list isn't a drag zone, because `svelte-dnd-action` shares its handle state across zones.
+- Leaving by a link with unsaved changes asks "Discard changes?" in `beforeNavigate`, cancels the navigation, and carries on with `goto(resolve(route))` once confirmed.
+- The layout's `load` now returns `storage`, so the screen edits through the same storage object as everything else.
+- The sort is the `routineSort` setting that milestone 5 added, so no new storage was needed.
+
+### The running routine
+
+- Edit and Delete are disabled on the routine of the run in progress, in any tab, with a hint. The Routines screen reads the shared run, so a run another tab starts locks it too. Save is disabled if the run starts mid-edit, with a line saying why, and a delete confirmed after that is ignored.
+- This is in the UI only, with no guard in storage. Restoring a run whose routine was deleted forgets the run, which is why the screen has to stop it. Storage has no guard for it, so a caller that skips the screen could still edit or delete the routine, and that's a known limit.
+
+### Timer changes
+
+- The picker follows the sort with `sortRoutines` in `TimerScreen`, so the Timer and the Routines screen always agree.
+- The controls are pinned with `position: sticky` at the bottom of the window, above the phone's tab bar, as `03-pwa-and-github-pages.md` planned, and the active block scrolls into view with a scroll margin that clears them. The box reaches down under the tab bar, so no sliver of a block shows between them, and carries the page's background so the blocks scrolling under don't show through.
+
+### Tooling
+
+- `optimizeDeps.include` for `svelte-dnd-action`, `layerchart` and `date-fns`, top-level in `vite.config.ts`. A cold dev server found these only when a lazily loaded screen imported them, re-bundled and reloaded the page mid-journey, which failed a test. Listing them was proven on cold runs.
+- Component tests that check layout, the sticky controls and the scroll, import `layout.css`, because the classes do nothing without Tailwind's stylesheet.
+
+### Testing
+
+- `e2e/routines.spec.ts` covers creating, editing, reordering and deleting a routine, building a multi-block routine and running it as configured, the discard prompt, and the last routine's Delete. Reordering uses a real mouse drag.
+- It passed 240 of 240 repeats.

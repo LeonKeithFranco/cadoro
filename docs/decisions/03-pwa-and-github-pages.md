@@ -16,6 +16,7 @@ The app goes online at GitHub Pages, installable and working offline, and offers
 - With enough blocks, Play, Next and Finish are pushed below the screen. The fix is planned for milestone 6, when routines long enough to show it can first be built. Both starter routines have one or two blocks.
 - The controls will be pinned at the bottom with `position: sticky`, above the phone's tab bar, so they look as they do now when everything fits. Moving them to the top was rejected, because scrolling to a later block would push them off the top instead. A bar that also shows the active time was rejected as more work, showing the time twice.
 - When the run moves to a block that's out of view, the page scrolls it into view with `scrollIntoView({ block: 'nearest' })`, which does nothing when every block fits, with a `scroll-margin` clearing the pinned controls. It moves only when the block changes, not every second. The user asked about a scrollable box around the blocks. Page scrolling was recommended instead, because a scroll area inside a scrolling page is awkward on phones.
+- **Changed later:** built in milestone 6, in [The timer changes](06-routines.md#timer-changes).
 
 ## Step 1: the base path (`build/base-path`), 2026-11-10
 
