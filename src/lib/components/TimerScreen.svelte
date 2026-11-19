@@ -2,8 +2,9 @@
   @component
   The Timer screen: the routine picker, where the run is in the routine, a card for each of the
   routine's blocks, and the buttons that run it. While a timer is counting, the screen updates
-  every second. Finish asks first, and a run that ends shows its summary. Leaving the screen
-  pauses the run, so time spent on another screen isn't counted.
+  every second, saving the run's heartbeat, which it also saves as the page is hidden or closed.
+  Finish asks first, and a run that ends shows its summary. Leaving the screen pauses the run, so
+  time spent on another screen isn't counted.
 -->
 <script module lang="ts">
 	import { MS_PER_SECOND } from '../time';
@@ -70,7 +71,23 @@
 			session.play();
 		}
 	}
+
+	/**
+	 * Saves the run's heartbeat as the page is hidden, such as when the user switches tabs or
+	 * apps, or locks the phone. The browser may slow the page's timers or stop the app while it's
+	 * hidden, so this keeps the moment a restored run is paused at as late as it can be.
+	 */
+	function saveHeartbeatIfHidden(): void {
+		if (document.visibilityState === 'hidden') {
+			session.tick();
+		}
+	}
 </script>
+
+<!-- `pagehide` fires as the page is closed, reloaded or left for another site, including into
+     the browser's back-forward cache, where `unload` doesn't fire. -->
+<svelte:document onvisibilitychange={saveHeartbeatIfHidden} />
+<svelte:window onpagehide={() => session.tick()} />
 
 <ScreenHeading title="Timer" />
 
