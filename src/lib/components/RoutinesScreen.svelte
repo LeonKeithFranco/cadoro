@@ -75,6 +75,12 @@
 		settingsSession: SettingsSession;
 		/** The routines not deleted as the app opened, so the first render already lists them. */
 		initialRoutines: readonly Routine[];
+		/**
+		 * The id of the routine a run in progress, in this tab or another, is running, or `null`
+		 * when none is. That routine can't be edited or deleted, because a saved run is restored
+		 * from its routine and is forgotten if the routine is gone.
+		 */
+		runningRoutineId?: string | null;
 		/** Returns a new unique id each time it's called. `crypto.randomUUID` unless a test gives its own. */
 		newId?: () => string;
 		/** Returns the current moment. `new Date()` unless a test gives its own. */
@@ -85,6 +91,7 @@
 		storage,
 		settingsSession,
 		initialRoutines,
+		runningRoutineId = null,
 		newId = (): string => crypto.randomUUID(),
 		now = (): Date => new Date()
 	}: Props = $props();
@@ -190,6 +197,18 @@
 		console.error(`${what} failed.`, error);
 	}
 
+	/**
+	 * Says why an edit can't be saved, which it can't once a run of its routine has started.
+	 *
+	 * @param current - The edit.
+	 * @returns The reason, or `undefined` when it can be saved.
+	 */
+	function lockedReasonOf(current: Editing): string | undefined {
+		return !current.isNew && current.original.id === runningRoutineId
+			? 'A run of this routine has started, so it can’t be saved. Cancel, and edit it once the run ends.'
+			: undefined;
+	}
+
 	/** Opens a new routine for editing at the top of the list. */
 	function startNewRoutine(): void {
 		discardingChanges(() => {
@@ -212,7 +231,7 @@
 	/** Saves the routine being edited, and closes the form once it's saved. */
 	async function save(): Promise<void> {
 		const current = editing;
-		if (current === null) {
+		if (current === null || lockedReasonOf(current) !== undefined) {
 			return;
 		}
 
@@ -252,7 +271,7 @@
 	async function confirmDelete(): Promise<void> {
 		const routine = routineToDelete;
 		routineToDelete = null;
-		if (routine === null) {
+		if (routine === null || routine.id === runningRoutineId) {
 			return;
 		}
 
@@ -342,6 +361,7 @@
 			draft={current.draft}
 			{newId}
 			saveError={current.saveError}
+			lockedReason={lockedReasonOf(current)}
 			onchange={(draft: Routine): void => {
 				editing = { ...current, draft, saveError: undefined };
 			}}
@@ -361,6 +381,7 @@
 		canMoveUp={index > 0}
 		canMoveDown={index < sorted.length - 1}
 		{canDelete}
+		isRunning={routine.id === runningRoutineId}
 		onedit={(): void => startEditing(routine)}
 		onduplicate={(): void => void duplicate(routine)}
 		ondelete={(): void => {

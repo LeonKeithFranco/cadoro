@@ -32,6 +32,11 @@
 		canMoveDown: boolean;
 		/** Whether the routine may be deleted, which it may unless it's the only one left. */
 		canDelete: boolean;
+		/**
+		 * Whether the routine is the one a run in progress, in this tab or another, is running, which
+		 * can't be edited or deleted until the run ends.
+		 */
+		isRunning: boolean;
 		/** Called when the user presses Edit. */
 		onedit: () => void;
 		/** Called when the user presses Duplicate. */
@@ -51,6 +56,7 @@
 		canMoveUp,
 		canMoveDown,
 		canDelete,
+		isRunning,
 		onedit,
 		onduplicate,
 		ondelete,
@@ -89,6 +95,7 @@
 	<div class="mt-3 flex flex-wrap items-center gap-2">
 		<button
 			type="button"
+			disabled={isRunning}
 			onclick={onedit}
 			class="{COMPACT_BUTTON_SHAPE} {SECONDARY_BUTTON_COLOURS}"
 		>
@@ -105,7 +112,7 @@
 		</button>
 		<button
 			type="button"
-			disabled={!canDelete}
+			disabled={!canDelete || isRunning}
 			onclick={ondelete}
 			class="{COMPACT_BUTTON_SHAPE} {SECONDARY_BUTTON_COLOURS}"
 		>
@@ -133,7 +140,11 @@
 			</button>
 		{/if}
 	</div>
-	{#if !canDelete}
+	{#if isRunning}
+		<p class="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+			This routine is running, so it can't be edited or deleted. Finish the run first.
+		</p>
+	{:else if !canDelete}
 		<p class="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
 			This is your only routine, so it can't be deleted. There is always one to run.
 		</p>
