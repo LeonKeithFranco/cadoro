@@ -17,8 +17,9 @@ export const OPEN_TAB_LOCK = 'cadoro-open-tab';
  * The other tabs are checked before this tab takes its own lock, so two tabs opening at the same
  * moment both find none open, and both restore the run paused, rather than each taking the other
  * to have it live. Without the Web Locks API, as outside HTTPS and `localhost`, or if the browser
- * refuses the lock, no other tab can be seen, so this says none is open, and the run is
- * restored paused, as when the app opens alone. A refusal is logged.
+ * refuses the check, no other tab can be seen, so this says none is open, and the run is
+ * restored paused, as when the app opens alone. A refusal of this tab's own lock, after the check
+ * found another tab, still says one is open. A refusal is logged.
  *
  * @param locks - The browser's lock manager, `navigator.locks`, or `undefined` where there's
  * none.
@@ -34,15 +35,17 @@ export async function joinOpenTabs(
 		return false;
 	}
 
+	let isAnotherTabOpen = false;
 	try {
 		const { held = [] } = await locks.query();
-		const isAnotherTabOpen = held.some((lock) => lock.name === name);
+		isAnotherTabOpen = held.some((lock) => lock.name === name);
 		await holdUntilClosed(locks, name);
-		return isAnotherTabOpen;
 	} catch (error: unknown) {
 		console.error('Could not tell whether the app is open in another tab.', error);
-		return false;
 	}
+	// Another tab that was found stays found if only this tab's own lock was refused, since
+	// restoring the run paused would pause it in that tab.
+	return isAnotherTabOpen;
 }
 
 /**
