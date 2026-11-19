@@ -1,6 +1,9 @@
 import { page, userEvent } from 'vitest/browser';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
+// The app's styles, which the layout loads, since the pinned controls and the scrolling need them.
+import '../../routes/layout.css';
+import { requireDefined } from '../defined';
 import { createStarterRoutines, type Routine } from '../routine';
 import { InMemoryStorage } from '../storage/in-memory-storage';
 import { minutes, seconds } from '../testing/durations';
@@ -559,5 +562,109 @@ describe('following the run from another tab', () => {
 
 		await expect.element(page.getByRole('button', { name: 'Pause' })).toBeVisible();
 		await expect.element(page.getByRole('dialog')).not.toBeInTheDocument();
+	});
+});
+
+/**
+ * Makes a routine of many one-cycle blocks, so the screen is much taller than the window.
+ *
+ * @param count - How many blocks.
+ * @returns A routine that repeats forever, whose blocks are titled `Block 1`, `Block 2` and so on.
+ */
+function routineOfBlocks(count: number): Routine {
+	return {
+		...oneRoundRoutine,
+		id: 'long',
+		title: 'Long',
+		rounds: 'infinite',
+		blocks: Array.from({ length: count }, (_, index) => ({
+			id: `long-${index + 1}`,
+			title: `Block ${index + 1}`,
+			targetMinutes: 25,
+			breakPercent: 20,
+			cycles: 1
+		}))
+	};
+}
+
+/**
+ * Finds the pinned container the run's buttons sit in.
+ *
+ * @returns The container, which is the closest `sticky` ancestor of the Finish button.
+ */
+function pinnedControls(): Element {
+	const finish = page.getByRole('button', { name: 'Finish' }).element();
+	return requireDefined(finish.closest('.sticky'), 'the pinned controls');
+}
+
+describe('a long routine on the Timer screen', () => {
+	it('keeps the controls pinned in the window, however far down the page is', async () => {
+		render(TimerScreen, { session: createSession([routineOfBlocks(12)]) });
+		window.scrollTo(0, 0);
+
+		expect(getComputedStyle(pinnedControls()).position).toBe('sticky');
+		const controls = pinnedControls().getBoundingClientRect();
+		expect(controls.bottom).toBeLessThanOrEqual(window.innerHeight);
+		expect(controls.top).toBeGreaterThan(0);
+		expect(document.documentElement.scrollHeight).toBeGreaterThan(window.innerHeight * 2);
+	});
+
+	it('scrolls the active block into view when the run moves to a block out of view', async () => {
+		render(TimerScreen, { session: createSession([routineOfBlocks(12)]) });
+		await page.getByRole('button', { name: 'Play' }).click();
+		window.scrollTo(0, 0);
+
+		// Each block's work, then its break, with two presses.
+		for (let press = 0; press < 16; press++) {
+			await page.getByRole('button', { name: 'Next' }).click();
+		}
+
+		await expect.element(page.getByText('Round 1 · Block 9 of 12', { exact: true })).toBeVisible();
+		await expect
+			.poll(() => {
+				const card = page
+					.getByRole('region', { name: 'Block 9' })
+					.element()
+					.getBoundingClientRect();
+				const controls = pinnedControls().getBoundingClientRect();
+				return card.top >= 0 && card.bottom <= controls.top + 1;
+			})
+			.toBe(true);
+	});
+
+	it('doesn’t scroll while every block fits, however the run moves', async () => {
+		render(TimerScreen, { session: createSession([routineOfBlocks(2)]) });
+		window.scrollTo(0, 0);
+		await page.getByRole('button', { name: 'Play' }).click();
+
+		for (let press = 0; press < 3; press++) {
+			await page.getByRole('button', { name: 'Next' }).click();
+		}
+
+		expect(window.scrollY).toBe(0);
+	});
+});
+
+describe('the routine picker on the Timer screen', () => {
+	it('lists the routines in the order the Routines screen’s sort gives', async () => {
+		render(TimerScreen, { session: createSession(), routineSort: 'title-desc' });
+
+		const options = page.getByRole('combobox', { name: 'Routine' }).getByRole('option');
+
+		expect(options.elements().map((option) => option.textContent)).toEqual([
+			'Classic with long break',
+			'Classic'
+		]);
+	});
+
+	it('lists them in custom order when no sort is given', async () => {
+		render(TimerScreen, { session: createSession() });
+
+		const options = page.getByRole('combobox', { name: 'Routine' }).getByRole('option');
+
+		expect(options.elements().map((option) => option.textContent)).toEqual([
+			'Classic',
+			'Classic with long break'
+		]);
 	});
 });
