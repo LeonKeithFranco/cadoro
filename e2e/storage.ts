@@ -3,6 +3,7 @@
 
 import type { Page } from '@playwright/test';
 import type { WorkPeriod } from '../src/lib/run-records';
+import type { Settings } from '../src/lib/settings';
 
 /**
  * Reads every work period the app has saved in its IndexedDB database.
@@ -39,8 +40,78 @@ export async function savedWorkPeriods(page: Page): Promise<WorkPeriod[]> {
 }
 
 /**
- * Saves the settings row in the app's IndexedDB database, as the Settings screen will once it
- * exists, so a journey can start from a chosen theme.
+ * Tells whether the app has a run in progress saved in its IndexedDB database.
+ *
+ * @remarks
+ * It reads with IndexedDB's own API, as {@link savedWorkPeriods} does, so a journey can wait
+ * until Done has forgotten an ended run before it reloads the page.
+ *
+ * @param page - A page of the app, whose database is read.
+ * @returns `true` while a run in progress is saved, and `false` once none is.
+ * @throws Rejects with IndexedDB's error when the database or its `runInProgress` table can't be
+ * read.
+ */
+export async function hasSavedRunInProgress(page: Page): Promise<boolean> {
+	return page.evaluate(
+		() =>
+			new Promise<boolean>((resolve, reject) => {
+				const opening = indexedDB.open('cadoro');
+				opening.onerror = (): void =>
+					reject(opening.error ?? new Error('Opening the database failed.'));
+				opening.onsuccess = (): void => {
+					const database = opening.result;
+					const counting = database
+						.transaction('runInProgress')
+						.objectStore('runInProgress')
+						.count();
+					counting.onerror = (): void =>
+						reject(counting.error ?? new Error('Reading the run in progress failed.'));
+					counting.onsuccess = (): void => {
+						database.close();
+						resolve(counting.result > 0);
+					};
+				};
+			})
+	);
+}
+
+/**
+ * Reads the settings row the app has saved in its IndexedDB database.
+ *
+ * @remarks
+ * It reads with IndexedDB's own API, as {@link savedWorkPeriods} does, so a journey can wait
+ * until a change on the Settings screen is saved before it reloads the page.
+ *
+ * @param page - A page of the app, whose database is read.
+ * @returns The row, holding only the settings the user has changed, or `undefined` while none
+ * has been saved.
+ * @throws Rejects with IndexedDB's error when the database or its `settings` table can't be
+ * read.
+ */
+export async function savedSettingsRow(page: Page): Promise<Partial<Settings> | undefined> {
+	return page.evaluate(
+		() =>
+			new Promise<Partial<Settings> | undefined>((resolve, reject) => {
+				const opening = indexedDB.open('cadoro');
+				opening.onerror = (): void =>
+					reject(opening.error ?? new Error('Opening the database failed.'));
+				opening.onsuccess = (): void => {
+					const database = opening.result;
+					const reading = database.transaction('settings').objectStore('settings').get('current');
+					reading.onerror = (): void =>
+						reject(reading.error ?? new Error('Reading the settings failed.'));
+					reading.onsuccess = (): void => {
+						database.close();
+						resolve(reading.result as Partial<Settings> | undefined);
+					};
+				};
+			})
+	);
+}
+
+/**
+ * Saves the settings row in the app's IndexedDB database, so a journey can start from chosen
+ * settings without going through the Settings screen.
  *
  * @remarks
  * It writes with IndexedDB's own API, so the page's open Dexie connection isn't told, and a
@@ -52,7 +123,7 @@ export async function savedWorkPeriods(page: Page): Promise<WorkPeriod[]> {
  * @throws Rejects with IndexedDB's error when the database or its `settings` table can't be
  * written.
  */
-export async function saveSettingsRow(page: Page, row: { theme: string }): Promise<void> {
+export async function saveSettingsRow(page: Page, row: Partial<Settings>): Promise<void> {
 	await page.evaluate(
 		(settingsRow) =>
 			new Promise<void>((resolve, reject) => {
