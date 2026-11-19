@@ -2,6 +2,7 @@
 // data without asking. It asks once work is saved, and never on an empty first visit, because
 // Firefox shows the user a prompt for it.
 
+import { recordError } from '../error-log';
 import type { CadoroStorage } from './storage';
 
 /** The parts of the browser's `StorageManager`, `navigator.storage`, that asking needs. */
@@ -37,7 +38,7 @@ export function askToPersistOnce(manager: PersistenceManager | undefined): () =>
 				await manager.persist();
 			}
 		} catch (error: unknown) {
-			console.error('Persistent storage could not be requested.', error);
+			void recordError('Persistent storage could not be requested.', error);
 		}
 	};
 }
@@ -60,7 +61,7 @@ export async function askToPersistIfWorkSaved(
 			await askToPersist();
 		}
 	} catch (error: unknown) {
-		console.error('Saved work could not be checked for.', error);
+		void recordError('Saved work could not be checked for.', error);
 	}
 }
 

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { requireDefined } from './defined';
+import { useErrorLog } from './error-log';
 import { createStarterRoutines, type Routine } from './routine';
 import type { StoredRunInProgress } from './run-in-progress';
 import type { RunRecords } from './run-records';
@@ -1642,5 +1643,100 @@ describe('following the routines', () => {
 			failure
 		);
 		expect(session.routines).toBe(routines);
+	});
+});
+
+describe('recording its failures in the activity log', () => {
+	// Takes away the log a test chose for errors, and puts back what each test spied on.
+	afterEach(() => {
+		useErrorLog(null);
+		vi.restoreAllMocks();
+	});
+
+	/**
+	 * Reads the error entries recorded so far.
+	 *
+	 * @param log - The storage the errors were recorded in.
+	 * @returns The messages and the error messages of the entries, newest first.
+	 */
+	async function recorded(log: CadoroStorage): Promise<[string, unknown][]> {
+		const entries = await log.getLogEntries();
+		return entries
+			.filter((entry) => entry.type === 'error')
+			.map((entry) => [entry.message, entry.details?.['message']]);
+	}
+
+	it('records a save that fails', async () => {
+		const storage = new InMemoryStorage();
+		useErrorLog(storage);
+		vi.spyOn(storage, 'saveRunInProgress').mockRejectedValueOnce(new Error('The disk is full.'));
+		const session = createSession([foreverRoutine], { storage });
+
+		session.play();
+
+		await expect
+			.poll(() => recorded(storage))
+			.toEqual([['The run could not be saved.', 'The disk is full.']]);
+	});
+
+	it('records a run that cannot be read while catching up', async () => {
+		const storage = new InMemoryStorage();
+		const firstTab = createSession([foreverRoutine], { storage, newId: numberedIds('first') });
+		firstTab.play();
+		const playing = await reopen(storage, '1970-01-01T00:00:00.000Z');
+		const secondTab = tabMissingChanges(storage, playing);
+		nowMs = minutes(10);
+		firstTab.pause();
+		await reopen(storage, '1970-01-01T00:10:00.000Z');
+		useErrorLog(storage);
+		vi.spyOn(storage, 'getRunInProgress').mockRejectedValueOnce(
+			new Error('The disk could not be read.')
+		);
+		nowMs = minutes(25);
+
+		secondTab.next();
+
+		await expect
+			.poll(() => recorded(storage))
+			.toContainEqual(['The run could not be read.', 'The disk could not be read.']);
+	});
+
+	it('records that the run can no longer be followed', async () => {
+		const storage: CadoroStorage = new InMemoryStorage();
+		useErrorLog(storage);
+		vi.spyOn(storage, 'watchRunInProgress').mockImplementationOnce(
+			(_onChange, onError): (() => void) => {
+				onError(new Error('The run could not be read.'));
+				return (): void => {};
+			}
+		);
+
+		createSession([foreverRoutine], { storage });
+
+		await expect
+			.poll(() => recorded(storage))
+			.toEqual([
+				[
+					'Changes to the run from other tabs can no longer be followed.',
+					'The run could not be read.'
+				]
+			]);
+	});
+
+	it('records that the routines can no longer be followed', async () => {
+		const storage: CadoroStorage = new InMemoryStorage();
+		useErrorLog(storage);
+		vi.spyOn(storage, 'watchRoutines').mockImplementation((_onChange, onError) => {
+			onError(new Error('The routines could not be read.'));
+			return (): void => {};
+		});
+
+		createSession(routines, { storage });
+
+		await expect
+			.poll(() => recorded(storage))
+			.toEqual([
+				['Changes to the routines can no longer be followed.', 'The routines could not be read.']
+			]);
 	});
 });

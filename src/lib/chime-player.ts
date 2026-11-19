@@ -3,6 +3,7 @@
 // clock keeps time. Browser-only: it needs `AudioContext`, which it's given so tests can fake it.
 
 import { nextChime, type ChimeAlert, type DueChime } from './chime-schedule';
+import { recordError } from './error-log';
 import type { RunState } from './run';
 import { MS_PER_SECOND } from './time';
 
@@ -245,7 +246,7 @@ export class ChimePlayer {
 		try {
 			await output.context.resume();
 		} catch (error: unknown) {
-			console.error('Could not start the audio for the chimes', error);
+			void recordError('Could not start the audio for the chimes', error);
 			return false;
 		}
 		await this.catchUp();
@@ -433,7 +434,7 @@ export class ChimePlayer {
 			this.#output = { context, volume };
 			return this.#output;
 		} catch (error) {
-			console.error('Could not set up the audio for the chimes', error);
+			void recordError('Could not set up the audio for the chimes', error);
 			return null;
 		}
 	}
@@ -471,7 +472,7 @@ export class ChimePlayer {
 			return loaded;
 		}
 		const loading = this.#load(context, file).catch((error: unknown) => {
-			console.error(`Could not load the chime ${file}`, error);
+			void recordError(`Could not load the chime ${file}`, error);
 			return null;
 		});
 		this.#sounds.set(file, loading);

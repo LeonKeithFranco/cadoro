@@ -1,6 +1,7 @@
 // The settings as reactive state the screens read, kept in step with storage: a change made
 // here is shown at once and saved, and one saved by another tab is followed.
 
+import { recordError } from './error-log';
 import { settingsFrom, settingsWithChanges, type Settings } from './settings';
 import type { CadoroStorage } from './storage/storage';
 
@@ -36,7 +37,7 @@ export class SettingsSession {
 				this.#settings = settings;
 			},
 			(error: unknown) => {
-				console.error('Following the settings failed.', error);
+				void recordError('Following the settings failed.', error);
 			}
 		);
 	}
@@ -62,11 +63,11 @@ export class SettingsSession {
 		try {
 			await this.#storage.saveSettings(changes);
 		} catch (error) {
-			console.error('Saving the settings failed.', error);
+			void recordError('Saving the settings failed.', error);
 			try {
 				this.#settings = await this.#storage.getSettings();
 			} catch (readError) {
-				console.error('Reading the settings back failed.', readError);
+				void recordError('Reading the settings back failed.', readError);
 			}
 		}
 	}

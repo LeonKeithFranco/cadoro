@@ -4,6 +4,8 @@
 // progress is still live in another tab, which a heartbeat's age can't tell, since a hidden tab's
 // heartbeats can be a minute apart.
 
+import { recordError } from './error-log';
+
 /**
  * The name of the lock each open tab of the app holds. A tab still on an older version must see a
  * newer one, and the other way round, so it never changes.
@@ -41,7 +43,7 @@ export async function joinOpenTabs(
 		isAnotherTabOpen = held.some((lock) => lock.name === name);
 		await holdUntilClosed(locks, name);
 	} catch (error: unknown) {
-		console.error('Could not tell whether the app is open in another tab.', error);
+		await recordError('Could not tell whether the app is open in another tab.', error);
 	}
 	// Another tab that was found stays found if only this tab's own lock was refused, since
 	// restoring the run paused would pause it in that tab.

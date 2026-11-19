@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi, type Mock } from 'vitest';
+import { useErrorLog } from '../error-log';
 import { savedRunInProgress } from '../testing/run-in-progress';
 import { firstWorkPeriod, runInProgress } from '../testing/run-records';
 import { InMemoryStorage } from './in-memory-storage';
@@ -33,8 +34,10 @@ function fakeManager(isPersisted: boolean): FakeManager {
 	};
 }
 
-// Puts back `console.error`, which some tests silence to check what's logged.
+// Puts back `console.error`, which some tests silence to check what's logged, and takes away the
+// log a test chose for errors.
 afterEach(() => {
+	useErrorLog(null);
 	vi.restoreAllMocks();
 });
 
@@ -64,6 +67,21 @@ describe('askToPersistOnce', () => {
 
 		expect(manager.persisted).toHaveBeenCalledOnce();
 		expect(manager.persist).toHaveBeenCalledOnce();
+	});
+
+	it('records a refused request in the activity log', async () => {
+		const log = new InMemoryStorage();
+		useErrorLog(log);
+		const manager = fakeManager(false);
+		manager.persist.mockRejectedValueOnce(new Error('The request was blocked.'));
+
+		await askToPersistOnce(manager)();
+
+		expect((await log.getLogEntries())[0]).toMatchObject({
+			type: 'error',
+			message: 'Persistent storage could not be requested.',
+			details: { message: 'The request was blocked.' }
+		});
 	});
 
 	it('does nothing where the browser has no storage manager', async () => {
@@ -124,6 +142,23 @@ describe('askToPersistIfWorkSaved', () => {
 
 		expect(askToPersist).not.toHaveBeenCalled();
 		expect(consoleError).toHaveBeenCalledWith('Saved work could not be checked for.', failure);
+	});
+
+	it('records storage that cannot be read in the activity log', async () => {
+		const storage = new InMemoryStorage();
+		useErrorLog(storage);
+		vi.spyOn(storage, 'hasWorkPeriods').mockRejectedValueOnce(new Error('IndexedDB is blocked.'));
+
+		await askToPersistIfWorkSaved(
+			storage,
+			vi.fn(async () => {})
+		);
+
+		expect((await storage.getLogEntries())[0]).toMatchObject({
+			type: 'error',
+			message: 'Saved work could not be checked for.',
+			details: { message: 'IndexedDB is blocked.' }
+		});
 	});
 });
 

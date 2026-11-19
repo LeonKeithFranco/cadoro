@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { useErrorLog } from './error-log';
 import { joinOpenTabs, OPEN_TAB_LOCK } from './open-tabs';
+import { InMemoryStorage } from './storage/in-memory-storage';
 
 /**
  * Makes a lock name no other test uses, since a lock this page takes lasts as long as the page,
@@ -34,8 +36,10 @@ function refusingLocks(failure: Error, refuses: 'query' | 'request'): LockManage
 }
 
 describe('joinOpenTabs', () => {
-	// Puts back `console.error`, which the failure tests silence.
+	// Puts back `console.error`, which the failure tests silence, and takes away the log a test
+	// chose for errors.
 	afterEach(() => {
+		useErrorLog(null);
 		vi.restoreAllMocks();
 	});
 
@@ -83,6 +87,22 @@ describe('joinOpenTabs', () => {
 		expect(consoleError).toHaveBeenCalledWith(
 			'Could not tell whether the app is open in another tab.',
 			failure
+		);
+	});
+
+	it('records a refused check, and a refused lock, in the activity log', async () => {
+		const log = new InMemoryStorage();
+		useErrorLog(log);
+
+		await joinOpenTabs(refusingLocks(new Error('Query blocked.'), 'query'), newLockName());
+		await joinOpenTabs(refusingLocks(new Error('Request blocked.'), 'request'), newLockName());
+
+		const entries = await log.getLogEntries();
+		expect(entries.map((entry) => [entry.type, entry.message, entry.details?.['message']])).toEqual(
+			[
+				['error', 'Could not tell whether the app is open in another tab.', 'Request blocked.'],
+				['error', 'Could not tell whether the app is open in another tab.', 'Query blocked.']
+			]
 		);
 	});
 
