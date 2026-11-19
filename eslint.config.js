@@ -7,6 +7,8 @@ import tsdoc from 'eslint-plugin-tsdoc';
 import { defineConfig, includeIgnoreFile } from 'eslint/config';
 import globals from 'globals';
 import ts from 'typescript-eslint';
+import vitest from '@vitest/eslint-plugin';
+import playwright from 'eslint-plugin-playwright';
 
 /** The `.gitignore` file, whose ignored files, such as the build, hold no code to check. */
 const gitignorePath = path.resolve(import.meta.dirname, '.gitignore');
@@ -149,6 +151,34 @@ export default defineConfig(
 		rules: {
 			// A callback whose type comes from where it's passed stays untyped, like its parameters.
 			'@typescript-eslint/explicit-function-return-type': 'error'
+		}
+	},
+	{
+		// A test that is skipped, focused or asserts nothing passes without checking anything.
+		files: ['src/**/*.test.ts', 'dev-server.test.ts'],
+		plugins: { vitest },
+		rules: {
+			'vitest/no-disabled-tests': 'error',
+			'vitest/no-focused-tests': 'error',
+			'vitest/expect-expect': 'error',
+			'vitest/valid-expect': 'error',
+			'vitest/no-identical-title': 'error'
+		}
+	},
+	{
+		// The same for the Playwright journeys.
+		files: ['e2e/**/*.ts'],
+		plugins: { playwright },
+		rules: {
+			'playwright/no-skipped-test': 'error',
+			'playwright/no-focused-test': 'error',
+			'playwright/expect-expect': [
+				'error',
+				// The journeys' own helpers whose job is to assert.
+				{ assertFunctionNames: ['expectScreenShowing'] }
+			],
+			'playwright/missing-playwright-await': 'error',
+			'playwright/valid-expect': 'error'
 		}
 	},
 	{
