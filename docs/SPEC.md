@@ -168,7 +168,7 @@ When a run ends, by its last work period or by Finish, a dialog headed "Run summ
 - Rounds reached
 - Total overtime
 
-Done or Escape closes the dialog and returns the routine to its starting state, ready for another run. The run is already saved, so closing loses nothing. Until it's closed, the summary stays open, even after a visit to another screen.
+Done or Escape closes the dialog and returns the routine to its starting state, ready for another run. The run is already saved, so closing loses nothing. Until it's closed, the summary stays open, even after a visit to another screen or a reload.
 
 ### Leaving and returning
 
