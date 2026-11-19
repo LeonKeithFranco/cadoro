@@ -10,9 +10,9 @@ const now = new Date('2026-01-05T09:00:00.000Z');
  *
  * @returns A generator giving `id-1`, then `id-2`, and so on.
  */
-function countingIds() {
+function countingIds(): () => string {
 	let count = 0;
-	return () => `id-${++count}`;
+	return (): string => `id-${++count}`;
 }
 
 describe('pickableRoutines', () => {

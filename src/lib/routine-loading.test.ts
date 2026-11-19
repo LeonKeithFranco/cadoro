@@ -26,7 +26,7 @@ describe('loadRoutines', () => {
 		const first = await loadRoutines(storage, firstLaunch, numberedIds());
 
 		// Ids that differ from the first launch's, so new starters would show.
-		const otherIds = () => `other-${crypto.randomUUID()}`;
+		const otherIds = (): string => `other-${crypto.randomUUID()}`;
 		const second = await loadRoutines(storage, laterLaunch, otherIds);
 
 		expect(second).toEqual(first);

@@ -1,5 +1,5 @@
 import { page } from 'vitest/browser';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, type Mock } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import TimerControls from './TimerControls.svelte';
 
@@ -8,7 +8,7 @@ import TimerControls from './TimerControls.svelte';
  *
  * @returns A spy for each of Play or Pause, Next and Finish.
  */
-function createCallbacks() {
+function createCallbacks(): { onplaypause: Mock; onnext: Mock; onfinish: Mock } {
 	return { onplaypause: vi.fn(), onnext: vi.fn(), onfinish: vi.fn() };
 }
 

@@ -25,7 +25,7 @@
 	<!-- The binding reads the chosen id from the prop, and reports the user's choice to the
 	     parent, which owns it, rather than changing the prop here. -->
 	<select
-		bind:value={() => selectedId, onselect}
+		bind:value={(): string => selectedId, onselect}
 		{disabled}
 		class="mt-1 block w-full rounded-md border-zinc-300 bg-white text-zinc-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
 	>
