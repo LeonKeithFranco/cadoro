@@ -25,6 +25,7 @@ The Routines screen, editing routines and blocks in place, the activity log of r
 - `deleteRoutine` returns `false` for the last routine, and `reorderRoutines` returns `false` when nothing would change, so neither logs. `duplicateRoutine` takes the original's id, so storage places the copy.
 - This settles the open item about deleting every routine: the last one can't be deleted, in storage and in the UI, so `TimerSession` always has one.
 - `TimerSession` follows `watchRoutines`. A ready run takes its routine's new version, or the first routine if it was deleted. A run that has started keeps the routine it started with, which it carries in its plan.
+- "The first routine", when there's no last routine or it's deleted, means the picker's first, which follows the chosen sort, as the spec says. The first version took the first in custom order. `TimerSession` takes a `pickerOrder` option, and the layout passes `sortRoutines` with the saved sort and the runs read as the app opened, so the "last used" and "most work" sorts are as of opening. Giving the session the sort and a live usage was rejected: it would make the session follow the settings and every run too, for a fallback.
 - `RoutineUsage` needs only the runs and work periods, not a whole storage, so the sorts are pure and tests build it by hand.
 
 ### The Routines screen

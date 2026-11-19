@@ -22,6 +22,16 @@ const classicWithLongBreak = requireDefined(routines[1], 'the Classic with long 
 /** The one-round routine's 25-minute block at 20%, repeating forever, so Next always starts a break. */
 const foreverRoutine = routineWith({ id: 'forever', title: 'Forever', rounds: 'infinite' });
 
+/**
+ * Orders routines by title, Z to A, as a picker sorted that way does.
+ *
+ * @param choices - The routines in any order.
+ * @returns A new list, the last title in the alphabet first.
+ */
+function byTitleDescending(choices: readonly Routine[]): Routine[] {
+	return choices.toSorted((a, b) => b.title.localeCompare(a.title));
+}
+
 /** The fake clock's current moment, in milliseconds since 1970, which each test moves by hand. */
 let nowMs = 0;
 
@@ -49,7 +59,7 @@ function createSession(
 	options: Partial<
 		Pick<
 			TimerSessionOptions,
-			'storage' | 'newId' | 'onWorkSaved' | 'onPress' | 'onRunStarted' | 'onTick'
+			'storage' | 'newId' | 'onWorkSaved' | 'onPress' | 'onRunStarted' | 'onTick' | 'pickerOrder'
 		>
 	> = {},
 	opening: Partial<AppOpening> = {}
@@ -119,6 +129,22 @@ describe('opening on the last routine used', () => {
 		const session = createSession(routines, {}, { lastRoutineId: null });
 
 		expect(session.routine).toBe(classic);
+	});
+
+	it('chooses the first routine in the picker, not in custom order, when there is no last routine', () => {
+		const session = createSession(routines, { pickerOrder: byTitleDescending });
+
+		expect(session.routine).toBe(classicWithLongBreak);
+	});
+
+	it('chooses the first routine in the picker when the last one is gone', () => {
+		const session = createSession(
+			routines,
+			{ pickerOrder: byTitleDescending },
+			{ lastRoutineId: 'a-deleted-routine' }
+		);
+
+		expect(session.routine).toBe(classicWithLongBreak);
 	});
 });
 
@@ -1555,6 +1581,22 @@ describe('following the routines', () => {
 		await expect.poll(() => session.routine.id).toBe(classic.id);
 		expect(session.routines.map((routine) => routine.id)).toEqual([classic.id]);
 		expect(session.view).toMatchObject({ status: 'ready' });
+	});
+
+	it('chooses the first routine in the picker, not in custom order, when the chosen one is deleted', async () => {
+		const storage = new InMemoryStorage();
+		const three = [
+			routineWith({ id: 'a', title: 'A', customPosition: 0 }),
+			routineWith({ id: 'b', title: 'B', customPosition: 1 }),
+			routineWith({ id: 'c', title: 'C', customPosition: 2 })
+		];
+		await storage.addRoutinesIfNone(three);
+		const session = createSession(three, { storage, pickerOrder: byTitleDescending });
+		session.select('b');
+
+		await storage.deleteRoutine('b');
+
+		await expect.poll(() => session.routine.id).toBe('c');
 	});
 
 	it('keeps the run in progress as it was started, and readies the new version for the next run', async () => {

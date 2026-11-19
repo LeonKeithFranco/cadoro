@@ -61,6 +61,12 @@ export type TimerSessionOptions = {
 	 * laptop sleeps. Nothing is called when left out.
 	 */
 	onTick?: () => void;
+	/**
+	 * Puts the routines in the order the picker lists them, which the Routines screen's sort
+	 * chooses, so "the first routine" means the picker's first. The routines in custom order when
+	 * left out.
+	 */
+	pickerOrder?: (routines: readonly Routine[]) => readonly Routine[];
 };
 
 /** What the app found as it opened, which a session carries on from. */
@@ -74,8 +80,8 @@ export type AppOpening = {
 	isAnotherTabOpen: boolean;
 	/**
 	 * The id of the routine the last run used, from Settings, which the session chooses when
-	 * there's no run to carry on, if that routine is still among the routines. The first routine
-	 * when it's `null`, left out, or gone.
+	 * there's no run to carry on, if that routine is still among the routines. The picker's
+	 * first routine when it's `null`, left out, or gone.
 	 */
 	lastRoutineId?: string | null;
 };
@@ -99,7 +105,7 @@ export type AppOpening = {
  */
 export class TimerSession {
 	/**
-	 * The routines to pick from, in the picker's order, as storage last reported them. Never empty.
+	 * The routines to pick from, in custom order, as storage last reported them. Never empty.
 	 */
 	#routines: readonly Routine[];
 
@@ -126,6 +132,9 @@ export class TimerSession {
 
 	/** Called on every tick, after the view moves on. */
 	readonly #onTick: () => void;
+
+	/** Puts the routines in the picker's order, to find the picker's first. */
+	readonly #pickerOrder: (routines: readonly Routine[]) => readonly Routine[];
 
 	/**
 	 * The record of the run in progress, as Play started it, as restored or as taken on from
@@ -180,7 +189,7 @@ export class TimerSession {
 
 	/**
 	 * Starts a session that carries on the saved run in progress, or, when there's none, has the
-	 * first routine chosen and its run ready, and follows the saved run from then on.
+	 * picker's first routine chosen and its run ready, and follows the saved run from then on.
 	 *
 	 * @remarks
 	 * When no other tab is open, a saved run comes back paused at its last heartbeat, as
@@ -189,7 +198,8 @@ export class TimerSession {
 	 * saved, still running if it was, and nothing is saved. A saved run whose routine is gone is
 	 * forgotten, and the session starts as if there were none.
 	 *
-	 * @param routines - The routines to pick from, in the picker's order. There's always at least
+	 * @param routines - The routines to pick from, in custom order, as storage reads them. The
+	 * `pickerOrder` option says which is the picker's first. There's always at least
 	 * one, since the first launch creates the starter routines, and the last routine can't be
 	 * deleted. The session then follows storage's routines.
 	 * @param options - The clock, the storage runs are saved in, the id generators, what to do
@@ -210,14 +220,15 @@ export class TimerSession {
 			onWorkSaved,
 			onPress = (): void => {},
 			onRunStarted = (): void => {},
-			onTick = (): void => {}
+			onTick = (): void => {},
+			pickerOrder = (list): readonly Routine[] => list
 		}: TimerSessionOptions,
 		{ saved, isAnotherTabOpen, lastRoutineId = null }: AppOpening = {
 			saved: null,
 			isAnotherTabOpen: false
 		}
 	) {
-		const [firstRoutine] = routines;
+		const [firstRoutine] = pickerOrder(routines);
 		if (firstRoutine === undefined) {
 			throw new Error('A timer session needs at least one routine.');
 		}
@@ -231,6 +242,7 @@ export class TimerSession {
 		this.#onPress = onPress;
 		this.#onRunStarted = onRunStarted;
 		this.#onTick = onTick;
+		this.#pickerOrder = pickerOrder;
 
 		const carriedOn = TimerSession.#carryOn(saved, routines, isAnotherTabOpen);
 		const lastRoutine = routines.find((candidate) => candidate.id === lastRoutineId);
@@ -272,7 +284,7 @@ export class TimerSession {
 		);
 	}
 
-	/** The routines to pick from, in the picker's order, as of the last change to them. */
+	/** The routines to pick from, in custom order, as of the last change to them. */
 	get routines(): readonly Routine[] {
 		return this.#routines;
 	}
@@ -284,8 +296,8 @@ export class TimerSession {
 	 * @remarks
 	 * A report with no routine is ignored, since there's always one to run. A report equal to
 	 * what the session has, such as the first, which repeats what the app opened with, changes
-	 * nothing. A ready run follows its routine's new version, or the first routine if its routine
-	 * was deleted. A run that has started keeps the routine it started with, which it carries in
+	 * nothing. A ready run follows its routine's new version, or the picker's first routine if
+	 * its routine was deleted. A run that has started keeps the routine it started with, which it carries in
 	 * its plan, and takes the new version when the next run is readied.
 	 *
 	 * @param changed - The routines not deleted, in custom order.
@@ -306,13 +318,13 @@ export class TimerSession {
 	 * Finds a routine's current version among the routines to pick from.
 	 *
 	 * @param routine - The routine, as the session has it.
-	 * @returns The routine with the same id as storage last reported it, or the first routine when
-	 * it was deleted.
+	 * @returns The routine with the same id as storage last reported it, or the picker's first routine
+	 * when it was deleted.
 	 */
 	#latestVersionOf(routine: Routine): Routine {
 		return (
 			this.#routines.find((candidate) => candidate.id === routine.id) ??
-			this.#routines[0] ??
+			this.#pickerOrder(this.#routines)[0] ??
 			routine
 		);
 	}
