@@ -50,3 +50,33 @@ Runs survive reloads, every work period is recorded, and every open tab shows th
 - Tests stay written after the code, while Willison recommends red/green TDD, test first. His reason is that a test seen failing is proven able to catch a bug. The bug-fix exception and breaking the code on purpose afterwards give the same proof, so the testing rule stands.
 - `CLAUDE.md` gained a Commands section, because Anthropic's guide says the exact test, lint and typecheck commands are often its most useful lines, and it named none. It lists the Taskfile's `check:quick` and `check`, how to run one test file, and the `PORT` workaround for a stale dev server.
 - Outside the repo, at the user's choice: never stashing and never merging unasked moved from prose alone into permission rules in `~/.claude/settings.json`, a `deny` for `git stash` and `--autostash` and an `ask` for `gh pr merge` and `task pr:merge`. The guide's reason is that `CLAUDE.md` and rules hold "most of the time, not every time", and a request made in the chat can be lost when the conversation compacts. Project memories that only repeated `CLAUDE.md` or the global rules were removed.
+
+## Step 1: routines in storage (`feat/routine-storage`), 2026-11-19
+
+### The storage interface's first methods
+
+- `CadoroStorage` starts with the two methods step 1 needs: `getRoutines()`, the routines not deleted in custom order, and `addRoutinesIfNone(routines)`, which saves them only while storage holds no routine at all, deleted ones included, and says whether it did.
+- Deleted routines count, so a user who deletes both starter routines never sees them come back, as the spec's Starter routines section says.
+- Checking and adding are one method, so each backend can make them one step. A `hasRoutines()` and an `addRoutines()` called one after the other were rejected, because two tabs opening at once could both find storage empty.
+- Routines go in and come out as copies, as IndexedDB copies everything it saves. The in-memory backend copies with `structuredClone`, so tests against it can't pass by sharing objects with the code they check, and the shared suite checks the copies on both backends.
+- Which routines can be picked, and in what order, is the pure `pickableRoutines` in `routine.ts`, which both backends call, rather than a filter and a sort written in each.
+
+### The Dexie backend
+
+- `DexieStorage` keeps the data in a database named `cadoro`, which never changes, since renaming it would leave every user's data behind. A test pins the name. The constructor takes another name, so each test gets a database of its own.
+- Schema version 1 keys `routines`, `runs` and `workPeriods` by `id`, and keeps `runInProgress`'s key outside the row (`''`), so the run is saved exactly as the engine has it, under a fixed key. Only `routines` has a TypeScript type so far. The other tables get theirs with their records, in steps 2 and 3.
+- `addRoutinesIfNone` counts and adds in one read-write transaction. IndexedDB runs read-write transactions on the same table one after another, even across connections, so two tabs can't both add the starters.
+- Dexie is a dev dependency like every other package, since the build bundles it into the static files.
+
+### Testing storage
+
+- The shared suite runs on both backends in the browser project. Vitest's Playwright provider starts a fresh browser profile on every run unless `persistentContext` is set, as its source shows, so a random database name per test is enough to keep tests apart, with no clean-up.
+- Two `DexieStorage` objects on one database are two connections, as two tabs have, so a test races them with `Promise.all`. Without the transaction, both added their routines in every run, so the test catches it reliably.
+- The schema test reads IndexedDB's own stores through Dexie's `backendDB()`. Dexie reports a key kept outside the row as `''` when it reads a saved database, the same as a row that is its own key, while IndexedDB reports `null`. Reading Dexie's schema was rejected for that reason.
+
+### Loading the routines
+
+- `loadRoutines(storage, now, newId)`, in `src/lib/routine-loading.ts`, creates the starters if storage holds none and reads the routines. The root `+layout.ts` builds the `TimerSession` from them with `DexieStorage`, `Date.now` and `crypto.randomUUID`, in its own `openTimerSession`.
+- The plan had one `src/lib` function returning the whole session. Splitting the storage part off keeps it free of Svelte, so its tests run in Node against the in-memory backend, while a function that builds a `TimerSession` would need the browser project for its runes.
+- The `load` keeps the session's promise in a module variable, assigned with `??=`, so a `load` running again, such as after `invalidateAll()`, hands back the same session rather than losing the run.
+- `TimerSession` still needs at least one routine. Nothing can delete routines until milestone 6, and the spec doesn't yet say what the Timer screen shows when every routine is deleted, so that's left open for milestone 6.
