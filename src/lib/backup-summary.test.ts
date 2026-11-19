@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createBackup } from './backup-format';
-import { summarizeBackup } from './backup-summary';
+import { describeBackupSummary, summarizeBackup, type BackupSummary } from './backup-summary';
 import { DEFAULT_SETTINGS } from './settings';
 import { oneRoundRoutine, routineWith } from './testing/routines';
 import { firstWorkPeriod, runWith } from './testing/run-records';
@@ -64,5 +64,38 @@ describe('summarizeBackup', () => {
 		expect(summary.runCount).toBe(0);
 		expect(summary.firstRunAt).toBeNull();
 		expect(summary.lastRunAt).toBeNull();
+	});
+});
+
+describe('describeBackupSummary', () => {
+	/** A summary of a backup with runs, which tests change where it matters. */
+	const summary: BackupSummary = {
+		formatVersion: 1,
+		exportedAt: '2026-11-20T10:00:00.000Z',
+		routineCount: 3,
+		runCount: 5,
+		workPeriodCount: 12,
+		firstRunAt: '2026-11-10T08:00:00.000Z',
+		lastRunAt: '2026-11-19T09:00:00.000Z'
+	};
+
+	it('gives the counts, the days of the first and last runs and the day it was made', () => {
+		expect(describeBackupSummary(summary)).toBe(
+			'The backup holds 3 routines, 5 runs, 12 work periods, with runs from 2026-11-10 to 2026-11-19 (UTC), and was made on 2026-11-20 (UTC).'
+		);
+	});
+
+	it('uses the singular for a count of one', () => {
+		const one = { ...summary, routineCount: 1, runCount: 1, workPeriodCount: 1 };
+
+		expect(describeBackupSummary(one)).toContain('1 routine, 1 run, 1 work period,');
+	});
+
+	it('says no days of runs when the backup holds none', () => {
+		const none = { ...summary, runCount: 0, workPeriodCount: 0, firstRunAt: null, lastRunAt: null };
+
+		expect(describeBackupSummary(none)).toBe(
+			'The backup holds 3 routines, 0 runs, 0 work periods, and was made on 2026-11-20 (UTC).'
+		);
 	});
 });
