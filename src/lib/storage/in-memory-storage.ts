@@ -1,7 +1,16 @@
 // A backend that keeps data in memory, for tests of the code that uses storage. Data lasts only
 // as long as the object.
 
+import { LOG_MAX_ENTRIES, type LogEntry } from '../log';
 import { pickableRoutines, type Routine } from '../routine';
+import {
+	planCreate,
+	planDelete,
+	planDuplicate,
+	planReorder,
+	planSave,
+	type RoutineChange
+} from '../routine-changes';
 import { isRevision, withHeartbeat, type StoredRunInProgress } from '../run-in-progress';
 import {
 	noRecords,
@@ -12,7 +21,7 @@ import {
 	type WorkPeriod
 } from '../run-records';
 import { settingsFrom, settingsWithChanges, type Settings } from '../settings';
-import type { CadoroStorage } from './storage';
+import type { CadoroStorage, StorageOptions } from './storage';
 
 /**
  * Storage kept in memory, which starts empty and is lost when the object goes.
@@ -44,8 +53,82 @@ export class InMemoryStorage implements CadoroStorage {
 	/** The `onChange` of everything following the settings. */
 	#settingsWatchers = new Set<(settings: Settings) => void>();
 
+	/** Returns the current moment, which stamps each log entry and each deletion. */
+	readonly #now: () => Date;
+
+	/** How many log entries are kept. */
+	readonly #logLimit: number;
+
+	/** The log's entries, oldest first. */
+	#log: LogEntry[] = [];
+
+	/** The id the next log entry gets. */
+	#nextLogId = 1;
+
+	/** The `onChange` of everything following the routines. */
+	#routineWatchers = new Set<(routines: Routine[]) => void>();
+
+	/**
+	 * Makes empty storage.
+	 *
+	 * @param options - The clock and the log's size, as {@link StorageOptions} describes them.
+	 */
+	constructor({ now = (): Date => new Date(), logLimit = LOG_MAX_ENTRIES }: StorageOptions = {}) {
+		this.#now = now;
+		this.#logLimit = logLimit;
+	}
+
 	async getRoutines(): Promise<Routine[]> {
 		return structuredClone(pickableRoutines(this.#routines));
+	}
+
+	async getAllRoutines(): Promise<Routine[]> {
+		return structuredClone(this.#routines.toSorted((a, b) => a.customPosition - b.customPosition));
+	}
+
+	// It takes no `onError`, since memory can always be read.
+	watchRoutines(onChange: (routines: Routine[]) => void): () => void {
+		this.#routineWatchers.add(onChange);
+		this.#reportRoutines(onChange);
+		return (): void => {
+			this.#routineWatchers.delete(onChange);
+		};
+	}
+
+	async createRoutine(routine: Routine): Promise<void> {
+		this.#apply(planCreate(this.#routines, structuredClone(routine), this.#now()));
+	}
+
+	async duplicateRoutine(copy: Routine, originalId: string): Promise<void> {
+		this.#apply(planDuplicate(this.#routines, structuredClone(copy), originalId, this.#now()));
+	}
+
+	async saveRoutine(routine: Routine): Promise<void> {
+		this.#apply(planSave(this.#routines, structuredClone(routine), this.#now()));
+	}
+
+	async deleteRoutine(id: string): Promise<boolean> {
+		const change = planDelete(this.#routines, id, this.#now());
+		if (change === null) {
+			return false;
+		}
+
+		this.#apply(change);
+		return true;
+	}
+
+	async reorderRoutines(orderedIds: string[]): Promise<boolean> {
+		const change = planReorder(this.#routines, orderedIds, this.#now());
+		if (change === null) {
+			return false;
+		}
+
+		this.#apply(change);
+		return true;
+	}
+
+	async getLogEntries(): Promise<LogEntry[]> {
+		return structuredClone(this.#log.toReversed());
 	}
 
 	async addRoutinesIfNone(routines: Routine[]): Promise<boolean> {
@@ -54,6 +137,7 @@ export class InMemoryStorage implements CadoroStorage {
 		}
 
 		this.#routines = structuredClone(routines);
+		this.#reportToRoutineWatchers();
 		return true;
 	}
 
@@ -148,6 +232,48 @@ export class InMemoryStorage implements CadoroStorage {
 
 	async hasWorkPeriods(): Promise<boolean> {
 		return this.#workPeriods.size > 0;
+	}
+
+	/**
+	 * Saves a routine change and its log entry, and tells everything following the routines.
+	 *
+	 * @param change - What to save and log, from `routine-changes.ts`.
+	 */
+	#apply(change: RoutineChange): void {
+		for (const written of structuredClone(change.writes)) {
+			const index = this.#routines.findIndex((routine) => routine.id === written.id);
+			if (index === -1) {
+				this.#routines.push(written);
+			} else {
+				this.#routines[index] = written;
+			}
+		}
+
+		this.#log.push({ id: this.#nextLogId, ...structuredClone(change.entry) });
+		this.#nextLogId += 1;
+		this.#log = this.#log.slice(-this.#logLimit);
+		this.#reportToRoutineWatchers();
+	}
+
+	/** Tells everything following the routines what they are. */
+	#reportToRoutineWatchers(): void {
+		for (const watcher of this.#routineWatchers) {
+			this.#reportRoutines(watcher);
+		}
+	}
+
+	/**
+	 * Tells one follower of the routines what they are, once the current call has finished, as
+	 * `#reportSettings` does for the settings.
+	 *
+	 * @param watcher - The follower's `onChange`.
+	 */
+	#reportRoutines(watcher: (routines: Routine[]) => void): void {
+		queueMicrotask(() => {
+			if (this.#routineWatchers.has(watcher)) {
+				watcher(structuredClone(pickableRoutines(this.#routines)));
+			}
+		});
 	}
 
 	/**

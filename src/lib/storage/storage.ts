@@ -1,10 +1,22 @@
 // The one way the app reads and saves its data. Each backend, such as IndexedDB through Dexie or
 // memory for tests, implements this interface, and one shared suite of tests checks them all.
 
+import type { LogEntry } from '../log';
 import type { Routine } from '../routine';
 import type { StoredRunInProgress } from '../run-in-progress';
 import type { Run, RunRecords, WorkPeriod } from '../run-records';
 import type { Settings } from '../settings';
+
+/** What a backend takes from the rest of the app, passed in so tests can control it. */
+export type StorageOptions = {
+	/**
+	 * Returns the current moment, which stamps each log entry and each deletion. `new Date()` when
+	 * left out.
+	 */
+	now?: () => Date;
+	/** How many log entries to keep. `LOG_MAX_ENTRIES` (5,000) when left out. */
+	logLimit?: number;
+};
 
 /**
  * Where the app keeps its data. Every method returns a promise, because the browser's database
@@ -24,6 +36,112 @@ export interface CadoroStorage {
 	 * browser blocks IndexedDB.
 	 */
 	getRoutines(): Promise<Routine[]>;
+
+	/**
+	 * Reads every routine, deleted ones too, which Stats needs for the names of past work.
+	 *
+	 * @returns Every routine, lowest `customPosition` first. A deleted routine keeps the position
+	 * it had when it was deleted.
+	 * @throws Rejects with the backend's own error when its data can't be read.
+	 */
+	getAllRoutines(): Promise<Routine[]>;
+
+	/**
+	 * Follows the routines the user can pick, as {@link CadoroStorage.getRoutines} reads them:
+	 * calls `onChange` with them soon after this is called, and again after every change to them,
+	 * from this storage object or any other on the same data, as another tab's is.
+	 *
+	 * @remarks
+	 * It reports the same way {@link CadoroStorage.watchRunInProgress} does: always later, never
+	 * during this call or a change, with changes in quick succession possibly reported once. Each
+	 * report is a complete copy.
+	 *
+	 * @param onChange - Called with the routines not deleted, in custom order.
+	 * @param onError - Called if the routines can't be read.
+	 * @returns A function that stops following, after which neither callback is called.
+	 */
+	watchRoutines(
+		onChange: (routines: Routine[]) => void,
+		onError: (error: unknown) => void
+	): () => void;
+
+	/**
+	 * Saves a new routine at its `customPosition` among the routines not deleted, and moves down
+	 * those from there on, in one step.
+	 *
+	 * @remarks
+	 * The change is written to the activity log, as every routine change is. A failure to write the
+	 * log entry is reported with `console.error`, and never undoes or blocks the change.
+	 *
+	 * @param routine - The routine to add, with an id no routine has, deleted ones included. Its
+	 * `customPosition` is the place it goes, and 0 puts it first.
+	 * @throws Rejects with an {@link Error} when a routine with that id is saved already, or with
+	 * the backend's own error when the data can't be saved, and then nothing is saved.
+	 */
+	createRoutine(routine: Routine): Promise<void>;
+
+	/**
+	 * Saves a copy of a routine just below the routine it copies, moving down those from there on,
+	 * in one step, and logs it as a duplicate.
+	 *
+	 * @param copy - The copy, as `duplicateRoutine` makes it. Its own `customPosition` is ignored.
+	 * @param originalId - The id of the routine it copies.
+	 * @throws Rejects with an {@link Error} when no routine that isn't deleted has the original's id,
+	 * or a routine with the copy's id is saved already, or with the backend's own error when the
+	 * data can't be saved, and then nothing is saved.
+	 */
+	duplicateRoutine(copy: Routine, originalId: string): Promise<void>;
+
+	/**
+	 * Saves an edit to a routine's title, rounds and blocks.
+	 *
+	 * @remarks
+	 * The routine's position, creation date and deletion are kept as saved, so an edit worked out
+	 * before another tab reordered the routines can't undo the reorder. The log entry holds the old
+	 * and new title, rounds and blocks.
+	 *
+	 * @param routine - The routine as edited, with the id of the routine to change.
+	 * @throws Rejects with an {@link Error} when no routine that isn't deleted has that id, or with
+	 * the backend's own error when the data can't be saved, and then nothing is saved.
+	 */
+	saveRoutine(routine: Routine): Promise<void>;
+
+	/**
+	 * Deletes a routine by setting its `deletedAt`, unless it's the only routine not deleted.
+	 *
+	 * @remarks
+	 * The routine is kept, so Stats still has its name. It never deletes the last routine left, so
+	 * there's always one to run.
+	 *
+	 * @param id - The id of the routine to delete.
+	 * @returns `true` if the routine was deleted, or `false` if it's the only routine not deleted
+	 * and nothing changed.
+	 * @throws Rejects with an {@link Error} when no routine that isn't deleted has that id, or with
+	 * the backend's own error when the data can't be saved.
+	 */
+	deleteRoutine(id: string): Promise<boolean>;
+
+	/**
+	 * Puts the routines not deleted in a new custom order, saving every changed position in one
+	 * step.
+	 *
+	 * @param orderedIds - The ids of every routine that isn't deleted, in the new order. Each gets
+	 * the position of its index, so a gap in the saved positions is closed.
+	 * @returns `true` if any position changed, or `false` if the order was already this one, and
+	 * nothing was saved or logged.
+	 * @throws Rejects with an {@link Error} when the ids aren't exactly those of the routines not
+	 * deleted, each once, or with the backend's own error when the data can't be saved, and then no
+	 * position changes.
+	 */
+	reorderRoutines(orderedIds: string[]): Promise<boolean>;
+
+	/**
+	 * Reads the activity log.
+	 *
+	 * @returns The entries, newest first. Only the newest 5,000 are kept.
+	 * @throws Rejects with the backend's own error when its data can't be read.
+	 */
+	getLogEntries(): Promise<LogEntry[]>;
 
 	/**
 	 * Saves the given routines, but only if storage holds no routine at all, deleted ones
