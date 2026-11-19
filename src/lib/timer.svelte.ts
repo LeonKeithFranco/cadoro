@@ -1,13 +1,17 @@
-// The timer screen's state: the routines to pick from, the chosen routine and its run, whose
-// records it saves. The root
-// layout's `load` makes the app's one session and keeps it in the layout's data, rather than the
-// Timer page making it, since SvelteKit removes the page when another screen opens, and the run
-// must still be there on the way back.
+// The timer screen's state: the routines to pick from, the chosen routine and its run, which it
+// saves as it goes and restores when the app opens. The root layout's `load` makes the app's one
+// session and keeps it in the layout's data, rather than the Timer page making it, since
+// SvelteKit removes the page when another screen opens, and the run must still be there on the
+// way back.
 
 import type { Routine } from './routine';
 import { createRun, finish, next, pause, play, viewRun, type RunState, type RunView } from './run';
-import { toStoredRunInProgress } from './run-in-progress';
-import { recordPress, type Run, type RunRecords } from './run-records';
+import {
+	restoreRunInProgress,
+	toStoredRunInProgress,
+	type StoredRunInProgress
+} from './run-in-progress';
+import { noRecords, recordPress, type Run, type RunRecords } from './run-records';
 import type { CadoroStorage } from './storage/storage';
 
 /** A button's effect on a run, such as `play`, from the run engine. */
@@ -59,12 +63,12 @@ export class TimerSession {
 	readonly #onWorkSaved: () => void;
 
 	/**
-	 * The record of the latest run Play started, or `null` before the first. It isn't state,
-	 * since nothing on screen shows it.
+	 * The record of the latest run Play started, or of the run restored, or `null` before
+	 * either. It isn't state, since nothing on screen shows it.
 	 */
-	#record: Run | null = null;
+	#record: Run | null;
 
-	/** The last save handed to storage, which the next save waits for. */
+	/** The last write handed to storage, which the next write waits for. */
 	#saving: Promise<void> = Promise.resolve();
 
 	/** The routine chosen in the picker. */
@@ -80,18 +84,27 @@ export class TimerSession {
 	readonly view: RunView;
 
 	/**
-	 * Starts a session with the first routine chosen and its run ready.
+	 * Starts a session that carries on the saved run in progress, or, when there's none, has the
+	 * first routine chosen and its run ready.
+	 *
+	 * @remarks
+	 * A saved run comes back paused at its last heartbeat, as `restoreRunInProgress` explains,
+	 * and is saved again as it now is, so storage shows what the screen does. A saved run whose
+	 * routine is gone is forgotten, and the session starts as if there were none.
 	 *
 	 * @param routines - The routines to pick from, in the picker's order. There's always at least
 	 * one, since the first launch creates the starter routines, and routines can't be deleted
 	 * yet.
 	 * @param options - The clock, the storage runs are saved in, the id generator and what to do
 	 * once work is saved, as {@link TimerSessionOptions} describes them.
+	 * @param saved - The run in progress that storage held when the app opened, or `null` when it
+	 * held none.
 	 * @throws {@link Error} If there are no routines to pick from.
 	 */
 	constructor(
 		routines: readonly Routine[],
-		{ clock, storage, newId, onWorkSaved }: TimerSessionOptions
+		{ clock, storage, newId, onWorkSaved }: TimerSessionOptions,
+		saved: StoredRunInProgress | null = null
 	) {
 		const [firstRoutine] = routines;
 		if (firstRoutine === undefined) {
@@ -103,12 +116,22 @@ export class TimerSession {
 		this.#storage = storage;
 		this.#newId = newId;
 		this.#onWorkSaved = onWorkSaved;
-		this.#routine = $state.raw(firstRoutine);
-		this.#run = $state.raw(createRun(firstRoutine));
+
+		const restored = saved === null ? null : restoreRunInProgress(saved, routines);
+		const routine = restored?.routine ?? firstRoutine;
+		this.#record = restored?.record ?? null;
+		this.#routine = $state.raw(routine);
+		this.#run = $state.raw(restored?.run ?? createRun(routine));
 		this.#now = $state(clock());
 		// Set after the state it reads, which a field's initializer would read before the
 		// constructor had set it.
 		this.view = $derived(viewRun(this.#run, this.#now));
+
+		if (restored !== null) {
+			this.#save(noRecords());
+		} else if (saved !== null) {
+			this.#forgetRunInProgress();
+		}
 	}
 
 	/** The routine chosen in the picker. */
@@ -165,7 +188,9 @@ export class TimerSession {
 	 * Readies a new run of the same routine once the run has ended, as closing its summary does.
 	 *
 	 * @remarks
-	 * A run that hasn't ended is left as it is, so its work can't be thrown away by mistake.
+	 * A run that hasn't ended is left as it is, so its work can't be thrown away by mistake. The
+	 * ended run is kept as the run in progress until now, so its summary comes back after a
+	 * reload, and is forgotten here, while its run and work periods stay saved.
 	 */
 	readyNewRun(): void {
 		if (this.#run.status !== 'ended') {
@@ -173,10 +198,27 @@ export class TimerSession {
 		}
 
 		this.#run = createRun(this.#routine);
+		this.#forgetRunInProgress();
 	}
 
-	/** Moves the view on to the current moment, as the screen does every second while running. */
+	/**
+	 * Moves the view on to the current moment, as the screen does every second while running,
+	 * and saves the run's heartbeat while a timer is counting.
+	 *
+	 * @remarks
+	 * The heartbeat is the moment a restored run is paused at, so the screen also calls this as
+	 * the page is hidden, in case the app is stopped before the next tick. A paused run has
+	 * nothing new to save.
+	 */
 	tick(): void {
+		this.#moveOn();
+		if (this.view.isRunning) {
+			this.#save(noRecords());
+		}
+	}
+
+	/** Moves the view on to the current moment, without saving anything. */
+	#moveOn(): void {
 		this.#now = this.#clock();
 	}
 
@@ -192,7 +234,7 @@ export class TimerSession {
 	 * @param press - The button's effect on the run, from the engine.
 	 */
 	#press(press: Press): void {
-		this.tick();
+		this.#moveOn();
 		const before = this.#run;
 		const after = press(before, this.#now);
 		if (after === before) {
@@ -209,15 +251,10 @@ export class TimerSession {
 	}
 
 	/**
-	 * Hands the run in progress, with what a change left to keep, to storage once every earlier
-	 * save has finished, without waiting for it.
+	 * Saves the run in progress as of the current moment, with what a change left to keep.
 	 *
 	 * @remarks
-	 * Buttons change the screen at once and storage catches up, so a slow save never holds up
-	 * the timer. Each save waits for the one before, so saves reach storage in the order the
-	 * buttons were pressed whatever the backend, and a run's start is never saved after its end.
-	 * A failed save is logged and the next one still runs, until milestone 8's activity log
-	 * records errors. Once a save that held work periods has finished, `onWorkSaved` is called.
+	 * Once a save that held work periods has finished, `onWorkSaved` is called.
 	 *
 	 * @param records - What the change left to keep, besides the run in progress. A ready run
 	 * isn't saved, since nothing has happened yet that's worth keeping.
@@ -232,15 +269,34 @@ export class TimerSession {
 
 		const runInProgress = toStoredRunInProgress(record, run, this.#now);
 		const hasWorkPeriods = records.workPeriods.length > 0;
-		this.#saving = this.#saving
-			.then(async () => {
-				await this.#storage.saveRunInProgress(runInProgress, records);
-				if (hasWorkPeriods) {
-					this.#onWorkSaved();
-				}
-			})
-			.catch((error: unknown) => {
-				console.error('The run could not be saved.', error);
-			});
+		this.#enqueue(async () => {
+			await this.#storage.saveRunInProgress(runInProgress, records);
+			if (hasWorkPeriods) {
+				this.#onWorkSaved();
+			}
+		});
+	}
+
+	/** Forgets the saved run in progress, once every earlier save has finished. */
+	#forgetRunInProgress(): void {
+		this.#enqueue(() => this.#storage.clearRunInProgress());
+	}
+
+	/**
+	 * Hands a write to storage once every earlier write has finished, without waiting for it.
+	 *
+	 * @remarks
+	 * Buttons change the screen at once and storage catches up, so a slow write never holds up
+	 * the timer. Each write waits for the one before, so writes reach storage in the order they
+	 * were made whatever the backend: a run's start is never saved after its end, and a late
+	 * heartbeat can't bring back a run that Done has forgotten. A failed write is logged and the
+	 * next one still runs, until milestone 8's activity log records errors.
+	 *
+	 * @param write - The write, which starts only when it's called.
+	 */
+	#enqueue(write: () => Promise<void>): void {
+		this.#saving = this.#saving.then(write).catch((error: unknown) => {
+			console.error('The run could not be saved.', error);
+		});
 	}
 }

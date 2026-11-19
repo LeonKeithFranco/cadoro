@@ -14,6 +14,9 @@ const routines = createStarterRoutines(new Date(0), numberedIds());
 /** The starter routines, by name. */
 const [classic, classicWithLongBreak] = routines;
 
+/** The one-round routine's 25-minute block at 20%, repeating forever, so Next always starts a break. */
+const foreverRoutine = routineWith({ id: 'forever', title: 'Forever', rounds: 'infinite' });
+
 /** The fake clock's current moment, in milliseconds since 1970, which each test moves by hand. */
 let nowMs = 0;
 
@@ -23,19 +26,26 @@ let nowMs = 0;
  * @param choices - The routines to pick from. The starter routines unless a test needs others.
  * @param options - The options a test reads, `storage` and `onWorkSaved`. Unless given, the
  * session saves to new, empty storage, and `onWorkSaved` is a spy nothing checks.
- * @returns A new session, with the first routine chosen and its run ready.
+ * @param saved - The run in progress the app found saved as it opened, or `null` for none.
+ * @returns A new session, carrying on the saved run, or with the first routine chosen and its run
+ * ready.
  */
 function createSession(
 	choices: readonly Routine[] = routines,
-	options: Partial<Pick<TimerSessionOptions, 'storage' | 'onWorkSaved'>> = {}
+	options: Partial<Pick<TimerSessionOptions, 'storage' | 'onWorkSaved'>> = {},
+	saved: StoredRunInProgress | null = null
 ): TimerSession {
-	return new TimerSession(choices, {
-		clock: () => nowMs,
-		storage: new InMemoryStorage(),
-		newId: numberedIds(),
-		onWorkSaved: vi.fn(),
-		...options
-	});
+	return new TimerSession(
+		choices,
+		{
+			clock: () => nowMs,
+			storage: new InMemoryStorage(),
+			newId: numberedIds(),
+			onWorkSaved: vi.fn(),
+			...options
+		},
+		saved
+	);
 }
 
 beforeEach(() => {
@@ -340,9 +350,6 @@ describe('readying a new run', () => {
 });
 
 describe('recording runs', () => {
-	/** The one-round routine's block, repeating forever, so Next always starts a break. */
-	const foreverRoutine = routineWith({ id: 'forever', title: 'Forever', rounds: 'infinite' });
-
 	// Puts back what each test spied on, such as `console.error` and storage's methods.
 	afterEach(() => {
 		vi.restoreAllMocks();
@@ -588,5 +595,228 @@ describe('recording runs', () => {
 			.toEqual([expect.objectContaining({ outcome: 'finished' })]);
 		expect(await storage.getWorkPeriods()).toEqual([]);
 		expect(onWorkSaved).not.toHaveBeenCalled();
+	});
+});
+
+/**
+ * Waits for a session's saves to reach storage, then reads the run in progress, as the app does
+ * when it opens again after a reload, or after the phone stopped it.
+ *
+ * @param storage - The storage the session saved to.
+ * @param heartbeatAt - The heartbeat of the session's last save, as a UTC timestamp. Saves reach
+ * storage in order, so once it's saved, every earlier save is too.
+ * @returns The run in progress as last saved.
+ */
+async function reopen(
+	storage: InMemoryStorage,
+	heartbeatAt: string
+): Promise<StoredRunInProgress | null> {
+	await expect.poll(() => storage.getRunInProgress()).toMatchObject({ heartbeatAt });
+	return storage.getRunInProgress();
+}
+
+describe('keeping the run in progress', () => {
+	// Puts back what each test spied on, such as storage's methods.
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	it('saves a heartbeat on each tick while a timer is counting', async () => {
+		const storage = new InMemoryStorage();
+		const session = createSession([foreverRoutine], { storage });
+		session.play();
+		nowMs = seconds(1);
+
+		session.tick();
+
+		await expect
+			.poll(() => storage.getRunInProgress())
+			.toMatchObject({
+				run: { status: 'working', runningSince: '1970-01-01T00:00:00.000Z' },
+				heartbeatAt: '1970-01-01T00:00:01.000Z'
+			});
+	});
+
+	it('saves no heartbeat while the run is paused, since nothing new happens', async () => {
+		const storage = new InMemoryStorage();
+		const saveSpy = vi.spyOn(storage, 'saveRunInProgress');
+		const session = createSession([foreverRoutine], { storage });
+		session.play();
+		nowMs = minutes(10);
+		session.pause();
+		nowMs = minutes(11);
+		session.tick();
+		nowMs = minutes(12);
+
+		session.play();
+
+		await reopen(storage, '1970-01-01T00:12:00.000Z');
+		expect(saveSpy).toHaveBeenCalledTimes(3);
+	});
+
+	it('forgets the run in progress once Done readies a new run, and keeps its records', async () => {
+		const storage = new InMemoryStorage();
+		const session = createSession([foreverRoutine], { storage });
+		session.play();
+		nowMs = minutes(25);
+		session.finish();
+
+		session.readyNewRun();
+
+		await expect.poll(() => storage.getRunInProgress()).toBeNull();
+		expect(await storage.getRuns()).toEqual([expect.objectContaining({ outcome: 'finished' })]);
+		expect(await storage.getWorkPeriods()).toHaveLength(1);
+	});
+
+	it('never brings back a run that Done forgot, even when a heartbeat’s save is slow', async () => {
+		const storage = new InMemoryStorage();
+		const session = createSession([foreverRoutine], { storage });
+		session.play();
+		await reopen(storage, '1970-01-01T00:00:00.000Z');
+		const save = storage.saveRunInProgress.bind(storage);
+		const { promise: heartbeatHeld, resolve: releaseHeartbeat } = Promise.withResolvers<void>();
+		const saveSpy = vi
+			.spyOn(storage, 'saveRunInProgress')
+			.mockImplementationOnce(async (runInProgress: StoredRunInProgress, records?: RunRecords) => {
+				await heartbeatHeld;
+				await save(runInProgress, records);
+			});
+		const clearSpy = vi.spyOn(storage, 'clearRunInProgress');
+		nowMs = seconds(1);
+		session.tick();
+		nowMs = minutes(25);
+		session.finish();
+		session.readyNewRun();
+
+		releaseHeartbeat();
+		await vi.waitFor(() => {
+			expect(clearSpy).toHaveBeenCalledOnce();
+		});
+		await Promise.all(
+			[...saveSpy.mock.results, ...clearSpy.mock.results].map((result) => result.value)
+		);
+
+		expect(await storage.getRunInProgress()).toBeNull();
+	});
+
+	it('carries on a saved run with its routine chosen, paused at its last heartbeat', async () => {
+		const storage = new InMemoryStorage();
+		const first = createSession([classic, foreverRoutine], { storage });
+		first.select('forever');
+		first.play();
+		nowMs = minutes(10);
+		first.tick();
+		const saved = await reopen(storage, '1970-01-01T00:10:00.000Z');
+		nowMs = minutes(30);
+
+		const reopened = createSession([classic, foreverRoutine], { storage }, saved);
+
+		expect(reopened.routine).toBe(foreverRoutine);
+		expect(reopened.view).toMatchObject({
+			status: 'working',
+			workedMs: minutes(10),
+			isRunning: false,
+			isInProgress: true
+		});
+	});
+
+	it('saves the restored run as paused, so storage shows what the screen does', async () => {
+		const storage = new InMemoryStorage();
+		const first = createSession([foreverRoutine], { storage });
+		first.play();
+		nowMs = minutes(10);
+		first.tick();
+		const saved = await reopen(storage, '1970-01-01T00:10:00.000Z');
+		nowMs = minutes(30);
+
+		createSession([foreverRoutine], { storage }, saved);
+
+		expect(await reopen(storage, '1970-01-01T00:30:00.000Z')).toMatchObject({
+			run: {
+				segments: [{ start: '1970-01-01T00:00:00.000Z', end: '1970-01-01T00:10:00.000Z' }],
+				runningSince: null
+			}
+		});
+	});
+
+	it('ends the restored work period on the run Play started, saving its work once', async () => {
+		const storage = new InMemoryStorage();
+		const first = createSession([foreverRoutine], { storage });
+		first.play();
+		nowMs = minutes(10);
+		first.tick();
+		const saved = await reopen(storage, '1970-01-01T00:10:00.000Z');
+		nowMs = minutes(30);
+		const reopened = createSession([foreverRoutine], { storage }, saved);
+		reopened.play();
+		nowMs = minutes(45);
+
+		reopened.next();
+
+		await expect
+			.poll(() => storage.getWorkPeriods())
+			.toEqual([
+				expect.objectContaining({
+					runId: 'id-1',
+					segments: [
+						{ start: '1970-01-01T00:00:00.000Z', end: '1970-01-01T00:10:00.000Z' },
+						{ start: '1970-01-01T00:30:00.000Z', end: '1970-01-01T00:45:00.000Z' }
+					],
+					workedMs: minutes(25)
+				})
+			]);
+		expect(await storage.getRuns()).toEqual([expect.objectContaining({ id: 'id-1' })]);
+	});
+
+	it('restores a break with the time it had left at the heartbeat', async () => {
+		const storage = new InMemoryStorage();
+		const first = createSession([foreverRoutine], { storage });
+		first.play();
+		nowMs = minutes(25);
+		first.next();
+		nowMs = minutes(27);
+		first.tick();
+		const saved = await reopen(storage, '1970-01-01T00:27:00.000Z');
+		nowMs = minutes(40);
+
+		const reopened = createSession([foreverRoutine], { storage }, saved);
+
+		expect(reopened.view).toMatchObject({
+			status: 'break',
+			earnedMs: minutes(5),
+			remainingMs: minutes(3),
+			isRunning: false
+		});
+	});
+
+	it('opens on the summary of a run that had ended, until Done forgets it', async () => {
+		const storage = new InMemoryStorage();
+		const first = createSession([foreverRoutine], { storage });
+		first.play();
+		nowMs = minutes(25);
+		first.finish();
+		const saved = await reopen(storage, '1970-01-01T00:25:00.000Z');
+		const reopened = createSession([foreverRoutine], { storage }, saved);
+		expect(reopened.view).toMatchObject({
+			status: 'ended',
+			summary: { totalWorkMs: minutes(25), periodsCompleted: 1 }
+		});
+
+		reopened.readyNewRun();
+
+		await expect.poll(() => storage.getRunInProgress()).toBeNull();
+	});
+
+	it('starts as usual, and forgets the saved run, when its routine is gone', async () => {
+		const storage = new InMemoryStorage();
+		const first = createSession([foreverRoutine], { storage });
+		first.play();
+		const saved = await reopen(storage, '1970-01-01T00:00:00.000Z');
+
+		const reopened = createSession(routines, { storage }, saved);
+
+		expect(reopened.routine).toBe(classic);
+		expect(reopened.view).toMatchObject({ status: 'ready' });
+		await expect.poll(() => storage.getRunInProgress()).toBeNull();
 	});
 });
