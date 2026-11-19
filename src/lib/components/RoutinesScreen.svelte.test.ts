@@ -8,6 +8,7 @@ import type { Block, Routine } from '../routine';
 import { settingsFrom, type Settings } from '../settings';
 import { SettingsSession } from '../settings.svelte';
 import { InMemoryStorage } from '../storage/in-memory-storage';
+import type { CadoroStorage } from '../storage/storage';
 import { numberedIds } from '../testing/ids';
 import { routineWith } from '../testing/routines';
 import { runInProgressWith } from '../testing/run-in-progress';
@@ -995,6 +996,59 @@ describe('editing blocks', () => {
 // Takes away the log a test chose for errors.
 afterEach(() => {
 	useErrorLog(null);
+});
+
+describe('when reading fails', () => {
+	/**
+	 * Opens the screen on storage whose reads fail as a test sets up, with errors recorded in it.
+	 *
+	 * @param storage - The storage, already changed to fail.
+	 */
+	function openOn(storage: CadoroStorage): void {
+		useErrorLog(storage);
+		render(RoutinesScreen, {
+			storage,
+			settingsSession: new SettingsSession(storage, settingsFrom({})),
+			initialRoutines: threeRoutines(),
+			runningRoutineId: null,
+			newId: numberedIds('new'),
+			now: () => new Date(NOW)
+		});
+	}
+
+	it('records in the activity log that the routines can no longer be followed', async () => {
+		// Typed as the interface, which has the `onError` that `InMemoryStorage` leaves out.
+		const storage: CadoroStorage = new InMemoryStorage();
+		vi.spyOn(storage, 'watchRoutines').mockImplementation((_onChange, onError) => {
+			onError(new Error('The routines could not be read.'));
+			return (): void => {};
+		});
+
+		openOn(storage);
+
+		await expect.poll(() => storage.getLogEntries()).toHaveLength(1);
+		expect((await storage.getLogEntries())[0]).toMatchObject({
+			type: 'error',
+			message: 'Changes to the routines can no longer be followed.',
+			details: { message: 'The routines could not be read.' }
+		});
+	});
+
+	it('records in the activity log that the runs could not be read, and still lists the routines', async () => {
+		const storage = new InMemoryStorage();
+		await storage.addRoutinesIfNone(threeRoutines());
+		vi.spyOn(storage, 'getRuns').mockRejectedValue(new Error('The disk could not be read.'));
+
+		openOn(storage);
+
+		await expect.poll(() => storage.getLogEntries()).toHaveLength(1);
+		expect((await storage.getLogEntries())[0]).toMatchObject({
+			type: 'error',
+			message: 'The runs could not be read, so "last used" and "most work" are off.',
+			details: { message: 'The disk could not be read.' }
+		});
+		await expect.poll(() => listedTitles()).toEqual(['Alpha', 'Bravo', 'Charlie']);
+	});
 });
 
 describe('when saving fails', () => {
