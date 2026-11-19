@@ -4,6 +4,7 @@ import { loadRoutines } from '#lib/routine-loading.ts';
 import { RunChimes } from '#lib/run-chimes.svelte.ts';
 import { SettingsSession } from '#lib/settings.svelte.ts';
 import { DexieStorage } from '#lib/storage/dexie-storage.ts';
+import type { CadoroStorage } from '#lib/storage/storage.ts';
 import { askToPersistIfWorkSaved, askToPersistOnce } from '#lib/storage/persistence.ts';
 import { TimerSession, type TimerSessionOptions } from '#lib/timer.svelte.ts';
 import { WakeLockKeeper } from '#lib/wake-lock.svelte.ts';
@@ -36,6 +37,8 @@ type AppSessions = {
 	wakeLockKeeper: WakeLockKeeper;
 	/** The run's chimes, which Settings plays as previews. */
 	chimes: RunChimes;
+	/** The app's storage, which the Routines screen edits routines through. */
+	storage: CadoroStorage;
 };
 
 /**
@@ -121,7 +124,7 @@ async function openApp(): Promise<AppSessions> {
 		wakeLock,
 		page: document
 	});
-	return { timerSession, settingsSession, wakeLockKeeper, chimes };
+	return { timerSession, settingsSession, wakeLockKeeper, chimes, storage };
 }
 
 /**
