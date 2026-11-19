@@ -17,6 +17,7 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
 	import { viewBlock } from '../block-view';
+	import { sortRoutines, type RoutineSort, type RoutineUsage } from '../routine-sort';
 	import type { TimerSession } from '../timer.svelte';
 	import BlockCard from './BlockCard.svelte';
 	import FinishConfirmation from './FinishConfirmation.svelte';
@@ -29,9 +30,31 @@
 	type Props = {
 		/** The session to show and control: the app's own, or one a test makes with a fake clock. */
 		session: TimerSession;
+		/** The order the picker lists the routines in, which the Routines screen's sort sets. */
+		routineSort?: RoutineSort;
+		/** The runs and work periods that the "last used" and "most work" orders read. */
+		usage?: RoutineUsage;
 	};
 
-	let { session }: Props = $props();
+	let { session, routineSort = 'custom', usage = { runs: [], workPeriods: [] } }: Props = $props();
+
+	let pickableRoutines = $derived(sortRoutines([...session.routines], routineSort, usage));
+
+	/** The element holding the block cards, which the active block is scrolled into view in. */
+	let blocksElement: HTMLElement | undefined = $state();
+
+	// The block the run is in, or `null` once it has ended. Derived, so the effect below runs only
+	// when the run moves to another block, not every second.
+	let activeBlock = $derived(session.view.status === 'ended' ? null : session.view.block);
+
+	$effect(() => {
+		if (activeBlock === null) {
+			return;
+		}
+		// `nearest` moves the page only when the block is out of view, so nothing moves while every
+		// block fits. Each card's scroll margin clears the pinned controls.
+		blocksElement?.children[activeBlock]?.scrollIntoView({ block: 'nearest' });
+	});
 
 	// An ended run has no position. The screen behind its summary shows no label until a new run
 	// is ready.
@@ -106,7 +129,7 @@
 <div class="mt-4 grid gap-4">
 	<!-- Wrapped in an arrow function, because a method passed on its own loses its `this`. -->
 	<RoutinePicker
-		routines={session.routines}
+		routines={pickableRoutines}
 		selectedId={session.routine.id}
 		disabled={session.view.isInProgress}
 		onselect={(id: string): void => session.select(id)}
@@ -118,21 +141,31 @@
 
 	<!-- One column on every screen, so the blocks read top to bottom in the order the run goes
 	     through them, as each card's work box leads down to its break box. -->
-	<div class="grid gap-4">
+	<div bind:this={blocksElement} class="grid gap-4">
 		{#each session.routine.blocks as block, index (block.id)}
-			<BlockCard block={viewBlock(block, index, session.view)} />
+			<!-- The bottom scroll margin keeps a block that's scrolled into view clear of the pinned
+			     controls, which are taller on phones, where they sit above the tab bar. -->
+			<div class="scroll-mb-40 md:scroll-mb-28">
+				<BlockCard block={viewBlock(block, index, session.view)} />
+			</div>
 		{/each}
 	</div>
 
-	<TimerControls
-		{isRunning}
-		isInProgress={session.view.isInProgress}
-		onplaypause={playOrPause}
-		onnext={(): void => session.next()}
-		onfinish={(): void => {
-			isConfirmingFinish = true;
-		}}
-	/>
+	<!-- Pinned to the bottom of the window with `sticky`, so a long routine never pushes them out
+	     of reach, and in their place after the blocks when everything fits. On phones they sit
+	     above the fixed tab bar, which is about 4rem tall. The page's background and a little
+	     padding keep the blocks scrolling under them from showing through. -->
+	<div class="sticky bottom-16 z-10 -mx-4 bg-white px-4 py-3 md:bottom-0 dark:bg-zinc-950">
+		<TimerControls
+			{isRunning}
+			isInProgress={session.view.isInProgress}
+			onplaypause={playOrPause}
+			onnext={(): void => session.next()}
+			onfinish={(): void => {
+				isConfirmingFinish = true;
+			}}
+		/>
+	</div>
 </div>
 
 <!-- The run keeps counting behind the question, so Cancel changes nothing. -->
