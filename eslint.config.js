@@ -40,6 +40,10 @@ const RUNE_DECLARATION =
  */
 export default defineConfig(
 	includeIgnoreFile(gitignorePath),
+	{
+		// A comment such as `eslint-disable` can't switch a rule off, so a rule changes only here.
+		linterOptions: { noInlineConfig: true }
+	},
 	js.configs.recommended,
 	ts.configs.recommended,
 	{
@@ -53,7 +57,9 @@ export default defineConfig(
 			// Off because it only flags `async` functions with no `await`, which is how the
 			// in-memory storage and the tests' fakes implement an interface that returns promises,
 			// and it catches nothing there. A forgotten `await` is caught by `no-floating-promises`.
-			'@typescript-eslint/require-await': 'off'
+			'@typescript-eslint/require-await': 'off',
+			// `@ts-expect-error` is banned like `@ts-ignore`, since either hides a type error.
+			'@typescript-eslint/ban-ts-comment': ['error', { 'ts-expect-error': true }]
 		}
 	},
 	svelte.configs.recommended,
