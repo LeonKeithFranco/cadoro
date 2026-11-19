@@ -441,6 +441,25 @@ describe('DexieStorage', () => {
 		expect(entries.map((entry) => entry.id)).toEqual([2, 1]);
 	});
 
+	it('refuses one of two deletes of the last two routines from two connections at once, so one routine is left', async () => {
+		const name = newDatabaseName();
+		const firstTab = new DexieStorage(name);
+		const secondTab = new DexieStorage(name);
+		await firstTab.addRoutinesIfNone([
+			routineWith({ id: 'a', customPosition: 0 }),
+			routineWith({ id: 'b', customPosition: 1 })
+		]);
+
+		const results = await Promise.all([firstTab.deleteRoutine('a'), secondTab.deleteRoutine('b')]);
+
+		expect(results.toSorted()).toEqual([false, true]);
+		expect(await firstTab.getRoutines()).toHaveLength(1);
+		const logged = (await firstTab.getLogEntries()).filter((entry) =>
+			entry.message.startsWith('Deleted routine')
+		);
+		expect(logged).toHaveLength(1);
+	});
+
 	it('applies two changes from two connections one after the other, as two tabs at once', async () => {
 		const name = newDatabaseName();
 		const firstTab = new DexieStorage(name);
