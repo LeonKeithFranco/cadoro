@@ -37,5 +37,8 @@ export function rangeForPreset(preset: RangePreset, now: number, slices: DaySlic
 		const earliestWorkDay = Math.min(today, ...slices.map((slice) => slice.dayStart));
 		return { firstDay: earliestWorkDay, lastDay: today };
 	}
-	return { firstDay: subDays(today, DAYS_IN_PRESET[preset] - 1).getTime(), lastDay: today };
+	// `startOfLocalDay` again, since in a zone whose clocks change at midnight, `subDays` can land
+	// on a day's missing midnight.
+	const firstDay = startOfLocalDay(subDays(today, DAYS_IN_PRESET[preset] - 1).getTime());
+	return { firstDay, lastDay: today };
 }

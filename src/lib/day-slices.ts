@@ -28,13 +28,14 @@ export function startOfLocalDay(moment: number): number {
  *
  * @remarks
  * It keeps the wall-clock time of midnight, so a day with a daylight saving change is 23 or 25
- * hours long, not 24.
+ * hours long, not 24. In a zone whose clocks change at midnight, the change day has no midnight and
+ * starts at 01:00, so the next day's start is taken again from its date, rather than keeping 01:00.
  *
  * @param dayStart - The local midnight that starts a day, in milliseconds since 1970 (UTC).
  * @returns The local midnight that starts the next day.
  */
 export function nextLocalDay(dayStart: number): number {
-	return addDays(dayStart, 1).getTime();
+	return startOfDay(addDays(dayStart, 1)).getTime();
 }
 
 /**
