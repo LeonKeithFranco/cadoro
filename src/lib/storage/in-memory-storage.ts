@@ -1,6 +1,9 @@
 // A backend that keeps data in memory, for tests of the code that uses storage. Data lasts only
 // as long as the object.
 
+import type { BackupData } from '../backup-format';
+import { importLogEntry } from '../backup-log';
+import type { BackupSummary } from '../backup-summary';
 import { LOG_MAX_ENTRIES, type LogEntry } from '../log';
 import { pickableRoutines, type Routine } from '../routine';
 import {
@@ -228,6 +231,46 @@ export class InMemoryStorage implements CadoroStorage {
 
 	async getWorkPeriods(): Promise<WorkPeriod[]> {
 		return structuredClone(workPeriodsOldestFirst([...this.#workPeriods.values()]));
+	}
+
+	async readBackupData(): Promise<BackupData> {
+		return {
+			routines: await this.getAllRoutines(),
+			runs: await this.getRuns(),
+			workPeriods: await this.getWorkPeriods(),
+			settings: await this.getSettings()
+		};
+	}
+
+	async replaceAllData(data: BackupData, summary: BackupSummary): Promise<void> {
+		// Every check comes before any change, so a rejected import changes nothing, as an aborted
+		// transaction does in IndexedDB.
+		for (const [name, records] of [
+			['routine', data.routines],
+			['run', data.runs],
+			['work period', data.workPeriods]
+		] as const) {
+			const ids = records.map((record) => record.id);
+			if (new Set(ids).size !== ids.length) {
+				throw new Error(`Two ${name}s in the import share an id.`);
+			}
+		}
+
+		this.#routines = structuredClone(data.routines);
+		this.#runs = new Map(structuredClone(data.runs).map((run) => [run.id, run]));
+		this.#workPeriods = new Map(
+			structuredClone(data.workPeriods).map((period) => [period.id, period])
+		);
+		this.#settings = structuredClone(data.settings);
+		this.#changeRunInProgress(null);
+		this.#reportToRoutineWatchers();
+		for (const watcher of this.#settingsWatchers) {
+			this.#reportSettings(watcher);
+		}
+
+		this.#log.push({ id: this.#nextLogId, ...importLogEntry(summary, this.#now()) });
+		this.#nextLogId += 1;
+		this.#log = this.#log.slice(-this.#logLimit);
 	}
 
 	async hasWorkPeriods(): Promise<boolean> {

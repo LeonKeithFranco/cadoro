@@ -1,6 +1,8 @@
 // The one way the app reads and saves its data. Each backend, such as IndexedDB through Dexie or
 // memory for tests, implements this interface, and one shared suite of tests checks them all.
 
+import type { BackupData } from '../backup-format';
+import type { BackupSummary } from '../backup-summary';
 import type { LogEntry } from '../log';
 import type { Routine } from '../routine';
 import type { StoredRunInProgress } from '../run-in-progress';
@@ -300,6 +302,35 @@ export interface CadoroStorage {
 	 * @throws Rejects with the backend's own error when its data can't be read.
 	 */
 	getWorkPeriods(): Promise<WorkPeriod[]>;
+
+	/**
+	 * Reads everything a backup holds, in one consistent read.
+	 *
+	 * @returns Every routine (deleted ones too), run and work period, and all the settings, with
+	 * the default for any the user hasn't changed. The run in progress and the activity log aren't
+	 * part of a backup.
+	 * @throws Rejects with the backend's own error when its data can't be read.
+	 */
+	readBackupData(): Promise<BackupData>;
+
+	/**
+	 * Replaces every routine, run, work period and setting with those of an imported backup, and
+	 * forgets the run in progress, in one step.
+	 *
+	 * @remarks
+	 * The run in progress isn't in a backup, and it would refer to a routine that may be gone, so
+	 * it's forgotten. The activity log is kept. Once the data is replaced, the import is written to
+	 * the log, with the counts in `summary`, as every change is: a failure to write the entry is
+	 * reported with `console.error`, and never undoes the import. Everything following the routines,
+	 * the settings or the run in progress is told of the change.
+	 *
+	 * @param data - A valid backup's data, as `parseBackup` checks it.
+	 * @param summary - What the backup holds, which the log entry records.
+	 * @throws Rejects with an {@link Error} when two routines, runs or work periods share an id, or
+	 * with the backend's own error when the data can't be saved, and then nothing changes: the old
+	 * data stays as it was, and nothing is logged.
+	 */
+	replaceAllData(data: BackupData, summary: BackupSummary): Promise<void>;
 
 	/**
 	 * Says whether any work period is saved, without reading them all.
