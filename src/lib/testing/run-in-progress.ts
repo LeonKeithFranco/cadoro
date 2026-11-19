@@ -6,7 +6,7 @@ import { runInProgress } from './run-records';
 
 /**
  * {@link runInProgress}, ten minutes into its first work period and still running, as saved by
- * the heartbeat at 9:10 UTC.
+ * the heartbeat at 9:10 UTC, with the revision `revision-1`.
  */
 export const savedRunInProgress: StoredRunInProgress = {
 	record: runInProgress,
@@ -17,7 +17,8 @@ export const savedRunInProgress: StoredRunInProgress = {
 		segments: [],
 		runningSince: '2026-11-19T09:00:00.000Z'
 	},
-	heartbeatAt: '2026-11-19T09:10:00.000Z'
+	heartbeatAt: '2026-11-19T09:10:00.000Z',
+	revision: 'revision-1'
 };
 
 /**

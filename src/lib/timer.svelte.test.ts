@@ -4,10 +4,11 @@ import { createStarterRoutines, type Routine } from './routine';
 import type { StoredRunInProgress } from './run-in-progress';
 import type { RunRecords } from './run-records';
 import { InMemoryStorage } from './storage/in-memory-storage';
+import type { CadoroStorage } from './storage/storage';
 import { minutes, seconds } from './testing/durations';
 import { numberedIds } from './testing/ids';
 import { oneRoundRoutine, routineWith } from './testing/routines';
-import { TimerSession, type TimerSessionOptions } from './timer.svelte';
+import { TimerSession, type AppOpening, type TimerSessionOptions } from './timer.svelte';
 
 /** The starter routines, Classic then Classic with long break, with predictable ids. */
 const routines = createStarterRoutines(new Date(0), numberedIds());
@@ -25,19 +26,28 @@ const foreverRoutine = routineWith({ id: 'forever', title: 'Forever', rounds: 'i
 let nowMs = 0;
 
 /**
- * Starts a session on the fake clock, with ids numbered from `id-1`.
+ * Makes the revisions of every session in a test, numbered from `revision-1`, so two sessions on
+ * one storage, as two tabs, never make the same one, as `crypto.randomUUID` never does.
+ */
+let newRevision = numberedIds('revision');
+
+/**
+ * Starts a session on the fake clock, with ids numbered from `id-1` and revisions from
+ * `revision-1`.
  *
  * @param choices - The routines to pick from. The starter routines unless a test needs others.
- * @param options - The options a test reads, `storage` and `onWorkSaved`. Unless given, the
- * session saves to new, empty storage, and `onWorkSaved` is a spy nothing checks.
- * @param saved - The run in progress the app found saved as it opened, or `null` for none.
+ * @param options - The options a test sets, `storage`, `newId` and `onWorkSaved`. Unless given,
+ * the session saves to new, empty storage, and `onWorkSaved` is a spy nothing checks. Two tabs
+ * share a storage, each with ids of its own.
+ * @param opening - What the app found as it opened. No saved run and no other tab open, unless
+ * given.
  * @returns A new session, carrying on the saved run, or with the first routine chosen and its run
  * ready.
  */
 function createSession(
 	choices: readonly Routine[] = routines,
-	options: Partial<Pick<TimerSessionOptions, 'storage' | 'onWorkSaved'>> = {},
-	saved: StoredRunInProgress | null = null
+	options: Partial<Pick<TimerSessionOptions, 'storage' | 'newId' | 'onWorkSaved'>> = {},
+	opening: Partial<AppOpening> = {}
 ): TimerSession {
 	return new TimerSession(
 		choices,
@@ -45,15 +55,18 @@ function createSession(
 			clock: () => nowMs,
 			storage: new InMemoryStorage(),
 			newId: numberedIds(),
+			newRevision,
 			onWorkSaved: vi.fn(),
 			...options
 		},
-		saved
+		{ saved: null, isAnotherTabOpen: false, ...opening }
 	);
 }
 
+// Starts each test at the fake clock's 0, with revisions numbered from `revision-1` again.
 beforeEach(() => {
 	nowMs = 0;
+	newRevision = numberedIds('revision');
 });
 
 describe('TimerSession', () => {
@@ -481,7 +494,8 @@ describe('recording runs', () => {
 					segments: [{ start: '1970-01-01T00:00:00.000Z', end: '1970-01-01T00:10:00.000Z' }],
 					runningSince: null
 				},
-				heartbeatAt: '1970-01-01T00:10:00.000Z'
+				heartbeatAt: '1970-01-01T00:10:00.000Z',
+				revision: 'revision-2'
 			});
 	});
 
@@ -527,10 +541,16 @@ describe('recording runs', () => {
 		const { promise: firstSaveHeld, resolve: releaseFirstSave } = Promise.withResolvers<void>();
 		const saveSpy = vi
 			.spyOn(storage, 'saveRunInProgress')
-			.mockImplementationOnce(async (runInProgress: StoredRunInProgress, records?: RunRecords) => {
-				await firstSaveHeld;
-				await save(runInProgress, records);
-			});
+			.mockImplementationOnce(
+				async (
+					runInProgress: StoredRunInProgress,
+					basedOn: string | null,
+					records?: RunRecords
+				): Promise<boolean> => {
+					await firstSaveHeld;
+					return save(runInProgress, basedOn, records);
+				}
+			);
 		const session = createSession([oneRoundRoutine], { storage });
 		session.play();
 		nowMs = minutes(26);
@@ -644,6 +664,7 @@ describe('keeping the run in progress', () => {
 	it('saves no heartbeat while the run is paused, since nothing new happens', async () => {
 		const storage = new InMemoryStorage();
 		const saveSpy = vi.spyOn(storage, 'saveRunInProgress');
+		const heartbeatSpy = vi.spyOn(storage, 'saveHeartbeat');
 		const session = createSession([foreverRoutine], { storage });
 		session.play();
 		nowMs = minutes(10);
@@ -656,6 +677,7 @@ describe('keeping the run in progress', () => {
 
 		await reopen(storage, '1970-01-01T00:12:00.000Z');
 		expect(saveSpy).toHaveBeenCalledTimes(3);
+		expect(heartbeatSpy).not.toHaveBeenCalled();
 	});
 
 	it('forgets the run in progress once Done readies a new run, and keeps its records', async () => {
@@ -677,14 +699,15 @@ describe('keeping the run in progress', () => {
 		const session = createSession([foreverRoutine], { storage });
 		session.play();
 		await reopen(storage, '1970-01-01T00:00:00.000Z');
-		const save = storage.saveRunInProgress.bind(storage);
+		const saveHeartbeat = storage.saveHeartbeat.bind(storage);
 		const { promise: heartbeatHeld, resolve: releaseHeartbeat } = Promise.withResolvers<void>();
-		const saveSpy = vi
-			.spyOn(storage, 'saveRunInProgress')
-			.mockImplementationOnce(async (runInProgress: StoredRunInProgress, records?: RunRecords) => {
+		const heartbeatSpy = vi
+			.spyOn(storage, 'saveHeartbeat')
+			.mockImplementationOnce(async (revision: string, heartbeatAt: string): Promise<boolean> => {
 				await heartbeatHeld;
-				await save(runInProgress, records);
+				return saveHeartbeat(revision, heartbeatAt);
 			});
+		const saveSpy = vi.spyOn(storage, 'saveRunInProgress');
 		const clearSpy = vi.spyOn(storage, 'clearRunInProgress');
 		nowMs = seconds(1);
 		session.tick();
@@ -697,7 +720,9 @@ describe('keeping the run in progress', () => {
 			expect(clearSpy).toHaveBeenCalledOnce();
 		});
 		await Promise.all(
-			[...saveSpy.mock.results, ...clearSpy.mock.results].map((result): unknown => result.value)
+			[...heartbeatSpy.mock.results, ...saveSpy.mock.results, ...clearSpy.mock.results].map(
+				(result): unknown => result.value
+			)
 		);
 
 		expect(await storage.getRunInProgress()).toBeNull();
@@ -713,7 +738,7 @@ describe('keeping the run in progress', () => {
 		const saved = await reopen(storage, '1970-01-01T00:10:00.000Z');
 		nowMs = minutes(30);
 
-		const reopened = createSession([classic, foreverRoutine], { storage }, saved);
+		const reopened = createSession([classic, foreverRoutine], { storage }, { saved });
 
 		expect(reopened.routine).toBe(foreverRoutine);
 		expect(reopened.view).toMatchObject({
@@ -733,7 +758,7 @@ describe('keeping the run in progress', () => {
 		const saved = await reopen(storage, '1970-01-01T00:10:00.000Z');
 		nowMs = minutes(30);
 
-		createSession([foreverRoutine], { storage }, saved);
+		createSession([foreverRoutine], { storage }, { saved });
 
 		expect(await reopen(storage, '1970-01-01T00:30:00.000Z')).toMatchObject({
 			run: {
@@ -751,7 +776,7 @@ describe('keeping the run in progress', () => {
 		first.tick();
 		const saved = await reopen(storage, '1970-01-01T00:10:00.000Z');
 		nowMs = minutes(30);
-		const reopened = createSession([foreverRoutine], { storage }, saved);
+		const reopened = createSession([foreverRoutine], { storage }, { saved });
 		reopened.play();
 		nowMs = minutes(45);
 
@@ -783,7 +808,7 @@ describe('keeping the run in progress', () => {
 		const saved = await reopen(storage, '1970-01-01T00:27:00.000Z');
 		nowMs = minutes(40);
 
-		const reopened = createSession([foreverRoutine], { storage }, saved);
+		const reopened = createSession([foreverRoutine], { storage }, { saved });
 
 		expect(reopened.view).toMatchObject({
 			status: 'break',
@@ -800,7 +825,7 @@ describe('keeping the run in progress', () => {
 		nowMs = minutes(25);
 		first.finish();
 		const saved = await reopen(storage, '1970-01-01T00:25:00.000Z');
-		const reopened = createSession([foreverRoutine], { storage }, saved);
+		const reopened = createSession([foreverRoutine], { storage }, { saved });
 		expect(reopened.view).toMatchObject({
 			status: 'ended',
 			summary: { totalWorkMs: minutes(25), periodsCompleted: 1 }
@@ -817,10 +842,388 @@ describe('keeping the run in progress', () => {
 		first.play();
 		const saved = await reopen(storage, '1970-01-01T00:00:00.000Z');
 
-		const reopened = createSession(routines, { storage }, saved);
+		const reopened = createSession(routines, { storage }, { saved });
 
 		expect(reopened.routine).toBe(classic);
 		expect(reopened.view).toMatchObject({ status: 'ready' });
 		await expect.poll(() => storage.getRunInProgress()).toBeNull();
+	});
+});
+
+/**
+ * Opens a second tab on the same storage that is never told of a change, as a tab is until
+ * another tab's save reaches it, so a test can press in it as if it had missed a press. It joins
+ * the run as another tab had it open.
+ *
+ * @param storage - The storage the first tab saves to.
+ * @param saved - The run in progress storage held as the second tab opened.
+ * @param onWorkSaved - What the second tab calls once its save of work has finished.
+ * @returns The second tab's session, with ids numbered from `second-1`.
+ */
+function tabMissingChanges(
+	storage: InMemoryStorage,
+	saved: StoredRunInProgress | null,
+	onWorkSaved: () => void = vi.fn()
+): TimerSession {
+	vi.spyOn(storage, 'watchRunInProgress').mockImplementationOnce(
+		(): (() => void) => (): void => {}
+	);
+	return createSession(
+		[foreverRoutine],
+		{ storage, newId: numberedIds('second'), onWorkSaved },
+		{ saved, isAnotherTabOpen: true }
+	);
+}
+
+/**
+ * Waits for every call to a storage method a test spied on to finish, so the test can check
+ * what each gave, or that nothing came after.
+ *
+ * @param spy - The spy on the method.
+ * @param calls - How many calls to wait for, at least.
+ * @returns What each call's promise gave, in the order they were made.
+ */
+async function settledCalls(
+	spy: { mock: { results: { value: unknown }[] } },
+	calls: number
+): Promise<unknown[]> {
+	await vi.waitFor(() => {
+		expect(spy.mock.results.length).toBeGreaterThanOrEqual(calls);
+	});
+	return Promise.all(spy.mock.results.map((result) => result.value));
+}
+
+/**
+ * Waits until every write, report and read already started has finished, so a test can check
+ * that something didn't happen.
+ *
+ * @remarks
+ * `InMemoryStorage` answers and reports in microtasks, and the session chains its writes on
+ * promises, so all of them have run by the time the next task, a zero-delay timer, starts.
+ */
+async function waitForMicrotasks(): Promise<void> {
+	await new Promise<void>((resolve) => {
+		setTimeout(resolve, 0);
+	});
+}
+
+describe('sharing the run across tabs', () => {
+	// Puts back what each test spied on, such as storage's methods and `console.error`.
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	it('follows a press in another tab, still running, without saving it again', async () => {
+		const storage = new InMemoryStorage();
+		const firstTab = createSession([foreverRoutine], { storage, newId: numberedIds('first') });
+		const secondTab = createSession([foreverRoutine], { storage, newId: numberedIds('second') });
+		const saveSpy = vi.spyOn(storage, 'saveRunInProgress');
+
+		firstTab.play();
+		nowMs = minutes(10);
+
+		await expect.poll(() => secondTab.view).toMatchObject({ status: 'working', isRunning: true });
+		secondTab.tick();
+		expect(secondTab.view).toMatchObject({ workedMs: minutes(10) });
+		expect(saveSpy).toHaveBeenCalledOnce();
+		expect(await storage.getRuns()).toEqual([expect.objectContaining({ id: 'first-1' })]);
+	});
+
+	it('takes on the routine another tab chose and started', async () => {
+		const storage = new InMemoryStorage();
+		const firstTab = createSession(routines, { storage, newId: numberedIds('first') });
+		const secondTab = createSession(routines, { storage, newId: numberedIds('second') });
+
+		firstTab.select(classicWithLongBreak.id);
+		firstTab.play();
+
+		await expect.poll(() => secondTab.routine).toBe(classicWithLongBreak);
+		expect(secondTab.view).toMatchObject({
+			status: 'working',
+			label: 'Round 1 · Block 1 of 2 · Cycle 1 of 3'
+		});
+	});
+
+	it('readies a new run of the same routine in every tab once one closes the summary', async () => {
+		const storage = new InMemoryStorage();
+		const firstTab = createSession([classic, foreverRoutine], {
+			storage,
+			newId: numberedIds('first')
+		});
+		const secondTab = createSession([classic, foreverRoutine], {
+			storage,
+			newId: numberedIds('second')
+		});
+		firstTab.select('forever');
+		firstTab.play();
+		nowMs = minutes(25);
+		firstTab.finish();
+		await expect.poll(() => secondTab.view).toMatchObject({ status: 'ended' });
+
+		secondTab.readyNewRun();
+
+		await expect.poll(() => firstTab.view).toMatchObject({ status: 'ready' });
+		expect(firstTab.routine).toBe(foreverRoutine);
+		expect(await storage.getRunInProgress()).toBeNull();
+		expect(await storage.getRuns()).toEqual([expect.objectContaining({ outcome: 'finished' })]);
+	});
+
+	it('refuses a press from a tab that missed another’s, saving nothing from it, and takes on the saved run', async () => {
+		const storage = new InMemoryStorage();
+		const firstTab = createSession([foreverRoutine], { storage, newId: numberedIds('first') });
+		firstTab.play();
+		const playing = await reopen(storage, '1970-01-01T00:00:00.000Z');
+		const onWorkSaved = vi.fn();
+		const secondTab = tabMissingChanges(storage, playing, onWorkSaved);
+		nowMs = minutes(10);
+		firstTab.pause();
+		const paused = await reopen(storage, '1970-01-01T00:10:00.000Z');
+		nowMs = minutes(12);
+
+		secondTab.next();
+
+		await expect
+			.poll(() => secondTab.view)
+			.toMatchObject({ status: 'working', workedMs: minutes(10), isRunning: false });
+		expect(await storage.getRunInProgress()).toEqual(paused);
+		expect(await storage.getWorkPeriods()).toEqual([]);
+		expect(onWorkSaved).not.toHaveBeenCalled();
+	});
+
+	it('saves a work period once when two tabs end it at the same moment, from the tab whose press was saved', async () => {
+		const storage = new InMemoryStorage();
+		const firstTabWorkSaved = vi.fn();
+		const firstTab = createSession([foreverRoutine], {
+			storage,
+			newId: numberedIds('first'),
+			onWorkSaved: firstTabWorkSaved
+		});
+		firstTab.play();
+		const playing = await reopen(storage, '1970-01-01T00:00:00.000Z');
+		const secondTabWorkSaved = vi.fn();
+		const secondTab = tabMissingChanges(storage, playing, secondTabWorkSaved);
+		const saveSpy = vi.spyOn(storage, 'saveRunInProgress');
+		nowMs = minutes(25);
+
+		firstTab.next();
+		secondTab.next();
+
+		expect(await settledCalls(saveSpy, 2)).toEqual([true, false]);
+		expect(await storage.getWorkPeriods()).toEqual([
+			expect.objectContaining({ id: 'first-2', runId: 'first-1', workedMs: minutes(25) })
+		]);
+		await expect.poll(() => firstTabWorkSaved).toHaveBeenCalledOnce();
+		expect(secondTabWorkSaved).not.toHaveBeenCalled();
+		await expect.poll(() => secondTab.view).toMatchObject({ status: 'break', isRunning: true });
+	});
+
+	it('never lets a heartbeat from a tab that missed a press undo it', async () => {
+		const storage = new InMemoryStorage();
+		const firstTab = createSession([foreverRoutine], { storage, newId: numberedIds('first') });
+		firstTab.play();
+		const playing = await reopen(storage, '1970-01-01T00:00:00.000Z');
+		const secondTab = tabMissingChanges(storage, playing);
+		const heartbeatSpy = vi.spyOn(storage, 'saveHeartbeat');
+		nowMs = minutes(10);
+		firstTab.pause();
+		const paused = await reopen(storage, '1970-01-01T00:10:00.000Z');
+		nowMs = minutes(11);
+
+		secondTab.tick();
+
+		expect(await settledCalls(heartbeatSpy, 1)).toEqual([false]);
+		expect(await storage.getRunInProgress()).toEqual(paused);
+	});
+
+	it('keeps a newer run when a tab that missed it closes the old summary, and takes the newer run on', async () => {
+		const storage = new InMemoryStorage();
+		const firstTab = createSession([foreverRoutine], { storage, newId: numberedIds('first') });
+		firstTab.play();
+		nowMs = minutes(25);
+		firstTab.finish();
+		const ended = await reopen(storage, '1970-01-01T00:25:00.000Z');
+		const secondTab = tabMissingChanges(storage, ended);
+		firstTab.readyNewRun();
+		nowMs = minutes(30);
+		firstTab.play();
+		const newRun = await reopen(storage, '1970-01-01T00:30:00.000Z');
+
+		secondTab.readyNewRun();
+
+		await expect
+			.poll(() => secondTab.view)
+			.toMatchObject({ status: 'working', workedMs: 0, isRunning: true });
+		expect(await storage.getRunInProgress()).toEqual(newRun);
+	});
+
+	it('joins a run live in another tab still running, saving nothing', async () => {
+		const storage = new InMemoryStorage();
+		const firstTab = createSession([foreverRoutine], { storage, newId: numberedIds('first') });
+		firstTab.play();
+		nowMs = minutes(10);
+		firstTab.tick();
+		const live = await reopen(storage, '1970-01-01T00:10:00.000Z');
+		const saveSpy = vi.spyOn(storage, 'saveRunInProgress');
+		nowMs = minutes(30);
+
+		const secondTab = createSession(
+			[foreverRoutine],
+			{ storage, newId: numberedIds('second') },
+			{ saved: live, isAnotherTabOpen: true }
+		);
+
+		expect(secondTab.view).toMatchObject({
+			status: 'working',
+			workedMs: minutes(30),
+			isRunning: true
+		});
+		await waitForMicrotasks();
+		expect(saveSpy).not.toHaveBeenCalled();
+		expect(await storage.getRunInProgress()).toEqual(live);
+	});
+
+	it('takes on the later of two reads while catching up, even when the earlier finishes last', async () => {
+		const storage = new InMemoryStorage();
+		const firstTab = createSession([foreverRoutine], { storage, newId: numberedIds('first') });
+		const secondTab = createSession([foreverRoutine], { storage, newId: numberedIds('second') });
+		// Both tabs hear that nothing is saved yet before the first press, so only the second tab
+		// reads.
+		await waitForMicrotasks();
+		const read = storage.getRunInProgress.bind(storage);
+		const { promise: firstReadHeld, resolve: releaseFirstRead } = Promise.withResolvers<void>();
+		const readSpy = vi
+			.spyOn(storage, 'getRunInProgress')
+			.mockImplementationOnce(async (): Promise<StoredRunInProgress | null> => {
+				const playing = await read();
+				await firstReadHeld;
+				return playing;
+			});
+		firstTab.play();
+		await vi.waitFor(() => {
+			expect(readSpy).toHaveBeenCalledOnce();
+		});
+		nowMs = minutes(10);
+		firstTab.pause();
+		await expect
+			.poll(() => secondTab.view)
+			.toMatchObject({ isRunning: false, workedMs: minutes(10) });
+
+		releaseFirstRead();
+		await waitForMicrotasks();
+
+		expect(secondTab.view).toMatchObject({ isRunning: false, workedMs: minutes(10) });
+	});
+
+	it('drops a read that its own press overtook, so it never goes back to the run before the press', async () => {
+		const storage = new InMemoryStorage();
+		const firstTab = createSession([foreverRoutine], { storage, newId: numberedIds('first') });
+		const watch = storage.watchRunInProgress.bind(storage);
+		let reportToSecondTab: (runInProgress: StoredRunInProgress | null) => void = () => {};
+		vi.spyOn(storage, 'watchRunInProgress').mockImplementationOnce((onChange): (() => void) => {
+			reportToSecondTab = onChange;
+			return watch(onChange);
+		});
+		const secondTab = createSession([foreverRoutine], { storage, newId: numberedIds('second') });
+		firstTab.play();
+		await expect.poll(() => secondTab.view).toMatchObject({ isRunning: true });
+		const read = storage.getRunInProgress.bind(storage);
+		const { promise: readHeld, resolve: releaseRead } = Promise.withResolvers<void>();
+		vi.spyOn(storage, 'getRunInProgress').mockImplementationOnce(
+			async (): Promise<StoredRunInProgress | null> => {
+				const playing = await read();
+				await readHeld;
+				return playing;
+			}
+		);
+		// A report of the run before Play, arriving late, as a live query's can.
+		reportToSecondTab(null);
+		nowMs = minutes(10);
+		secondTab.pause();
+		const paused = await reopen(storage, '1970-01-01T00:10:00.000Z');
+
+		releaseRead();
+		await waitForMicrotasks();
+
+		expect(secondTab.view).toMatchObject({ isRunning: false, workedMs: minutes(10) });
+		expect(await storage.getRunInProgress()).toEqual(paused);
+	});
+
+	it('leaves its run alone when another tab starts a routine it doesn’t have', async () => {
+		const storage = new InMemoryStorage();
+		const firstTab = createSession([classic, foreverRoutine], {
+			storage,
+			newId: numberedIds('first')
+		});
+		const secondTab = createSession([classic], { storage, newId: numberedIds('second') });
+
+		firstTab.select('forever');
+		firstTab.play();
+
+		await reopen(storage, '1970-01-01T00:00:00.000Z');
+		await waitForMicrotasks();
+		expect(secondTab.routine).toBe(classic);
+		expect(secondTab.view).toMatchObject({ status: 'ready' });
+	});
+
+	it('logs that other tabs can no longer be followed when storage reports an error', () => {
+		// Typed as the interface, whose `watchRunInProgress` takes the `onError` this backend skips.
+		const storage: CadoroStorage = new InMemoryStorage();
+		const failure = new Error('The disk could not be read.');
+		vi.spyOn(storage, 'watchRunInProgress').mockImplementationOnce(
+			(_onChange, onError): (() => void) => {
+				onError(failure);
+				return (): void => {};
+			}
+		);
+		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+		createSession([foreverRoutine], { storage });
+
+		expect(consoleError).toHaveBeenCalledWith(
+			'Changes to the run from other tabs can no longer be followed.',
+			failure
+		);
+	});
+
+	it('logs a run it can’t read while catching up, and carries on', async () => {
+		const storage = new InMemoryStorage();
+		const firstTab = createSession([foreverRoutine], { storage, newId: numberedIds('first') });
+		firstTab.play();
+		const playing = await reopen(storage, '1970-01-01T00:00:00.000Z');
+		const secondTab = tabMissingChanges(storage, playing);
+		nowMs = minutes(10);
+		firstTab.pause();
+		await reopen(storage, '1970-01-01T00:10:00.000Z');
+		const failure = new Error('The disk could not be read.');
+		vi.spyOn(storage, 'getRunInProgress').mockRejectedValueOnce(failure);
+		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+		nowMs = minutes(25);
+
+		secondTab.next();
+
+		await expect
+			.poll(() => consoleError)
+			.toHaveBeenCalledWith('The run could not be read.', failure);
+		expect(secondTab.view).toMatchObject({ status: 'break' });
+		expect(await storage.getWorkPeriods()).toEqual([]);
+	});
+
+	it('forgets nothing on Done when every save of the run failed, since none was saved', async () => {
+		const storage = new InMemoryStorage();
+		const saveSpy = vi
+			.spyOn(storage, 'saveRunInProgress')
+			.mockRejectedValue(new Error('The disk is full.'));
+		const clearSpy = vi.spyOn(storage, 'clearRunInProgress');
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		const session = createSession([foreverRoutine], { storage });
+		session.play();
+		nowMs = minutes(25);
+		session.finish();
+
+		session.readyNewRun();
+
+		await waitForMicrotasks();
+		expect(saveSpy).toHaveBeenCalledTimes(2);
+		expect(clearSpy).not.toHaveBeenCalled();
 	});
 });

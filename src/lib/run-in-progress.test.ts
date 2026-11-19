@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import type { Routine } from './routine';
 import {
+	followRunInProgress,
+	isRevision,
 	restoreRunInProgress,
 	toStoredRunInProgress,
+	withHeartbeat,
 	type RestoredRun,
 	type StartedRun
 } from './run-in-progress';
 import { createRun, finish, next, pause, play, type RunState } from './run';
 import { minutes } from './testing/durations';
+import { savedRunInProgress } from './testing/run-in-progress';
 import { runInProgress } from './testing/run-records';
 import { routineWith } from './testing/routines';
 
@@ -51,7 +55,7 @@ function saveAndRestore(
 	heartbeatAt: number,
 	routines: Routine[] = [foreverRoutine]
 ): RestoredRun | null {
-	const stored = toStoredRunInProgress(runInProgress, started(run), heartbeatAt);
+	const stored = toStoredRunInProgress(runInProgress, started(run), heartbeatAt, 'revision-1');
 	// A copy, as IndexedDB keeps, so nothing can come back by sharing objects with the run saved.
 	return restoreRunInProgress(structuredClone(stored), routines);
 }
@@ -61,7 +65,9 @@ describe('toStoredRunInProgress', () => {
 		const working = pause(play(createRun(foreverRoutine), at('09:00:00.000')), at('09:10:00.250'));
 		const resumed = play(working, at('09:12:00.000'));
 
-		expect(toStoredRunInProgress(runInProgress, started(resumed), at('09:15:30.500'))).toEqual({
+		expect(
+			toStoredRunInProgress(runInProgress, started(resumed), at('09:15:30.500'), 'revision-1')
+		).toEqual({
 			record: runInProgress,
 			run: {
 				status: 'working',
@@ -70,7 +76,8 @@ describe('toStoredRunInProgress', () => {
 				segments: [{ start: '2026-11-19T09:00:00.000Z', end: '2026-11-19T09:10:00.250Z' }],
 				runningSince: '2026-11-19T09:12:00.000Z'
 			},
-			heartbeatAt: '2026-11-19T09:15:30.500Z'
+			heartbeatAt: '2026-11-19T09:15:30.500Z',
+			revision: 'revision-1'
 		});
 	});
 
@@ -80,7 +87,9 @@ describe('toStoredRunInProgress', () => {
 			at('09:26')
 		);
 
-		expect(toStoredRunInProgress(runInProgress, started(onBreak), at('09:26')).run).toEqual({
+		expect(
+			toStoredRunInProgress(runInProgress, started(onBreak), at('09:26'), 'revision-1').run
+		).toEqual({
 			status: 'break',
 			endedPeriods: [
 				{
@@ -164,5 +173,92 @@ describe('restoreRunInProgress', () => {
 		const working = play(createRun(foreverRoutine), at('09:00'));
 
 		expect(saveAndRestore(working, at('09:05'), [routineWith({ id: 'other' })])).toBeNull();
+	});
+});
+
+describe('followRunInProgress', () => {
+	it('gives back a running work period still running, since the tab that saved it is open', () => {
+		const working = play(createRun(foreverRoutine), at('09:00'));
+		const stored = toStoredRunInProgress(
+			runInProgress,
+			started(working),
+			at('09:05'),
+			'revision-1'
+		);
+
+		const followed = followRunInProgress(structuredClone(stored), [foreverRoutine]);
+
+		expect(followed).toEqual({ routine: foreverRoutine, record: runInProgress, run: working });
+	});
+
+	it('gives back a running break with the time it had left when it started counting', () => {
+		const onBreak = next(play(createRun(foreverRoutine), at('09:00')), at('09:25'));
+		const stored = toStoredRunInProgress(
+			runInProgress,
+			started(onBreak),
+			at('09:27'),
+			'revision-1'
+		);
+
+		expect(followRunInProgress(structuredClone(stored), [foreverRoutine])?.run).toEqual(onBreak);
+	});
+
+	it('gives null when the run’s routine isn’t among the routines', () => {
+		const working = play(createRun(foreverRoutine), at('09:00'));
+		const stored = toStoredRunInProgress(
+			runInProgress,
+			started(working),
+			at('09:05'),
+			'revision-1'
+		);
+
+		expect(followRunInProgress(stored, [routineWith({ id: 'other' })])).toBeNull();
+	});
+});
+
+describe('isRevision', () => {
+	it('says yes for the revision saved', () => {
+		expect(isRevision(savedRunInProgress, 'revision-1')).toBe(true);
+	});
+
+	it('says no for another revision', () => {
+		expect(isRevision(savedRunInProgress, 'revision-2')).toBe(false);
+	});
+
+	it('says no for a change worked out with none saved, once one is', () => {
+		expect(isRevision(savedRunInProgress, null)).toBe(false);
+	});
+
+	it('says no for a revision once none is saved', () => {
+		expect(isRevision(null, 'revision-1')).toBe(false);
+	});
+
+	it('says yes for a change worked out with none saved, while none is', () => {
+		expect(isRevision(null, null)).toBe(true);
+	});
+});
+
+describe('withHeartbeat', () => {
+	it('moves the heartbeat on, keeping everything else', () => {
+		expect(withHeartbeat(savedRunInProgress, 'revision-1', '2026-11-19T09:10:01.000Z')).toEqual({
+			...savedRunInProgress,
+			heartbeatAt: '2026-11-19T09:10:01.000Z'
+		});
+	});
+
+	it('drops a heartbeat taken for another revision, as by a tab that hasn’t seen a press', () => {
+		expect(withHeartbeat(savedRunInProgress, 'revision-2', '2026-11-19T09:10:01.000Z')).toBeNull();
+	});
+
+	it('drops a heartbeat when no run in progress is saved', () => {
+		expect(withHeartbeat(null, 'revision-1', '2026-11-19T09:10:01.000Z')).toBeNull();
+	});
+
+	it('drops a heartbeat earlier than the one saved, so another tab’s late one can’t move it back', () => {
+		expect(withHeartbeat(savedRunInProgress, 'revision-1', '2026-11-19T09:09:59.999Z')).toBeNull();
+	});
+
+	it('drops a heartbeat at the same moment as the one saved, since it adds nothing', () => {
+		expect(withHeartbeat(savedRunInProgress, 'revision-1', '2026-11-19T09:10:00.000Z')).toBeNull();
 	});
 });

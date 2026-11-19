@@ -85,7 +85,25 @@ export type StoredRunInProgress = {
 	 * hidden, as a UTC timestamp. Time after it doesn't count, as the app may have stopped then.
 	 */
 	heartbeatAt: string;
+	/**
+	 * Which change to the run this row holds: a new unique id with every change, but not with a
+	 * heartbeat, which changes only `heartbeatAt`.
+	 *
+	 * @remarks
+	 * Every tab shares the one row, and each change is saved only if the row still has the
+	 * revision the change was worked out from, so a tab that hasn't yet seen another's press can't
+	 * overwrite it. A unique id rather than a count, so two tabs can never make the same revision,
+	 * and a change worked out from a refused one is refused too. A row saved before revisions
+	 * existed gets {@link VERSION_1_REVISION} when the database is upgraded.
+	 */
+	revision: string;
 };
+
+/**
+ * The revision given to the run in progress saved by schema version 1, which had none, when the
+ * database is upgraded. Every later save makes a new unique id, so it never comes back.
+ */
+export const VERSION_1_REVISION = 'version-1';
 
 /** A run restored from storage, ready for the timer to show. */
 export type RestoredRun = {
@@ -103,18 +121,45 @@ export type RestoredRun = {
  * @param record - The run's record, as Play started it.
  * @param run - The run, from the engine.
  * @param heartbeatAt - The moment of this save, in milliseconds since 1970 (UTC).
+ * @param revision - A new unique id for this change, as {@link StoredRunInProgress} explains.
  * @returns The run in progress, with every moment as a UTC timestamp.
  */
 export function toStoredRunInProgress(
 	record: Run,
 	run: StartedRun,
-	heartbeatAt: number
+	heartbeatAt: number,
+	revision: string
 ): StoredRunInProgress {
-	return { record, run: storedRunState(run), heartbeatAt: toUtcTimestamp(heartbeatAt) };
+	return { record, run: storedRunState(run), heartbeatAt: toUtcTimestamp(heartbeatAt), revision };
 }
 
 /**
- * Restores the run in progress from storage, paused at its last heartbeat.
+ * Takes on the run in progress from storage exactly as it was saved, as a tab does when another
+ * tab that's still open changed it.
+ *
+ * @remarks
+ * A running timer carries on running, since its times come from timestamps and the tab that
+ * saved it is still open.
+ *
+ * @param stored - The run in progress, as storage keeps it.
+ * @param routines - The saved routines, which include the run's routine unless it was deleted.
+ * @returns The run with its routine and record, or `null` if its routine isn't among `routines`.
+ */
+export function followRunInProgress(
+	stored: StoredRunInProgress,
+	routines: readonly Routine[]
+): RestoredRun | null {
+	const routine = routines.find((candidate) => candidate.id === stored.record.routineId);
+	if (routine === undefined) {
+		return null;
+	}
+
+	return { routine, record: stored.record, run: runFromStored(stored.run, routine) };
+}
+
+/**
+ * Restores the run in progress from storage, paused at its last heartbeat, as the app does when
+ * it opens with no other tab open.
  *
  * @remarks
  * The app may have stopped at any moment after the heartbeat, so time after it doesn't count, and
@@ -131,14 +176,56 @@ export function restoreRunInProgress(
 	stored: StoredRunInProgress,
 	routines: readonly Routine[]
 ): RestoredRun | null {
-	const routine = routines.find((candidate) => candidate.id === stored.record.routineId);
-	if (routine === undefined) {
+	const followed = followRunInProgress(stored, routines);
+	if (followed === null) {
 		return null;
 	}
 
-	const run = runFromStored(stored.run, routine);
 	const heartbeatMs = fromUtcTimestamp(stored.heartbeatAt);
-	return { routine, record: stored.record, run: pause(run, heartbeatMs) };
+	return { ...followed, run: pause(followed.run, heartbeatMs) };
+}
+
+/**
+ * Says whether the saved run in progress is the one a change was worked out from, so the change
+ * may replace it.
+ *
+ * @param saved - The run in progress storage holds, or `null` when it holds none.
+ * @param basedOn - The revision the change was worked out from, or `null` if it was worked out
+ * with no run in progress saved.
+ * @returns `true` if `saved` has that revision, or if both are missing.
+ */
+export function isRevision(saved: StoredRunInProgress | null, basedOn: string | null): boolean {
+	const savedRevision = saved === null ? null : saved.revision;
+	return savedRevision === basedOn;
+}
+
+/**
+ * Moves the saved run in progress's heartbeat on, if the row is still the change the heartbeat
+ * was taken for.
+ *
+ * @remarks
+ * A heartbeat only ever records that the app was still open, so it changes nothing but
+ * `heartbeatAt`, and never the run, which another tab may have changed since. It's dropped when
+ * the row has another revision, since a tab that hasn't yet seen another's press has nothing to
+ * add to it, and when it isn't later than the one saved, so two open tabs' heartbeats arriving
+ * out of order can't move it back.
+ *
+ * @param saved - The run in progress storage holds, or `null` when it holds none.
+ * @param revision - The revision of the row the heartbeat was taken for.
+ * @param heartbeatAt - The heartbeat's moment, as a UTC timestamp.
+ * @returns The row with the new heartbeat, or `null` when it's dropped and the row stays as it is.
+ */
+export function withHeartbeat(
+	saved: StoredRunInProgress | null,
+	revision: string,
+	heartbeatAt: string
+): StoredRunInProgress | null {
+	if (saved === null || saved.revision !== revision) {
+		return null;
+	}
+
+	const isLater = fromUtcTimestamp(heartbeatAt) > fromUtcTimestamp(saved.heartbeatAt);
+	return isLater ? { ...saved, heartbeatAt } : null;
 }
 
 /**

@@ -2,7 +2,7 @@
 // as long as the object.
 
 import { pickableRoutines, type Routine } from '../routine';
-import type { StoredRunInProgress } from '../run-in-progress';
+import { isRevision, withHeartbeat, type StoredRunInProgress } from '../run-in-progress';
 import {
 	noRecords,
 	runsOldestFirst,
@@ -18,7 +18,8 @@ import type { CadoroStorage } from './storage';
  *
  * @remarks
  * Records are copied in and out with `structuredClone`, as IndexedDB copies everything it saves,
- * so tests against this backend can't pass by sharing objects with the code they check.
+ * so tests against this backend can't pass by sharing objects with the code they check. Two
+ * sessions given the same object stand for two tabs, each told of the other's changes.
  */
 export class InMemoryStorage implements CadoroStorage {
 	/** Every routine saved, deleted ones included, in the order they were added. */
@@ -32,6 +33,9 @@ export class InMemoryStorage implements CadoroStorage {
 
 	/** The run in progress, or `null` when none is saved. */
 	#runInProgress: StoredRunInProgress | null = null;
+
+	/** The `onChange` of everything following the run in progress. */
+	#watchers = new Set<(runInProgress: StoredRunInProgress | null) => void>();
 
 	async getRoutines(): Promise<Routine[]> {
 		return structuredClone(pickableRoutines(this.#routines));
@@ -48,8 +52,13 @@ export class InMemoryStorage implements CadoroStorage {
 
 	async saveRunInProgress(
 		runInProgress: StoredRunInProgress,
+		basedOn: string | null,
 		records: RunRecords = noRecords()
-	): Promise<void> {
+	): Promise<boolean> {
+		if (!isRevision(this.#runInProgress, basedOn)) {
+			return false;
+		}
+
 		// Every check comes before any change, so a rejected call saves nothing, as a rolled-back
 		// transaction does in IndexedDB.
 		const newIds = new Set<string>();
@@ -60,21 +69,46 @@ export class InMemoryStorage implements CadoroStorage {
 			newIds.add(period.id);
 		}
 
-		this.#runInProgress = structuredClone(runInProgress);
 		if (records.run !== null) {
 			this.#runs.set(records.run.id, structuredClone(records.run));
 		}
 		for (const period of records.workPeriods) {
 			this.#workPeriods.set(period.id, structuredClone(period));
 		}
+		this.#changeRunInProgress(runInProgress);
+		return true;
+	}
+
+	async saveHeartbeat(revision: string, heartbeatAt: string): Promise<boolean> {
+		const changed = withHeartbeat(this.#runInProgress, revision, heartbeatAt);
+		if (changed === null) {
+			return false;
+		}
+
+		this.#changeRunInProgress(changed);
+		return true;
 	}
 
 	async getRunInProgress(): Promise<StoredRunInProgress | null> {
 		return structuredClone(this.#runInProgress);
 	}
 
-	async clearRunInProgress(): Promise<void> {
-		this.#runInProgress = null;
+	// It takes no `onError`, since memory can always be read.
+	watchRunInProgress(onChange: (runInProgress: StoredRunInProgress | null) => void): () => void {
+		this.#watchers.add(onChange);
+		this.#report(onChange);
+		return (): void => {
+			this.#watchers.delete(onChange);
+		};
+	}
+
+	async clearRunInProgress(basedOn: string): Promise<boolean> {
+		if (!isRevision(this.#runInProgress, basedOn)) {
+			return false;
+		}
+
+		this.#changeRunInProgress(null);
+		return true;
 	}
 
 	async getRuns(): Promise<Run[]> {
@@ -87,5 +121,36 @@ export class InMemoryStorage implements CadoroStorage {
 
 	async hasWorkPeriods(): Promise<boolean> {
 		return this.#workPeriods.size > 0;
+	}
+
+	/**
+	 * Replaces the run in progress, and tells everything following it.
+	 *
+	 * @param runInProgress - The new run in progress, or `null` to forget it.
+	 */
+	#changeRunInProgress(runInProgress: StoredRunInProgress | null): void {
+		this.#runInProgress = structuredClone(runInProgress);
+		for (const watcher of this.#watchers) {
+			this.#report(watcher);
+		}
+	}
+
+	/**
+	 * Tells one follower the run in progress, once the current call has finished, as IndexedDB's
+	 * live queries answer later too.
+	 *
+	 * @remarks
+	 * It reports the run in progress as it is when the report is made, so changes in quick
+	 * succession may be reported with the latest more than once. A follower that has stopped
+	 * following by then isn't told.
+	 *
+	 * @param watcher - The follower's `onChange`.
+	 */
+	#report(watcher: (runInProgress: StoredRunInProgress | null) => void): void {
+		queueMicrotask(() => {
+			if (this.#watchers.has(watcher)) {
+				watcher(structuredClone(this.#runInProgress));
+			}
+		});
 	}
 }

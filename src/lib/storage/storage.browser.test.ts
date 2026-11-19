@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { requireDefined } from '../defined';
+import type { StoredRunInProgress } from '../run-in-progress';
 import { minutes } from '../testing/durations';
 import { routineWith } from '../testing/routines';
 import { runInProgressWith, savedRunInProgress } from '../testing/run-in-progress';
@@ -22,6 +23,37 @@ const backends: Backend[] = [
 	// A new database for each test. The test browser starts with no data on every run.
 	{ name: 'DexieStorage', create: () => new DexieStorage(`test-${crypto.randomUUID()}`) }
 ];
+
+/** What a test following the run in progress has been told so far. */
+type Reports = {
+	/** Each run in progress reported, oldest first. */
+	changes: (StoredRunInProgress | null)[];
+	/** Stops following. */
+	stop: () => void;
+};
+
+/**
+ * Follows a storage's run in progress, keeping each report for the test to check.
+ *
+ * @remarks
+ * No test here expects storage to report an error, so one is thrown from the report, which
+ * Vitest fails the run for as an unhandled error.
+ *
+ * @param storage - The storage to follow.
+ * @returns The reports so far, which grow as storage reports more, and the way to stop.
+ */
+function follow(storage: CadoroStorage): Reports {
+	const changes: (StoredRunInProgress | null)[] = [];
+	const stop = storage.watchRunInProgress(
+		(runInProgress) => {
+			changes.push(runInProgress);
+		},
+		(error: unknown) => {
+			throw new Error('Following the run in progress failed.', { cause: error });
+		}
+	);
+	return { changes, stop };
+}
 
 describe.each(backends)('$name', ({ create }) => {
 	describe('getRoutines', () => {
@@ -139,7 +171,7 @@ describe.each(backends)('$name', ({ create }) => {
 				workedMs: 1_500_250
 			});
 
-			await storage.saveRunInProgress(savedRunInProgress, {
+			await storage.saveRunInProgress(savedRunInProgress, null, {
 				run: runInProgress,
 				workPeriods: [firstWorkPeriod, pausedPeriod]
 			});
@@ -150,14 +182,17 @@ describe.each(backends)('$name', ({ create }) => {
 
 		it('replaces the run when it is saved again as it ends', async () => {
 			const storage = create();
-			await storage.saveRunInProgress(savedRunInProgress, { run: runInProgress, workPeriods: [] });
+			await storage.saveRunInProgress(savedRunInProgress, null, {
+				run: runInProgress,
+				workPeriods: []
+			});
 			const endedRun = runWith({
 				endedAt: '2026-11-19T09:25:00.000Z',
 				outcome: 'completed',
 				roundsReached: 1
 			});
 
-			await storage.saveRunInProgress(savedRunInProgress, {
+			await storage.saveRunInProgress(savedRunInProgress, 'revision-1', {
 				run: endedRun,
 				workPeriods: [firstWorkPeriod]
 			});
@@ -167,9 +202,12 @@ describe.each(backends)('$name', ({ create }) => {
 
 		it('adds work periods and leaves the run as it was when the run is null', async () => {
 			const storage = create();
-			await storage.saveRunInProgress(savedRunInProgress, { run: runInProgress, workPeriods: [] });
+			await storage.saveRunInProgress(savedRunInProgress, null, {
+				run: runInProgress,
+				workPeriods: []
+			});
 
-			await storage.saveRunInProgress(savedRunInProgress, {
+			await storage.saveRunInProgress(savedRunInProgress, 'revision-1', {
 				run: null,
 				workPeriods: [firstWorkPeriod]
 			});
@@ -180,7 +218,7 @@ describe.each(backends)('$name', ({ create }) => {
 
 		it('rejects a work period whose id is already saved, and saves nothing from that call', async () => {
 			const storage = create();
-			await storage.saveRunInProgress(savedRunInProgress, {
+			await storage.saveRunInProgress(savedRunInProgress, null, {
 				run: runInProgress,
 				workPeriods: [firstWorkPeriod]
 			});
@@ -188,11 +226,12 @@ describe.each(backends)('$name', ({ create }) => {
 			const endedRun = runWith({ endedAt: '2026-11-19T09:50:00.000Z', outcome: 'finished' });
 			const endedRunInProgress = runInProgressWith({
 				run: { status: 'ended', endedPeriods: [], outcome: 'finished' },
-				heartbeatAt: '2026-11-19T09:50:00.000Z'
+				heartbeatAt: '2026-11-19T09:50:00.000Z',
+				revision: 'revision-2'
 			});
 
 			await expect(
-				storage.saveRunInProgress(endedRunInProgress, {
+				storage.saveRunInProgress(endedRunInProgress, 'revision-1', {
 					run: endedRun,
 					workPeriods: [newPeriod, firstWorkPeriod]
 				})
@@ -207,7 +246,7 @@ describe.each(backends)('$name', ({ create }) => {
 			const storage = create();
 			const run = runWith({});
 			const period = workPeriodWith({});
-			await storage.saveRunInProgress(savedRunInProgress, { run, workPeriods: [period] });
+			await storage.saveRunInProgress(savedRunInProgress, null, { run, workPeriods: [period] });
 			run.roundsReached = 5;
 			requireDefined(period.segments[0], "the period's segment").end = '2026-11-19T11:00:00.000Z';
 
@@ -237,20 +276,23 @@ describe.each(backends)('$name', ({ create }) => {
 				heartbeatAt: '2026-11-19T09:26:00.000Z'
 			});
 
-			await storage.saveRunInProgress(onBreak);
+			await storage.saveRunInProgress(onBreak, null);
 
 			expect(await storage.getRunInProgress()).toEqual(onBreak);
 		});
 
-		it('replaces the run in progress with each save, leaving runs and work periods alone, as a heartbeat does', async () => {
+		it('replaces the run in progress with each save, leaving runs and work periods alone when it keeps nothing new', async () => {
 			const storage = create();
-			await storage.saveRunInProgress(savedRunInProgress, {
+			await storage.saveRunInProgress(savedRunInProgress, null, {
 				run: runInProgress,
 				workPeriods: [firstWorkPeriod]
 			});
-			const later = runInProgressWith({ heartbeatAt: '2026-11-19T09:10:01.000Z' });
+			const later = runInProgressWith({
+				heartbeatAt: '2026-11-19T09:10:01.000Z',
+				revision: 'revision-2'
+			});
 
-			await storage.saveRunInProgress(later);
+			await storage.saveRunInProgress(later, 'revision-1');
 
 			expect(await storage.getRunInProgress()).toEqual(later);
 			expect(await storage.getRuns()).toEqual([runInProgress]);
@@ -260,11 +302,142 @@ describe.each(backends)('$name', ({ create }) => {
 		it('saves a copy, so changing the run in progress after saving it leaves the saved one unchanged', async () => {
 			const storage = create();
 			const saved = runInProgressWith({});
-			await storage.saveRunInProgress(saved);
+			await storage.saveRunInProgress(saved, null);
 			saved.heartbeatAt = '2026-11-19T11:00:00.000Z';
 			saved.record.roundsReached = 5;
 
 			expect(await storage.getRunInProgress()).toEqual(savedRunInProgress);
+		});
+
+		it('says it saved a change worked out from the revision saved', async () => {
+			const storage = create();
+			const firstSaved = await storage.saveRunInProgress(savedRunInProgress, null);
+			const paused = runInProgressWith({ revision: 'revision-2' });
+
+			const secondSaved = await storage.saveRunInProgress(paused, 'revision-1');
+
+			expect([firstSaved, secondSaved]).toEqual([true, true]);
+			expect(await storage.getRunInProgress()).toEqual(paused);
+		});
+
+		it('refuses a change worked out from another revision, as from a tab that missed a press, and saves nothing from it', async () => {
+			const storage = create();
+			await storage.saveRunInProgress(savedRunInProgress, null, {
+				run: runInProgress,
+				workPeriods: []
+			});
+			const stale = runInProgressWith({
+				run: { status: 'ended', endedPeriods: [], outcome: 'finished' },
+				revision: 'revision-3'
+			});
+
+			const saved = await storage.saveRunInProgress(stale, 'revision-2', {
+				run: runWith({ endedAt: '2026-11-19T09:25:00.000Z', outcome: 'finished' }),
+				workPeriods: [firstWorkPeriod]
+			});
+
+			expect(saved).toBe(false);
+			expect(await storage.getRunInProgress()).toEqual(savedRunInProgress);
+			expect(await storage.getRuns()).toEqual([runInProgress]);
+			expect(await storage.getWorkPeriods()).toEqual([]);
+		});
+
+		it('refuses a change worked out with none saved once a run in progress is saved, as another tab’s Play', async () => {
+			const storage = create();
+			await storage.saveRunInProgress(savedRunInProgress, null);
+			const otherStart = runInProgressWith({
+				record: runWith({ id: 'run-2' }),
+				revision: 'revision-2'
+			});
+
+			const saved = await storage.saveRunInProgress(otherStart, null, {
+				run: runWith({ id: 'run-2' }),
+				workPeriods: []
+			});
+
+			expect(saved).toBe(false);
+			expect(await storage.getRunInProgress()).toEqual(savedRunInProgress);
+			expect(await storage.getRuns()).toEqual([]);
+		});
+
+		it('refuses a change worked out from a run in progress that has since been forgotten', async () => {
+			const storage = create();
+			await storage.saveRunInProgress(savedRunInProgress, null);
+			await storage.clearRunInProgress('revision-1');
+
+			const saved = await storage.saveRunInProgress(
+				runInProgressWith({ revision: 'revision-2' }),
+				'revision-1'
+			);
+
+			expect(saved).toBe(false);
+			expect(await storage.getRunInProgress()).toBeNull();
+		});
+
+		it('saves only one of two changes worked out from the same revision, as two tabs pressing at once, so work is saved once', async () => {
+			const storage = create();
+			await storage.saveRunInProgress(savedRunInProgress, null);
+			const fromFirstTab = runInProgressWith({ revision: 'first-tab' });
+			const fromSecondTab = runInProgressWith({ revision: 'second-tab' });
+
+			const saved = await Promise.all([
+				storage.saveRunInProgress(fromFirstTab, 'revision-1', {
+					run: null,
+					workPeriods: [workPeriodWith({ id: 'first-tab-period' })]
+				}),
+				storage.saveRunInProgress(fromSecondTab, 'revision-1', {
+					run: null,
+					workPeriods: [workPeriodWith({ id: 'second-tab-period' })]
+				})
+			]);
+
+			expect(saved.toSorted()).toEqual([false, true]);
+			const winner = saved[0] === true ? fromFirstTab : fromSecondTab;
+			expect(await storage.getRunInProgress()).toEqual(winner);
+			expect(await storage.getWorkPeriods()).toHaveLength(1);
+		});
+	});
+
+	describe('saveHeartbeat', () => {
+		it('moves the heartbeat on, changing nothing else, and says it did', async () => {
+			const storage = create();
+			await storage.saveRunInProgress(savedRunInProgress, null);
+
+			const saved = await storage.saveHeartbeat('revision-1', '2026-11-19T09:10:01.000Z');
+
+			expect(saved).toBe(true);
+			expect(await storage.getRunInProgress()).toEqual(
+				runInProgressWith({ heartbeatAt: '2026-11-19T09:10:01.000Z' })
+			);
+		});
+
+		it('drops a heartbeat for another revision, so a tab that missed a press can’t undo it', async () => {
+			const storage = create();
+			await storage.saveRunInProgress(savedRunInProgress, null);
+
+			const saved = await storage.saveHeartbeat('revision-0', '2026-11-19T09:10:01.000Z');
+
+			expect(saved).toBe(false);
+			expect(await storage.getRunInProgress()).toEqual(savedRunInProgress);
+		});
+
+		it('drops a heartbeat earlier than the one saved', async () => {
+			const storage = create();
+			await storage.saveRunInProgress(savedRunInProgress, null);
+
+			const saved = await storage.saveHeartbeat('revision-1', '2026-11-19T09:09:59.000Z');
+
+			expect(saved).toBe(false);
+			expect(await storage.getRunInProgress()).toEqual(savedRunInProgress);
+		});
+
+		it('drops a heartbeat when no run in progress is saved, rather than saving one', async () => {
+			const storage = create();
+
+			const saved = await storage.saveHeartbeat('revision-1', '2026-11-19T09:10:01.000Z');
+
+			expect(saved).toBe(false);
+			expect(await storage.getRunInProgress()).toBeNull();
 		});
 	});
 
@@ -277,7 +450,7 @@ describe.each(backends)('$name', ({ create }) => {
 
 		it('returns a copy, so changing it leaves the saved run in progress unchanged', async () => {
 			const storage = create();
-			await storage.saveRunInProgress(savedRunInProgress);
+			await storage.saveRunInProgress(savedRunInProgress, null);
 			const read = await storage.getRunInProgress();
 			if (read === null) {
 				throw new Error('The run in progress should have been saved.');
@@ -288,16 +461,90 @@ describe.each(backends)('$name', ({ create }) => {
 		});
 	});
 
+	describe('watchRunInProgress', () => {
+		it('reports the run in progress soon after following starts, and not during the call', async () => {
+			const storage = create();
+			await storage.saveRunInProgress(savedRunInProgress, null);
+
+			const reports = follow(storage);
+
+			expect(reports.changes).toEqual([]);
+			await expect.poll(() => reports.changes).toEqual([savedRunInProgress]);
+		});
+
+		it('reports null when no run in progress is saved', async () => {
+			const storage = create();
+
+			const reports = follow(storage);
+
+			await expect.poll(() => reports.changes).toEqual([null]);
+		});
+
+		it('reports each change: a save, a heartbeat and a forgotten run', async () => {
+			const storage = create();
+			const reports = follow(storage);
+			await expect.poll(() => reports.changes).toEqual([null]);
+
+			await storage.saveRunInProgress(savedRunInProgress, null);
+			await expect.poll(() => reports.changes.at(-1)).toEqual(savedRunInProgress);
+			await storage.saveHeartbeat('revision-1', '2026-11-19T09:10:01.000Z');
+			await expect
+				.poll(() => reports.changes.at(-1))
+				.toEqual(runInProgressWith({ heartbeatAt: '2026-11-19T09:10:01.000Z' }));
+			await storage.clearRunInProgress('revision-1');
+
+			await expect.poll(() => reports.changes.at(-1)).toBeNull();
+		});
+
+		it('reports to everything following, as each open tab follows', async () => {
+			const storage = create();
+			const first = follow(storage);
+			const second = follow(storage);
+
+			await storage.saveRunInProgress(savedRunInProgress, null);
+
+			await expect.poll(() => first.changes.at(-1)).toEqual(savedRunInProgress);
+			await expect.poll(() => second.changes.at(-1)).toEqual(savedRunInProgress);
+		});
+
+		it('reports nothing more once stopped', async () => {
+			const storage = create();
+			const stopped = follow(storage);
+			const still = follow(storage);
+			await expect.poll(() => stopped.changes).toEqual([null]);
+
+			stopped.stop();
+			await storage.saveRunInProgress(savedRunInProgress, null);
+
+			// Reports go out together, so once the one still following hears, the other would have.
+			await expect.poll(() => still.changes.at(-1)).toEqual(savedRunInProgress);
+			expect(stopped.changes).toEqual([null]);
+		});
+
+		it('reports copies, so changing one leaves the saved run in progress unchanged', async () => {
+			const storage = create();
+			await storage.saveRunInProgress(savedRunInProgress, null);
+			const reports = follow(storage);
+			await expect.poll(() => reports.changes).toHaveLength(1);
+
+			requireDefined(reports.changes[0] ?? undefined, 'the run reported').heartbeatAt =
+				'2026-11-19T11:00:00.000Z';
+
+			expect(await storage.getRunInProgress()).toEqual(savedRunInProgress);
+		});
+	});
+
 	describe('clearRunInProgress', () => {
 		it('forgets the run in progress, and keeps its run and work periods', async () => {
 			const storage = create();
-			await storage.saveRunInProgress(savedRunInProgress, {
+			await storage.saveRunInProgress(savedRunInProgress, null, {
 				run: runInProgress,
 				workPeriods: [firstWorkPeriod]
 			});
 
-			await storage.clearRunInProgress();
+			const cleared = await storage.clearRunInProgress('revision-1');
 
+			expect(cleared).toBe(true);
 			expect(await storage.getRunInProgress()).toBeNull();
 			expect(await storage.getRuns()).toEqual([runInProgress]);
 			expect(await storage.getWorkPeriods()).toEqual([firstWorkPeriod]);
@@ -306,9 +553,20 @@ describe.each(backends)('$name', ({ create }) => {
 		it('does nothing when no run in progress is saved', async () => {
 			const storage = create();
 
-			await storage.clearRunInProgress();
+			const cleared = await storage.clearRunInProgress('revision-1');
 
+			expect(cleared).toBe(false);
 			expect(await storage.getRunInProgress()).toBeNull();
+		});
+
+		it('keeps a run in progress with another revision, so a tab that missed a newer run can’t forget it', async () => {
+			const storage = create();
+			await storage.saveRunInProgress(savedRunInProgress, null);
+
+			const cleared = await storage.clearRunInProgress('revision-0');
+
+			expect(cleared).toBe(false);
+			expect(await storage.getRunInProgress()).toEqual(savedRunInProgress);
 		});
 	});
 
@@ -321,11 +579,11 @@ describe.each(backends)('$name', ({ create }) => {
 
 		it('returns the runs in the order they started, whatever order they were saved in', async () => {
 			const storage = create();
-			await storage.saveRunInProgress(savedRunInProgress, {
+			await storage.saveRunInProgress(savedRunInProgress, null, {
 				run: runWith({ id: 'afternoon', startedAt: '2026-11-19T14:00:00.000Z' }),
 				workPeriods: []
 			});
-			await storage.saveRunInProgress(savedRunInProgress, {
+			await storage.saveRunInProgress(savedRunInProgress, 'revision-1', {
 				run: runWith({ id: 'morning', startedAt: '2026-11-19T09:00:00.000Z' }),
 				workPeriods: []
 			});
@@ -337,7 +595,10 @@ describe.each(backends)('$name', ({ create }) => {
 
 		it('returns copies, so changing one leaves the saved run unchanged', async () => {
 			const storage = create();
-			await storage.saveRunInProgress(savedRunInProgress, { run: runInProgress, workPeriods: [] });
+			await storage.saveRunInProgress(savedRunInProgress, null, {
+				run: runInProgress,
+				workPeriods: []
+			});
 			const [read] = await storage.getRuns();
 			requireDefined(read, 'the saved run').roundsReached = 5;
 
@@ -354,7 +615,7 @@ describe.each(backends)('$name', ({ create }) => {
 
 		it('returns the work periods in the order they started, whatever order they were saved in', async () => {
 			const storage = create();
-			await storage.saveRunInProgress(savedRunInProgress, {
+			await storage.saveRunInProgress(savedRunInProgress, null, {
 				run: null,
 				workPeriods: [
 					workPeriodWith({
@@ -375,7 +636,7 @@ describe.each(backends)('$name', ({ create }) => {
 
 		it('returns copies, so changing one leaves the saved work period unchanged', async () => {
 			const storage = create();
-			await storage.saveRunInProgress(savedRunInProgress, {
+			await storage.saveRunInProgress(savedRunInProgress, null, {
 				run: null,
 				workPeriods: [firstWorkPeriod]
 			});
@@ -392,7 +653,10 @@ describe.each(backends)('$name', ({ create }) => {
 			const storage = create();
 			expect(await storage.hasWorkPeriods()).toBe(false);
 
-			await storage.saveRunInProgress(savedRunInProgress, { run: runInProgress, workPeriods: [] });
+			await storage.saveRunInProgress(savedRunInProgress, null, {
+				run: runInProgress,
+				workPeriods: []
+			});
 
 			expect(await storage.hasWorkPeriods()).toBe(false);
 		});
@@ -400,7 +664,7 @@ describe.each(backends)('$name', ({ create }) => {
 		it('says yes once a work period is saved', async () => {
 			const storage = create();
 
-			await storage.saveRunInProgress(savedRunInProgress, {
+			await storage.saveRunInProgress(savedRunInProgress, null, {
 				run: runInProgress,
 				workPeriods: [firstWorkPeriod]
 			});
