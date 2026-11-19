@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { Routine } from './routine';
-import { recordPress, type Run, type RunRecords } from './run-records';
+import { recordPress, workPeriodsOldestFirst, type Run, type RunRecords } from './run-records';
 import { createRun, finish, next, pause, play, type RunState } from './run';
 import { minutes, seconds } from './testing/durations';
 import { numberedIds } from './testing/ids';
+import { firstWorkPeriod, workPeriodWith } from './testing/run-records';
 import { oneRoundRoutine, routineWith } from './testing/routines';
 
 /** A button's effect on a run, such as `play`, from the run engine. */
@@ -218,5 +219,15 @@ describe('recordPress', () => {
 				numberedIds()
 			)
 		).toThrow('A run must have a record before its work can be saved.');
+	});
+});
+
+describe('workPeriodsOldestFirst', () => {
+	it('throws when a work period has no segments', () => {
+		const withoutSegments = workPeriodWith({ segments: [] });
+
+		expect(() => workPeriodsOldestFirst([firstWorkPeriod, withoutSegments])).toThrow(
+			"Expected the work period's first segment to exist"
+		);
 	});
 });
