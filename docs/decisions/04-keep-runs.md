@@ -177,7 +177,7 @@ Runs survive reloads, every work period is recorded, and every open tab shows th
 
 ### Milestone 0: the guardrails
 
-- Installed `@vitest/eslint-plugin`, `eslint-plugin-playwright`, `date-fns`, `layerchart` 2.11 and `svelte-dnd-action` in one command. All fit Svelte 5.57, TypeScript 6 and Vite 8, so none was replaced. They're dev dependencies, like Dexie, so `npm audit --omit=dev` leaves them out.
+- Installed `@vitest/eslint-plugin`, `eslint-plugin-playwright`, `date-fns`, `layerchart` 2.11 and `svelte-dnd-action` in one command. All fit Svelte 5.57, TypeScript 6 and Vite 8, so none was replaced. **Corrected:** this first said the new packages are dev dependencies, like Dexie, so `npm audit --omit=dev` leaves them out. That meant the `audit` task audited nothing, since the app's packages were all dev dependencies. `dexie`, `@lucide/svelte`, `date-fns`, `layerchart` and `svelte-dnd-action` are now `dependencies`, which `task audit` checks.
 - Explicit return types, with 19 fixes.
 - typescript-eslint's typed rules, with the promise rules on. `require-await` is off, because `InMemoryStorage` and the test fakes implement promise interfaces with `async` methods that don't await, while `no-floating-promises` still catches a forgotten await. `tsconfig.json` now includes `dev-server.test.ts` and `pwa-assets.config.ts`, so the typed rules cover them.
 - The Vitest and Playwright lint plugins check the tests. Inline ESLint configuration is ignored (`noInlineConfig`, which ESLint reports as a warning while the rule it tried to disable still errors), and `@ts-expect-error` is banned.
