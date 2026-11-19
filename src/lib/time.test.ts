@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatElapsed, formatRemaining, minutesToMs } from './time';
+import { formatElapsed, formatRemaining, minutesToMs, toUtcTimestamp } from './time';
 
 /** One row of a formatting table: the rule it shows, a duration and how it should look. */
 type Case = [rule: string, ms: number, shown: string];
@@ -11,6 +11,17 @@ describe('minutesToMs', () => {
 
 	it('converts the longest target, 240 minutes, to 4 hours', () => {
 		expect(minutesToMs(240)).toBe(14_400_000);
+	});
+});
+
+describe('toUtcTimestamp', () => {
+	it('stamps the start of 1970 as midnight UTC', () => {
+		expect(toUtcTimestamp(0)).toBe('1970-01-01T00:00:00.000Z');
+	});
+
+	it('keeps the milliseconds', () => {
+		// `Date.UTC` counts months from 0, so 10 is November.
+		expect(toUtcTimestamp(Date.UTC(2026, 10, 19, 9, 30, 15, 250))).toBe('2026-11-19T09:30:15.250Z');
 	});
 });
 
