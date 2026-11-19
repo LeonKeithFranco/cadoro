@@ -45,8 +45,8 @@ export type TimerSessionOptions = {
 	/**
 	 * Called as any button is pressed, before the press changes the run, and from within the
 	 * press itself, which the app uses to unlock the chimes' audio, since browsers allow audio to
-	 * start only during a user gesture. Called even when the press changes nothing. Nothing is
-	 * called when left out.
+	 * start only during a user gesture. Called even when the press changes nothing, but not for
+	 * {@link TimerSession.pauseOnLeave}, which no button does. Nothing is called when left out.
 	 */
 	onPress?: () => void;
 	/**
@@ -316,6 +316,17 @@ export class TimerSession {
 		this.#press(pause);
 	}
 
+	/**
+	 * Pauses the run as the Timer screen is left, so the time away isn't counted.
+	 *
+	 * @remarks
+	 * It changes the run as Pause does, and saves it, but it's no button press, so `onPress` isn't
+	 * called, and leaving can't unlock the chimes in a tab where no button was pressed.
+	 */
+	pauseOnLeave(): void {
+		this.#apply(pause);
+	}
+
 	/** Presses Next: ends the work period and starts its break, or ends the break early. */
 	next(): void {
 		this.#press(next);
@@ -387,19 +398,28 @@ export class TimerSession {
 	}
 
 	/**
-	 * Applies a button to the run at the current moment, and saves the run with what it started
-	 * or ended.
-	 *
-	 * @remarks
-	 * `onPress` is called first, while the button's gesture is still going. The clock is read
-	 * next, so the view is up to date as soon as the button changes the run, rather than at the
-	 * next tick. A button that does nothing, such as Pause on a ready run, leaves the run as it
-	 * was, so nothing is saved.
+	 * Presses a button: calls `onPress` while the button's gesture is still going, then applies the
+	 * button to the run.
 	 *
 	 * @param press - The button's effect on the run, from the engine.
 	 */
 	#press(press: Press): void {
 		this.#onPress();
+		this.#apply(press);
+	}
+
+	/**
+	 * Applies a button's effect to the run at the current moment, and saves the run with what it
+	 * started or ended.
+	 *
+	 * @remarks
+	 * The clock is read first, so the view is up to date as soon as the change shows, rather than
+	 * at the next tick. An effect that does nothing, such as Pause on a ready run, leaves the run as
+	 * it was, so nothing is saved.
+	 *
+	 * @param press - The button's effect on the run, from the engine.
+	 */
+	#apply(press: Press): void {
 		this.#moveOn();
 		const before = this.#run;
 		const after = press(before, this.#now);

@@ -438,6 +438,26 @@ describe('running a routine from the Timer screen', () => {
 			.toHaveTextContent('4:00 / 25:00');
 		expect(vi.getTimerCount()).toBe(0);
 	});
+
+	it('pauses on leaving without counting it as a button press, so the chimes stay locked', async () => {
+		const onPress = vi.fn();
+		const session = new TimerSession(createStarterRoutines(new Date(0), numberedIds()), {
+			clock: (): number => nowMs,
+			storage: new InMemoryStorage(),
+			newId: numberedIds(),
+			newRevision,
+			onWorkSaved: vi.fn(),
+			onPress
+		});
+		const screen = render(TimerScreen, { session });
+		await page.getByRole('button', { name: 'Play' }).click();
+		expect(onPress).toHaveBeenCalledOnce();
+
+		screen.unmount();
+
+		expect(session.view).toMatchObject({ isRunning: false, isInProgress: true });
+		expect(onPress).toHaveBeenCalledOnce();
+	});
 });
 
 describe('saving the run as the page goes away', () => {
