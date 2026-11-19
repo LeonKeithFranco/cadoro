@@ -1,8 +1,9 @@
 import { beforeNavigate, goto, type BeforeNavigate } from '$app/navigation';
 import { page, type Locator } from 'vitest/browser';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { requireDefined } from '../defined';
+import { useErrorLog } from '../error-log';
 import type { Block, Routine } from '../routine';
 import { settingsFrom, type Settings } from '../settings';
 import { SettingsSession } from '../settings.svelte';
@@ -991,10 +992,14 @@ describe('editing blocks', () => {
 	});
 });
 
+// Takes away the log a test chose for errors.
+afterEach(() => {
+	useErrorLog(null);
+});
+
 describe('when saving fails', () => {
 	it('says so, and keeps the form open with the changes', async () => {
 		const { storage } = await openScreen();
-		vi.spyOn(console, 'error').mockImplementation(() => {});
 		vi.spyOn(storage, 'saveRoutine').mockRejectedValue(new Error('The disk is full.'));
 		await openForEditing('Alpha');
 		await typeTitle('Renamed');
@@ -1007,5 +1012,22 @@ describe('when saving fails', () => {
 		await expect
 			.element(page.getByRole('textbox', { name: 'Title', exact: true }))
 			.toHaveValue('Renamed');
+	});
+
+	it('records the failure in the activity log', async () => {
+		const { storage } = await openScreen();
+		useErrorLog(storage);
+		vi.spyOn(storage, 'saveRoutine').mockRejectedValue(new Error('The disk is full.'));
+		await openForEditing('Alpha');
+		await typeTitle('Renamed');
+
+		await page.getByRole('button', { name: 'Save' }).click();
+
+		await expect.poll(() => storage.getLogEntries()).toHaveLength(1);
+		expect((await storage.getLogEntries())[0]).toMatchObject({
+			type: 'error',
+			message: 'Saving the routine failed.',
+			details: { message: 'The disk is full.' }
+		});
 	});
 });

@@ -2,6 +2,7 @@
 // allows it. The browser drops the lock whenever the page is hidden, so the lock is asked for again
 // when the page is visible.
 
+import { recordError } from './error-log';
 import type { RunView } from './run';
 import type { Settings } from './settings';
 
@@ -158,7 +159,7 @@ function holdScreenOn(wakeLock: WakeLockApi, page: PageVisibility): () => void {
 				});
 			},
 			(error: unknown) => {
-				console.error('Could not keep the screen on.', error);
+				void recordError('Could not keep the screen on.', error);
 			}
 		);
 	};
@@ -179,6 +180,6 @@ function holdScreenOn(wakeLock: WakeLockApi, page: PageVisibility): () => void {
  */
 function releaseAndLog(lock: ScreenLock): void {
 	lock.release().catch((error: unknown) => {
-		console.error('Could not release the screen lock.', error);
+		void recordError('Could not release the screen lock.', error);
 	});
 }

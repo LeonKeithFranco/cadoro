@@ -72,6 +72,7 @@
 	import { dragHandleZone, type DndEvent } from 'svelte-dnd-action';
 	import { onMount, untrack } from 'svelte';
 	import { newRoutine, canDeleteRoutine, withTrimmedTitles, type Routine } from '../routine';
+	import { recordError } from '../error-log';
 	import { duplicateRoutine } from '../routine-duplication';
 	import { moveRoutineDown, moveRoutineUp } from '../routine-order';
 	import { sortRoutines, type RoutineUsage } from '../routine-sort';
@@ -159,7 +160,7 @@
 				noticeChangesToEditedRoutine(changed);
 			},
 			(error: unknown) => {
-				console.error('Changes to the routines can no longer be followed.', error);
+				void recordError('Changes to the routines can no longer be followed.', error);
 			}
 		);
 		Promise.all([storage.getRuns(), storage.getWorkPeriods()])
@@ -167,7 +168,10 @@
 				usage = { runs, workPeriods };
 			})
 			.catch((error: unknown) => {
-				console.error('The runs could not be read, so "last used" and "most work" are off.', error);
+				void recordError(
+					'The runs could not be read, so "last used" and "most work" are off.',
+					error
+				);
 			});
 		return stop;
 	});
@@ -242,7 +246,7 @@
 	 * @param error - What storage threw.
 	 */
 	function reportFailure(what: string, error: unknown): void {
-		console.error(`${what} failed.`, error);
+		void recordError(`${what} failed.`, error);
 	}
 
 	/**

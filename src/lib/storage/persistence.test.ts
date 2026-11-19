@@ -172,14 +172,23 @@ describe('isStoragePersistent', () => {
 		expect(await isStoragePersistent(undefined)).toBeNull();
 	});
 
-	it('logs a failed check and says it can’t tell, rather than rejecting', async () => {
-		const failure = new Error('Blocked.');
-		const manager = { persisted: vi.fn().mockRejectedValue(failure), persist: vi.fn() };
-		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+	it('records a failed check in the activity log and says it can’t tell, rather than rejecting', async () => {
+		const storage = new InMemoryStorage();
+		useErrorLog(storage);
+		const manager = {
+			persisted: vi.fn().mockRejectedValue(new Error('Blocked.')),
+			persist: vi.fn()
+		};
 
 		expect(await isStoragePersistent(manager)).toBeNull();
 
-		expect(consoleError).toHaveBeenCalledWith('Persistent storage could not be checked.', failure);
+		expect(await storage.getLogEntries()).toMatchObject([
+			{
+				type: 'error',
+				message: 'Persistent storage could not be checked.',
+				details: { message: 'Blocked.' }
+			}
+		]);
 	});
 });
 
@@ -197,16 +206,22 @@ describe('requestPersistentStorage', () => {
 		await expect(requestPersistentStorage(undefined)).resolves.toBeUndefined();
 	});
 
-	it('logs a failed request rather than rejecting', async () => {
-		const failure = new Error('Blocked.');
-		const manager = { persisted: vi.fn(), persist: vi.fn().mockRejectedValue(failure) };
-		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+	it('records a failed request in the activity log rather than rejecting', async () => {
+		const storage = new InMemoryStorage();
+		useErrorLog(storage);
+		const manager = {
+			persisted: vi.fn(),
+			persist: vi.fn().mockRejectedValue(new Error('Blocked.'))
+		};
 
 		await expect(requestPersistentStorage(manager)).resolves.toBeUndefined();
 
-		expect(consoleError).toHaveBeenCalledWith(
-			'Persistent storage could not be requested.',
-			failure
-		);
+		expect(await storage.getLogEntries()).toMatchObject([
+			{
+				type: 'error',
+				message: 'Persistent storage could not be requested.',
+				details: { message: 'Blocked.' }
+			}
+		]);
 	});
 });

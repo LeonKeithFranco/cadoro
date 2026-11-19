@@ -6,6 +6,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import TimerScreen from '#lib/components/TimerScreen.svelte';
+	import { recordError } from '#lib/error-log.ts';
 	import type { RoutineUsage } from '#lib/routine-sort.ts';
 	import type { PageProps } from './$types';
 
@@ -20,7 +21,7 @@
 				usage = { runs, workPeriods };
 			})
 			.catch((error: unknown) => {
-				console.error('The runs could not be read, so the picker may be out of order.', error);
+				void recordError('The runs could not be read, so the picker may be out of order.', error);
 			});
 	});
 </script>
