@@ -277,7 +277,7 @@ type LogEntry = {
   - The prompt is a card reading "A new version is ready.", with Reload and Later. It floats above the phone's tab bar, and sits in the bottom-right corner on wider screens, in the page's opposite colours.
   - The card stays hidden while a run is in progress, and shows once the run ends, or before Play. Reload hands over to the new version and reloads the page. Later hides the card, and the new version takes over the next time the app opens.
   - The browser looks for a new version whenever the app opens or reloads. The app doesn't check again while it stays open.
-  - With the app open in several tabs, Reload in one reloads every tab that isn't mid-run. A tab that's mid-run carries on, and offers to reload once its run ends.
+  - With the app open in several tabs, every tab shows the same run, so every tab hides the card while it's in progress, and shows it once the run ends. Reload in one tab then reloads every tab.
 - Requires HTTPS, except on `localhost`.
 
 ### Persistent storage
