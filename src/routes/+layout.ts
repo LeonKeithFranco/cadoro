@@ -22,7 +22,7 @@ let timerSessionOpening: Promise<TimerSession> | undefined;
 
 /**
  * Opens storage, creates the starter routines on the first launch, and starts the timer session
- * with the routines saved.
+ * with the routines saved, saving its runs in the same storage.
  *
  * @remarks
  * `crypto.randomUUID` is wrapped rather than passed as it is, because called on its own, away from
@@ -32,8 +32,10 @@ let timerSessionOpening: Promise<TimerSession> | undefined;
  * @throws Rejects with storage's own error when the routines can't be read or saved.
  */
 async function openTimerSession(): Promise<TimerSession> {
-	const routines = await loadRoutines(new DexieStorage(), new Date(), () => crypto.randomUUID());
-	return new TimerSession(routines, () => Date.now());
+	const storage = new DexieStorage();
+	const newId = (): string => crypto.randomUUID();
+	const routines = await loadRoutines(storage, new Date(), newId);
+	return new TimerSession(routines, { clock: () => Date.now(), storage, newId });
 }
 
 /**

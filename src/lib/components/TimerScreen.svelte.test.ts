@@ -1,7 +1,8 @@
 import { page, userEvent } from 'vitest/browser';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
-import { createStarterRoutines } from '../routine';
+import { createStarterRoutines, type Routine } from '../routine';
+import { InMemoryStorage } from '../storage/in-memory-storage';
 import { minutes, seconds } from '../testing/durations';
 import { numberedIds } from '../testing/ids';
 import { oneRoundRoutine } from '../testing/routines';
@@ -13,13 +14,20 @@ import TimerScreen from './TimerScreen.svelte';
 let nowMs = 0;
 
 /**
- * Starts a session of the starter routines on the fake clock, so a test can drive the run the
- * screen shows without real time passing.
+ * Starts a session on the fake clock, so a test can drive the run the screen shows without real
+ * time passing. It saves to new, empty storage, which the screen's tests don't read.
  *
- * @returns A new session, with Classic chosen and its run ready.
+ * @param routines - The routines to pick from. The starter routines unless a test needs others.
+ * @returns A new session, with the first routine chosen and its run ready.
  */
-function createSession(): TimerSession {
-	return new TimerSession(createStarterRoutines(new Date(0), numberedIds()), () => nowMs);
+function createSession(
+	routines: readonly Routine[] = createStarterRoutines(new Date(0), numberedIds())
+): TimerSession {
+	return new TimerSession(routines, {
+		clock: () => nowMs,
+		storage: new InMemoryStorage(),
+		newId: numberedIds()
+	});
 }
 
 /**
@@ -329,7 +337,7 @@ describe('running a routine from the Timer screen', () => {
 	});
 
 	it("shows the run summary once a finite routine's last work period ends", async () => {
-		const session = new TimerSession([oneRoundRoutine], () => nowMs);
+		const session = createSession([oneRoundRoutine]);
 		render(TimerScreen, { session });
 		await page.getByRole('button', { name: 'Play' }).click();
 		elapse(minutes(26));

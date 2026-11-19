@@ -1,8 +1,11 @@
-import { beforeEach, describe, expect, it } from 'vitest';
-import { createStarterRoutines } from './routine';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createStarterRoutines, type Routine } from './routine';
+import type { RunRecords } from './run-records';
+import { InMemoryStorage } from './storage/in-memory-storage';
+import type { CadoroStorage } from './storage/storage';
 import { minutes, seconds } from './testing/durations';
 import { numberedIds } from './testing/ids';
-import { oneRoundRoutine } from './testing/routines';
+import { oneRoundRoutine, routineWith } from './testing/routines';
 import { TimerSession } from './timer.svelte';
 
 /** The starter routines, Classic then Classic with long break, with predictable ids. */
@@ -15,12 +18,17 @@ const [classic, classicWithLongBreak] = routines;
 let nowMs = 0;
 
 /**
- * Starts a session of the starter routines on the fake clock.
+ * Starts a session on the fake clock, saving to the storage given, with ids numbered from `id-1`.
  *
- * @returns A new session, with Classic chosen and its run ready.
+ * @param choices - The routines to pick from. The starter routines unless a test needs others.
+ * @param storage - Where the session saves its runs. New, empty storage unless a test reads it.
+ * @returns A new session, with the first routine chosen and its run ready.
  */
-function createSession(): TimerSession {
-	return new TimerSession(routines, () => nowMs);
+function createSession(
+	choices: readonly Routine[] = routines,
+	storage: CadoroStorage = new InMemoryStorage()
+): TimerSession {
+	return new TimerSession(choices, { clock: () => nowMs, storage, newId: numberedIds() });
 }
 
 beforeEach(() => {
@@ -50,9 +58,7 @@ describe('TimerSession', () => {
 	});
 
 	it('refuses to start without a routine to pick', () => {
-		expect(() => new TimerSession([], () => nowMs)).toThrow(
-			'A timer session needs at least one routine.'
-		);
+		expect(() => createSession([])).toThrow('A timer session needs at least one routine.');
 	});
 });
 
@@ -244,7 +250,7 @@ describe('the controls', () => {
 	});
 
 	it('ends a finite routine with its last Next, keeping the run and its summary', () => {
-		const session = new TimerSession([oneRoundRoutine], () => nowMs);
+		const session = createSession([oneRoundRoutine]);
 		session.play();
 		nowMs = minutes(26);
 
@@ -323,5 +329,153 @@ describe('readying a new run', () => {
 			workedMs: minutes(10),
 			isInProgress: true
 		});
+	});
+});
+
+describe('recording runs', () => {
+	/** The one-round routine's block, repeating forever, so Next always starts a break. */
+	const foreverRoutine = routineWith({ id: 'forever', title: 'Forever', rounds: 'infinite' });
+
+	// Puts back what each test spied on, such as `console.error` and storage's methods.
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	it('saves a whole run: its start, each work period and how it ended', async () => {
+		const storage = new InMemoryStorage();
+		const session = createSession([foreverRoutine], storage);
+		session.play();
+		nowMs = minutes(10);
+		session.pause();
+		nowMs = minutes(15);
+		session.play();
+		nowMs = minutes(30);
+		session.next();
+		nowMs = minutes(36);
+		session.play();
+		nowMs = minutes(40);
+
+		session.finish();
+
+		await expect
+			.poll(() => storage.getRuns())
+			.toEqual([
+				{
+					id: 'id-1',
+					routineId: 'forever',
+					startedAt: '1970-01-01T00:00:00.000Z',
+					endedAt: '1970-01-01T00:40:00.000Z',
+					outcome: 'finished',
+					roundsReached: 2
+				}
+			]);
+		expect(await storage.getWorkPeriods()).toEqual([
+			{
+				id: 'id-2',
+				runId: 'id-1',
+				routineId: 'forever',
+				blockId: 'one-round-focus',
+				targetMinutes: 25,
+				segments: [
+					{ start: '1970-01-01T00:00:00.000Z', end: '1970-01-01T00:10:00.000Z' },
+					{ start: '1970-01-01T00:15:00.000Z', end: '1970-01-01T00:30:00.000Z' }
+				],
+				workedMs: minutes(25)
+			},
+			{
+				id: 'id-3',
+				runId: 'id-1',
+				routineId: 'forever',
+				blockId: 'one-round-focus',
+				targetMinutes: 25,
+				segments: [{ start: '1970-01-01T00:36:00.000Z', end: '1970-01-01T00:40:00.000Z' }],
+				workedMs: minutes(4)
+			}
+		]);
+	});
+
+	it('saves nothing before Play, whatever routine is chosen or button pressed', async () => {
+		const storage = new InMemoryStorage();
+		const session = createSession([oneRoundRoutine, foreverRoutine], storage);
+		session.select('forever');
+		session.pause();
+		session.next();
+		session.finish();
+		nowMs = minutes(5);
+
+		session.play();
+
+		// Saves reach storage in order, so once Play's run is saved, any earlier save would be too.
+		await expect
+			.poll(() => storage.getRuns())
+			.toEqual([
+				expect.objectContaining({ routineId: 'forever', startedAt: '1970-01-01T00:05:00.000Z' })
+			]);
+		expect(await storage.getWorkPeriods()).toEqual([]);
+	});
+
+	it('gives the next run after Done a record of its own', async () => {
+		const storage = new InMemoryStorage();
+		const session = createSession([oneRoundRoutine], storage);
+		session.play();
+		nowMs = minutes(26);
+		session.next();
+		session.readyNewRun();
+		nowMs = minutes(30);
+
+		session.play();
+
+		await expect
+			.poll(() => storage.getRuns())
+			.toEqual([
+				expect.objectContaining({ id: 'id-1', outcome: 'completed' }),
+				expect.objectContaining({
+					id: 'id-3',
+					startedAt: '1970-01-01T00:30:00.000Z',
+					outcome: null
+				})
+			]);
+	});
+
+	it('saves each press in order, even when an earlier save is slow', async () => {
+		const storage = new InMemoryStorage();
+		const save = storage.saveRunRecords.bind(storage);
+		const { promise: firstSaveHeld, resolve: releaseFirstSave } = Promise.withResolvers<void>();
+		const saveSpy = vi
+			.spyOn(storage, 'saveRunRecords')
+			.mockImplementationOnce(async (records: RunRecords) => {
+				await firstSaveHeld;
+				await save(records);
+			});
+		const session = createSession([oneRoundRoutine], storage);
+		session.play();
+		nowMs = minutes(26);
+		session.next();
+
+		releaseFirstSave();
+		await vi.waitFor(() => {
+			expect(saveSpy).toHaveBeenCalledTimes(2);
+		});
+		await Promise.all(saveSpy.mock.results.map((result) => result.value));
+
+		expect(await storage.getRuns()).toEqual([
+			expect.objectContaining({ id: 'id-1', outcome: 'completed' })
+		]);
+	});
+
+	it('logs a save that fails, and carries on timing and saving', async () => {
+		const storage = new InMemoryStorage();
+		const failure = new Error('The disk is full.');
+		vi.spyOn(storage, 'saveRunRecords').mockRejectedValueOnce(failure);
+		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const session = createSession([foreverRoutine], storage);
+		session.play();
+		nowMs = minutes(25);
+
+		session.next();
+
+		expect(session.view).toMatchObject({ status: 'break', earnedMs: minutes(5) });
+		await expect.poll(() => storage.getWorkPeriods()).toHaveLength(1);
+		expect(consoleError).toHaveBeenCalledWith('The run could not be saved.', failure);
 	});
 });
