@@ -33,15 +33,15 @@ Beside the timer, `RunChimes` and `WakeLockKeeper` watch the session's run and t
 - `time.ts`: unit conversions (`MS_PER_SECOND`, `minutesToMs`), `toUtcTimestamp` and `fromUtcTimestamp` for moments saved in storage, and time formatting (`formatElapsed` rounds down, `formatRemaining` rounds up).
 - `percent.ts`: `percentOf` and `asPercentOf`, multiplying before dividing.
 - `screens.ts`: `isCurrentScreen`, which link in the navigation is the current one.
-- `timer.svelte.ts`: `TimerSession`, built from the routines, `TimerSessionOptions` (`clock`, `storage`, `newId`, `newRevision`, `onWorkSaved`, `onPress`, `onRunStarted`) and how the app opened (`saved`, `isAnotherTabOpen`, `lastRoutineId`), which decides whether it restores the saved run or joins it live, and which routine it opens on: the last one used, else the first pickable. It has a `run` getter for the chimes, calls `onPress` from every button, and calls `onRunStarted` with the routine when a run starts. The root layout makes the app's one session.
+- `timer.svelte.ts`: `TimerSession`, built from the routines, `TimerSessionOptions` (`clock`, `storage`, `newId`, `newRevision`, `onWorkSaved`, `onPress`, `onRunStarted`) and how the app opened (`saved`, `isAnotherTabOpen`, `lastRoutineId`), which decides whether it restores the saved run or joins it live, and which routine it opens on: the last one used, else the first pickable. It has a `run` getter for the chimes, calls `onPress` from every button, and calls `onRunStarted` with the routine when a run starts. `pauseOnLeave` pauses the run as the Timer screen is left, without calling `onPress`, since no button was pressed. The root layout makes the app's one session.
 - `chime-schedule.ts`: `nextChime`, which works out from a run and the current moment the one chime still ahead (`DueChime`: its `ChimeAlert`, `target` or `break`, and its moment), or none. Pure.
-- `chime-player.ts`: `ChimePlayer`, which loads the chime files and schedules each chime on the audio clock (`AudioContext.currentTime`), through `ChimeAudioContext`, the parts of `AudioContext` it uses, so tests can fake it. It plays nothing until `unlock()`, which a button press calls, and `preview` plays a file at once without touching the schedule.
+- `chime-player.ts`: `ChimePlayer`, which loads the chime files and schedules each chime on the audio clock (`AudioContext.currentTime`), through `ChimeAudioContext`, the parts of `AudioContext` it uses, so tests can fake it. It plays nothing until `unlock()`, which a button press calls and which says whether the audio can play, and `preview` plays a file at once without touching the schedule. The audio clock stops while a laptop sleeps or a phone takes a call, so the player places the last run's chime again from the wall clock (`catchUp`) when the context runs again, after an unlock resumes it, and as the page shows again. A chime more than `LATE_CHIME_TOLERANCE_MS` (1 second) late is dropped. `cancel` forgets the run and its chime.
 - `chimes.ts`: the chime ids (`CHIME_IDS`), `DEFAULT_CHIME`, their names for Settings (`chimeName`), and the file each id or alert plays (`chimeFile`, `chimeFilesFor`), where an unknown id plays the default. Pure.
-- `run-chimes.svelte.ts`: `RunChimes`, which follows the session's run and the settings and has the player reschedule whenever the run or the chosen chime or volume changes, never on a tick. It joins the Web Lock queue `cadoro-chimes` on a tab's first press, so one tab sounds. Its `preview` is for Settings.
-- `wake-lock.svelte.ts`: `WakeLockKeeper`, which asks for the screen wake lock while a timer counts, the page is visible and the setting is on, releases it otherwise, and says whether the browser has the API (`isSupported`).
+- `run-chimes.svelte.ts`: `RunChimes`, which follows the session's run and the settings and has the player reschedule whenever the run or the chosen chime changes, never on a tick. A volume change only sets the gain, which reaches the scheduled chime too. It joins the Web Lock queue `cadoro-chimes` once a press has made the tab's audio play, and gives its turn up when an unlock finds the audio can't resume, so one tab that can play sounds. It has the player catch up as the page shows again. Its `preview` is for Settings.
+- `wake-lock.svelte.ts`: `WakeLockKeeper`, which asks for the screen wake lock while a timer counts, the page is visible and the setting is on, releases it otherwise, asks again when the browser lets it go by itself while the page is visible, and says whether the browser has the API (`isSupported`).
 - `settings.ts`: the `Settings` and `Theme` types from the spec, `DEFAULT_SETTINGS`, `settingsWithChanges`, which keeps only the changed settings, and `settingsFrom`, which fills in the defaults a saved row lacks. Pure.
 - `settings.svelte.ts`: `SettingsSession`, the settings as Svelte state that screens read: a change shows at once and is saved, and a change another tab saves is followed.
-- `theme.ts`: `resolveTheme`, which turns the theme setting and the device's preference into the light or dark theme to show. Pure.
+- `theme.ts`: `resolveTheme`, which turns the theme setting and the device's preference into the light or dark theme to show, and `THEME_COLOURS`, each theme's page background for the browser's bars. Pure.
 - `page-reload.ts`: `reloadPage`, alone in its module so tests can replace it.
 
 ### `src/lib/storage`: where data is kept
@@ -54,11 +54,11 @@ Beside the timer, `RunChimes` and `WakeLockKeeper` watch the session's run and t
 
 ### `src/lib/components`: the Svelte components
 
-- `TimerScreen` lays out the Timer screen: `RoutinePicker`, a `BlockCard` per block, `TimerControls`, and the `FinishConfirmation` and `RunSummary` dialogs, both built on `ModalDialog`. It runs the one-second tick, ticks again as the page is hidden or closed (`<svelte:document>`, `<svelte:window>`), and pauses the run when it's removed.
+- `TimerScreen` lays out the Timer screen: `RoutinePicker`, a `BlockCard` per block, `TimerControls`, and the `FinishConfirmation` and `RunSummary` dialogs, both built on `ModalDialog`. It runs the one-second tick, ticks again as the page is hidden or closed (`<svelte:document>`, `<svelte:window>`), and pauses the run with `pauseOnLeave` when it's removed.
 - `ScreenNav` is the navigation, `ScreenHeading` gives each screen its heading and tab title, and `ScreenPlaceholder` stands in for the screens not built yet.
 - `UpdatePrompt` registers the service worker and offers to reload when a new version is waiting.
 - `SettingsScreen` is the Settings screen: the theme, a chime picker with a Preview button for each alert, the volume (saved when the slider is released), keep the screen awake (disabled where the browser has no wake lock), the persistent storage status with "Ask again", and the version.
-- `ThemeSync` draws nothing: it sets `data-theme` on `<html>` from the theme setting, following the device's setting live for `system`.
+- `ThemeSync` draws nothing: it sets `data-theme` on `<html>` from the theme setting, following the device's setting live for `system`, and sets the `theme-color` meta to the shown theme's background, so the browser's bars match.
 - `button-colours.ts` holds the main and outlined buttons' Tailwind classes, which every screen and dialog shares.
 
 ### `src/routes`: the screens
@@ -66,7 +66,7 @@ Beside the timer, `RunChimes` and `WakeLockKeeper` watch the session's run and t
 - `+layout.ts` turns off server-side rendering, so the app renders only in the browser, and its `load` opens storage, reads the routines, the settings and the run in progress, and returns `{ timerSession, settingsSession, wakeLockKeeper, chimes }` as the layout's `data`, which every page receives. It also starts the check for persistent storage, without waiting for it.
 - `+layout.svelte` is the frame: the global styles from `layout.css`, `ThemeSync`, the header, the navigation and `UpdatePrompt`.
 - `+page.svelte` is the Timer screen, showing the session from `data`. `routines/` and `stats/` hold the other screens, and `settings/` shows `SettingsScreen`.
-- `src/app.html` has a small inline script in its head that reads the theme mirror and sets `data-theme` before the first paint, making the same choice as `resolveTheme`.
+- `src/app.html` has a small inline script in its head that reads the theme mirror and sets `data-theme` and the `theme-color` meta before the first paint, making the same choice as `resolveTheme` and `THEME_COLOURS`.
 
 ### Tests and their helpers
 
@@ -98,9 +98,9 @@ Beside the timer, `RunChimes` and `WakeLockKeeper` watch the session's run and t
 - A heartbeat writes only the time, never a whole run, so a stale tab's heartbeat can't undo another tab's press.
 - Work is recorded by the tab that pressed, and only when its save is accepted, so each work period and run is saved once however many tabs are open. A tab that follows a change never saves it.
 - A restored run comes back paused at its last heartbeat, so time after it never counts as work. A tab that opens while another tab is open joins the run live and doesn't pause it. A ready run is never saved.
-- One tab sounds each chime. Each tab joins the Web Lock queue `cadoro-chimes` on its first press, and only the holder schedules chimes. Without Web Locks, or if the lock is refused, every unlocked tab sounds. A Preview plays in any tab and never takes the lock.
-- Chimes are scheduled once on the audio clock, ahead of their moment, whenever the run or the chosen chime or volume changes, never on a tick. A chime whose moment has passed is never scheduled, so a restore or another tab's change can't sound one late. Nothing sounds before a button press has unlocked the audio.
-- The wake lock is held only while a timer counts, the page is visible and the setting is on, and is asked for again whenever the page becomes visible.
+- One tab sounds each chime. Each tab joins the Web Lock queue `cadoro-chimes` once a press has made its audio play, and only the holder schedules chimes. A tab whose audio can't be made or resumed never holds the lock, so it can't silence a tab that can play. Without Web Locks, or if the lock is refused, every unlocked tab sounds. A Preview plays in any tab and never takes the lock.
+- Chimes are scheduled on the audio clock, ahead of their moment, whenever the run or the chosen chime changes, never on a tick. A volume change only sets the gain. A chime whose moment has passed is never scheduled, so a restore or another tab's change can't sound one late. Because the audio clock can stand still while time goes on, the chime is placed again from the wall clock when the audio runs again, after an unlock and as the page shows, and no chime starts more than a second late. Nothing sounds before a button press has unlocked the audio, and leaving the Timer screen isn't a press.
+- The wake lock is held only while a timer counts, the page is visible and the setting is on, and is asked for again whenever the page becomes visible, or the browser lets it go by itself while the page is visible.
 - The theme mirror in `localStorage` is the one use of `localStorage`, and storage owns it: only `DexieStorage` writes it, and IndexedDB stays the source of truth.
 - What's stored survives upgrades: schema versions 1 to 3 never change now that they're deployed, so a change to what's stored takes a new Dexie version with an upgrade, and a test for it.
 
@@ -117,7 +117,7 @@ Beside the timer, `RunChimes` and `WakeLockKeeper` watch the session's run and t
 
 - The buttons stay synchronous, and the screen changes at once. `TimerSession` puts every write, saves and Done's clear alike, on one promise chain (`#enqueue`), so each starts once the one before has finished, and doesn't wait for it.
 - Each tab holds a shared Web Lock for as long as it's open, which the browser lets go when the tab closes or crashes. A tab opening checks for it before taking its own, since a heartbeat's age can't say whether another tab is alive.
-- Leaving the Timer screen pauses the run, which is a press, so it pauses the run in every tab.
+- Leaving the Timer screen pauses the run, which is saved like a press, so it pauses the run in every tab. It isn't a button press, so it doesn't unlock the chimes.
 - The run in progress is saved on every press that changes the run, on each tick while a timer counts, and as the page is hidden or closed. In a tab hidden for over 5 minutes, Chrome runs the tick about once a minute, so heartbeats come less often there.
 - A failed save, or a failed request for persistent storage, is logged with `console.error`, and the app carries on. Milestone 8's activity log records errors.
 - Persistent storage is asked for at most once per launch: at startup when work is saved, or else after the first work period is saved.
@@ -125,7 +125,7 @@ Beside the timer, `RunChimes` and `WakeLockKeeper` watch the session's run and t
 ### Styling and themes
 
 - Tailwind classes only, with `@tailwindcss/forms` styling native controls. Native elements cover every widget, such as `<dialog>` and `<select>`.
-- The `dark:` variant follows `data-theme` on `<html>`, which `app.html` starts as `dark`, its inline script sets from the theme mirror before the first paint, and `ThemeSync` then keeps in step with the theme setting. Every element carries both its light and its dark colours.
+- The `dark:` variant follows `data-theme` on `<html>`, which `app.html` starts as `dark`, its inline script sets from the theme mirror before the first paint, and `ThemeSync` then keeps in step with the theme setting. The `theme-color` meta follows the same way, so the browser's bars match the page. The manifest's `theme_color` is one file for every user, so it stays the default dark. Every element carries both its light and its dark colours.
 - Rose is the accent and amber means overtime, and colour never carries meaning alone. Text keeps at least 5:1 contrast, and outlines and bars at least 3:1, in both themes.
 - The layout is one centred column up to `max-w-3xl`, with a bottom tab bar on phones and header links from `md` (48rem).
 
