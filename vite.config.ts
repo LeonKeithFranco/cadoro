@@ -85,6 +85,13 @@ export default defineConfig({
 					// The plugin always looks for prerendered pages too, and the app prerenders none,
 					// so a pattern that matches nothing is a warning rather than a failed build.
 					globStrict: false,
+					// The plugin's own pattern for the client's files, which a pattern given here
+					// replaces, so it's repeated, with the chimes added, so they play offline. The
+					// plugin still adds its pattern for prerendered pages.
+					globPatterns: [
+						'client/**/*.{js,css,ico,png,svg,webp,webmanifest}',
+						'client/chimes/*.mp3'
+					],
 					// Answers every page address with the kept fallback page, so any screen opens
 					// offline.
 					navigateFallback: FALLBACK_ADDRESS
