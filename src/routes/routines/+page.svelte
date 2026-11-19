@@ -1,12 +1,16 @@
 <!--
   @component
-  The Routines screen, a placeholder until routines can be edited.
+  The Routines screen, listing, sorting and editing the routines, which the app's storage keeps.
 -->
 <script lang="ts">
-	import ScreenPlaceholder from '#lib/components/ScreenPlaceholder.svelte';
+	import RoutinesScreen from '#lib/components/RoutinesScreen.svelte';
+	import type { PageProps } from './$types';
+
+	let { data }: PageProps = $props();
 </script>
 
-<ScreenPlaceholder
-	title="Routines"
-	message="Your routines will be listed, sorted and edited here in a later version."
+<RoutinesScreen
+	storage={data.storage}
+	settingsSession={data.settingsSession}
+	initialRoutines={data.timerSession.routines}
 />
