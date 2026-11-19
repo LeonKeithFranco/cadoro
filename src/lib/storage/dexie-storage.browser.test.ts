@@ -2,7 +2,7 @@ import Dexie from 'dexie';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { routineWith } from '../testing/routines';
 import { runInProgressWith, savedRunInProgress } from '../testing/run-in-progress';
-import { firstWorkPeriod, runInProgress, workPeriodWith } from '../testing/run-records';
+import { firstWorkPeriod, runInProgress, runWith, workPeriodWith } from '../testing/run-records';
 import { DEFAULT_SETTINGS, type Settings } from '../settings';
 import { DexieStorage } from './dexie-storage';
 import { THEME_MIRROR_KEY } from './theme-mirror';
@@ -562,6 +562,68 @@ describe('DexieStorage', () => {
 			expect(routines.map((routine) => routine.id)).toEqual(['b', 'new', 'a', 'copy']);
 			expect(routines[0]?.title).toBe('Edited');
 		});
+
+		it('still imports the backup, and reports the failure', async () => {
+			const storage = new DexieStorage(newDatabaseName());
+			await storage.addRoutinesIfNone([routineWith({ id: 'a' })]);
+			const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+			failLogWrites('add');
+			failLogWrites('put');
+			const imported = routineWith({ id: 'imported' });
+
+			await storage.replaceAllData(
+				{ routines: [imported], runs: [], workPeriods: [], settings: DEFAULT_SETTINGS },
+				{
+					formatVersion: 1,
+					exportedAt: '2026-11-17T08:00:00.000Z',
+					routineCount: 1,
+					runCount: 0,
+					workPeriodCount: 0,
+					firstRunAt: null,
+					lastRunAt: null
+				}
+			);
+
+			expect((await storage.readBackupData()).routines).toEqual([imported]);
+			expect(await storage.getLogEntries()).toEqual([]);
+			expect(logged).toHaveBeenCalledWith('Writing to the activity log failed.', expect.anything());
+		});
+	});
+
+	it('aborts an import that fails midway, keeping every old table as it was', async () => {
+		const storage = new DexieStorage(newDatabaseName());
+		await storage.addRoutinesIfNone([routineWith({ id: 'a' })]);
+		await storage.saveSettings({ volume: 5 });
+		await storage.saveRunInProgress(savedRunInProgress, null, {
+			run: runInProgress,
+			workPeriods: [firstWorkPeriod]
+		});
+		const before = await storage.readBackupData();
+
+		// The routines and runs go in before the work periods, whose repeated id fails the import.
+		await expect(
+			storage.replaceAllData(
+				{
+					routines: [routineWith({ id: 'new' })],
+					runs: [runWith({ id: 'new-run', routineId: 'new' })],
+					workPeriods: [workPeriodWith({ id: 'same' }), workPeriodWith({ id: 'same' })],
+					settings: { ...DEFAULT_SETTINGS, volume: 77 }
+				},
+				{
+					formatVersion: 1,
+					exportedAt: '2026-11-17T08:00:00.000Z',
+					routineCount: 1,
+					runCount: 1,
+					workPeriodCount: 2,
+					firstRunAt: null,
+					lastRunAt: null
+				}
+			)
+		).rejects.toThrow();
+
+		expect(await storage.readBackupData()).toEqual(before);
+		expect(await storage.getRunInProgress()).toEqual(savedRunInProgress);
+		expect(await storage.getLogEntries()).toEqual([]);
 	});
 
 	it('logs nothing when the routine can’t be saved', async () => {

@@ -2,6 +2,9 @@
 // promises and gives each table a typed API.
 
 import Dexie, { liveQuery, type EntityTable, type Table, type Transaction } from 'dexie';
+import type { BackupData } from '../backup-format';
+import { importLogEntry } from '../backup-log';
+import type { BackupSummary } from '../backup-summary';
 import { LOG_MAX_ENTRIES, type LogEntry, type NewLogEntry } from '../log';
 import { pickableRoutines, type Routine } from '../routine';
 import {
@@ -464,6 +467,47 @@ export class DexieStorage implements CadoroStorage {
 	async getWorkPeriods(): Promise<WorkPeriod[]> {
 		const periods = await this.#database.workPeriods.toArray();
 		return workPeriodsOldestFirst(periods);
+	}
+
+	async readBackupData(): Promise<BackupData> {
+		const { routines, runs, workPeriods, settings } = this.#database;
+
+		// One read transaction over the four tables, so a backup never mixes data from before and
+		// after another tab's save.
+		return this.#database.transaction('r', [routines, runs, workPeriods, settings], async () => ({
+			routines: (await routines.toArray()).toSorted((a, b) => a.customPosition - b.customPosition),
+			runs: runsOldestFirst(await runs.toArray()),
+			workPeriods: workPeriodsOldestFirst(await workPeriods.toArray()),
+			settings: settingsFrom((await settings.get(SETTINGS_KEY)) ?? null)
+		}));
+	}
+
+	async replaceAllData(data: BackupData, summary: BackupSummary): Promise<void> {
+		const { routines, runs, workPeriods, settings, runInProgress } = this.#database;
+
+		// One read-write transaction over every table the backup replaces. If `bulkAdd` refuses a
+		// repeated id, the error aborts the transaction, which undoes the `clear`s too, so the old
+		// data stays.
+		await this.#database.transaction(
+			'rw',
+			[routines, runs, workPeriods, settings, runInProgress],
+			async () => {
+				await Promise.all([
+					routines.clear(),
+					runs.clear(),
+					workPeriods.clear(),
+					settings.clear(),
+					runInProgress.clear()
+				]);
+				await routines.bulkAdd(data.routines);
+				await runs.bulkAdd(data.runs);
+				await workPeriods.bulkAdd(data.workPeriods);
+				await settings.put(data.settings, SETTINGS_KEY);
+			}
+		);
+		// After the replace, so a failed one leaves the mirror as it was.
+		writeThemeMirror(data.settings.theme);
+		await this.#writeLogEntry(importLogEntry(summary, this.#now()));
 	}
 
 	async hasWorkPeriods(): Promise<boolean> {

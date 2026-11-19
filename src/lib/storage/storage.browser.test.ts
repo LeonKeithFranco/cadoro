@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
+import { createBackup, serializeBackup, type BackupData } from '../backup-format';
+import { parseBackup } from '../backup-parsing';
+import { summarizeBackup, type BackupSummary } from '../backup-summary';
 import { requireDefined } from '../defined';
-import type { StoredRunInProgress } from '../run-in-progress';
+import { createRun, next, pause, play, type RunState } from '../run';
+import { toStoredRunInProgress, type StoredRunInProgress } from '../run-in-progress';
+import { recordPress, type Run } from '../run-records';
+import { numberedIds } from '../testing/ids';
 import { DEFAULT_SETTINGS, type Settings } from '../settings';
 import { minutes } from '../testing/durations';
-import { routineWith } from '../testing/routines';
+import { oneRoundRoutine, routineWith } from '../testing/routines';
 import { runInProgressWith, savedRunInProgress } from '../testing/run-in-progress';
 import { firstWorkPeriod, runInProgress, runWith, workPeriodWith } from '../testing/run-records';
 import { DexieStorage } from './dexie-storage';
@@ -64,6 +70,16 @@ async function placed(storage: CadoroStorage): Promise<string[]> {
 	const routines = await storage.getRoutines();
 	return routines.map((routine) => `${routine.id}:${routine.customPosition}`);
 }
+
+/** A run being played through the engine in a test, with what saving it needs to remember. */
+type PressState = {
+	/** The run so far. */
+	run: RunState;
+	/** The run's record once Play has started it, or `null` before. */
+	record: Run | null;
+	/** The revision of the run in progress saved last, or `null` before the first save. */
+	revision: string | null;
+};
 
 /** What a test following the run in progress has been told so far. */
 type Reports = {
@@ -1264,6 +1280,342 @@ describe.each(backends)('$name', ({ create }) => {
 			});
 
 			expect(await storage.hasWorkPeriods()).toBe(true);
+		});
+	});
+
+	describe('readBackupData', () => {
+		it('reads empty storage as no records and the default settings', async () => {
+			const storage = create();
+
+			expect(await storage.readBackupData()).toEqual({
+				routines: [],
+				runs: [],
+				workPeriods: [],
+				settings: DEFAULT_SETTINGS
+			});
+		});
+
+		it('reads every routine, deleted ones too, with the runs, work periods and settings', async () => {
+			const storage = await storageWithAbc(create);
+			await storage.deleteRoutine('c');
+			await storage.saveSettings({ volume: 30 });
+			await storage.saveRunInProgress(savedRunInProgress, null, {
+				run: runInProgress,
+				workPeriods: [firstWorkPeriod]
+			});
+
+			const data = await storage.readBackupData();
+
+			expect(data.routines.map((routine) => `${routine.id}:${routine.deletedAt !== null}`)).toEqual(
+				['a:false', 'b:false', 'c:true']
+			);
+			expect(data.runs).toEqual([runInProgress]);
+			expect(data.workPeriods).toEqual([firstWorkPeriod]);
+			expect(data.settings).toEqual({ ...DEFAULT_SETTINGS, volume: 30 });
+		});
+
+		it('leaves out the run in progress and the activity log', async () => {
+			const storage = await storageWithAbc(create);
+			await storage.deleteRoutine('c');
+			await storage.saveRunInProgress(savedRunInProgress, null);
+
+			const data = await storage.readBackupData();
+
+			expect(Object.keys(data).toSorted()).toEqual(['routines', 'runs', 'settings', 'workPeriods']);
+		});
+
+		it('returns copies, so changing them leaves the saved data unchanged', async () => {
+			const storage = await storageWithAbc(create);
+
+			requireDefined((await storage.readBackupData()).routines[0], 'a routine').title = 'Changed';
+
+			expect((await storage.getAllRoutines())[0]?.title).toBe('A');
+		});
+	});
+
+	describe('replaceAllData', () => {
+		/** What an import brings: two routines, one deleted, a run with its work period, settings. */
+		const imported: BackupData = {
+			routines: [
+				routineWith({ id: 'x', title: 'X', customPosition: 0 }),
+				routineWith({
+					id: 'y',
+					title: 'Y',
+					customPosition: 1,
+					deletedAt: '2026-11-18T09:00:00.000Z'
+				})
+			],
+			runs: [runWith({ id: 'imported-run', routineId: 'x' })],
+			workPeriods: [
+				workPeriodWith({ id: 'imported-period', runId: 'imported-run', routineId: 'x' })
+			],
+			settings: { ...DEFAULT_SETTINGS, theme: 'light', volume: 12, lastRoutineId: 'x' }
+		};
+
+		/** What the imported backup holds, as its summary counts it. */
+		const summary: BackupSummary = {
+			formatVersion: 1,
+			exportedAt: '2026-11-17T08:00:00.000Z',
+			routineCount: 2,
+			runCount: 1,
+			workPeriodCount: 1,
+			firstRunAt: '2026-11-19T09:00:00.000Z',
+			lastRunAt: '2026-11-19T09:00:00.000Z'
+		};
+
+		/**
+		 * Makes storage with data of its own, which an import must replace: three routines, a run
+		 * with a work period, changed settings and a run in progress.
+		 *
+		 * @returns The storage.
+		 */
+		async function storageWithOldData(): Promise<CadoroStorage> {
+			const storage = await storageWithAbc(create);
+			await storage.saveSettings({ volume: 99, targetChime: 'old-chime' });
+			await storage.saveRunInProgress(savedRunInProgress, null, {
+				run: runWith({ id: 'old-run', routineId: 'a' }),
+				workPeriods: [workPeriodWith({ id: 'old-period', runId: 'old-run', routineId: 'a' })]
+			});
+			return storage;
+		}
+
+		it('replaces the routines, runs, work periods and settings with the imported ones', async () => {
+			const storage = await storageWithOldData();
+
+			await storage.replaceAllData(imported, summary);
+
+			expect(await storage.readBackupData()).toEqual(imported);
+			expect((await storage.getRoutines()).map((routine) => routine.id)).toEqual(['x']);
+		});
+
+		it('replaces settings the backup holds with every setting, not merging the old ones', async () => {
+			const storage = await storageWithOldData();
+
+			await storage.replaceAllData(imported, summary);
+
+			expect(await storage.getSettings()).toEqual(imported.settings);
+		});
+
+		it('forgets the run in progress', async () => {
+			const storage = await storageWithOldData();
+
+			await storage.replaceAllData(imported, summary);
+
+			expect(await storage.getRunInProgress()).toBeNull();
+		});
+
+		it('imports into empty storage', async () => {
+			const storage = create();
+
+			await storage.replaceAllData(imported, summary);
+
+			expect(await storage.readBackupData()).toEqual(imported);
+		});
+
+		it('imports a backup that holds nothing, emptying the storage', async () => {
+			const storage = await storageWithOldData();
+			const nothing: BackupData = {
+				routines: [],
+				runs: [],
+				workPeriods: [],
+				settings: DEFAULT_SETTINGS
+			};
+
+			await storage.replaceAllData(nothing, {
+				...summary,
+				routineCount: 0,
+				runCount: 0,
+				workPeriodCount: 0
+			});
+
+			expect(await storage.readBackupData()).toEqual(nothing);
+			expect(await storage.hasWorkPeriods()).toBe(false);
+		});
+
+		it('keeps the old log entries and adds an entry with what was imported', async () => {
+			const storage = await storageWithOldData();
+			await storage.deleteRoutine('c');
+
+			await storage.replaceAllData(imported, summary);
+
+			const entries = await storage.getLogEntries();
+			expect(entries.map((entry) => entry.message)).toEqual([
+				'Imported a backup',
+				'Deleted routine "C"'
+			]);
+			expect(entries[0]).toMatchObject({
+				type: 'change',
+				timestamp: NOW,
+				details: {
+					action: 'import',
+					formatVersion: 1,
+					exportedAt: '2026-11-17T08:00:00.000Z',
+					routines: 2,
+					runs: 1,
+					workPeriods: 1
+				}
+			});
+		});
+
+		it('keeps only the newest entries once the import takes the log over its limit', async () => {
+			const storage = await storageWithAbc(create, { ...atNow, logLimit: 2 });
+			await storage.saveRoutine(routineWith({ id: 'a', title: 'one' }));
+			await storage.saveRoutine(routineWith({ id: 'a', title: 'two' }));
+
+			await storage.replaceAllData(imported, summary);
+
+			expect((await storage.getLogEntries()).map((entry) => entry.message)).toEqual([
+				'Imported a backup',
+				'Edited routine "two"'
+			]);
+		});
+
+		it('refuses data where two routines share an id, and changes nothing', async () => {
+			const storage = await storageWithOldData();
+			const before = await storage.readBackupData();
+			const repeated: BackupData = {
+				...imported,
+				routines: [routineWith({ id: 'same' }), routineWith({ id: 'same' })]
+			};
+
+			await expect(storage.replaceAllData(repeated, summary)).rejects.toThrow();
+
+			expect(await storage.readBackupData()).toEqual(before);
+			expect(await storage.getRunInProgress()).toEqual(savedRunInProgress);
+			expect(await storage.getLogEntries()).toEqual([]);
+		});
+
+		it('refuses data where two work periods share an id, after the routines and runs went in', async () => {
+			const storage = await storageWithOldData();
+			const before = await storage.readBackupData();
+			const repeated: BackupData = {
+				...imported,
+				workPeriods: [workPeriodWith({ id: 'same' }), workPeriodWith({ id: 'same' })]
+			};
+
+			await expect(storage.replaceAllData(repeated, summary)).rejects.toThrow();
+
+			expect(await storage.readBackupData()).toEqual(before);
+			expect(await storage.getRunInProgress()).toEqual(savedRunInProgress);
+		});
+
+		it('tells the followers of the routines, the settings and the run in progress', async () => {
+			const storage = await storageWithOldData();
+			const routineReports: string[][] = [];
+			const settingsReports: number[] = [];
+			const runReports = follow(storage);
+			storage.watchRoutines(
+				(routines) => routineReports.push(routines.map((routine) => routine.id)),
+				() => {}
+			);
+			storage.watchSettings(
+				(settings) => settingsReports.push(settings.volume),
+				() => {}
+			);
+			await expect.poll(() => routineReports.length).toBeGreaterThan(0);
+
+			await storage.replaceAllData(imported, summary);
+
+			await expect.poll(() => routineReports.at(-1)).toEqual(['x']);
+			await expect.poll(() => settingsReports.at(-1)).toBe(12);
+			await expect.poll(() => runReports.changes.at(-1)).toBeNull();
+			runReports.stop();
+		});
+	});
+
+	describe('a backup of the app’s own data', () => {
+		/**
+		 * Presses a button on the run engine and saves the change as the timer session does: the
+		 * run's records from `recordPress`, with the run in progress.
+		 *
+		 * @param storage - Where to save.
+		 * @param state - The run so far, with its record and the revision saved last.
+		 * @param button - The engine's function for the button.
+		 * @param at - The moment of the press, in milliseconds since 1970 (UTC).
+		 * @returns The state after the press.
+		 * @throws {@link Error} If the press leaves the run ready or without a record, which none of
+		 * the presses here does.
+		 */
+		async function press(
+			storage: CadoroStorage,
+			state: PressState,
+			button: (run: RunState, now: number) => RunState,
+			at: number
+		): Promise<PressState> {
+			const after = button(state.run, at);
+			if (after.status === 'ready') {
+				throw new Error('A button press left the run ready.');
+			}
+			const records = recordPress(
+				{ before: state.run, after, now: at, routineId: 'one-round', record: state.record },
+				newIds
+			);
+			const record = records.run ?? state.record;
+			const revision = newRevisions();
+			if (record === null) {
+				throw new Error('A button press left no run record.');
+			}
+			const stored = toStoredRunInProgress(record, after, at, revision);
+			await storage.saveRunInProgress(stored, state.revision, records);
+			return { run: after, record, revision };
+		}
+
+		/** Numbers the ids of the records the engine's presses make. */
+		const newIds = numberedIds('made');
+		/** Numbers the revisions of the saves. */
+		const newRevisions = numberedIds('revision');
+
+		/**
+		 * Makes storage the way a user does: routines created, edited and deleted, a run with a pause
+		 * played through the engine and saved press by press, and settings changed.
+		 *
+		 * @returns The storage.
+		 */
+		async function storageUsedByTheApp(): Promise<CadoroStorage> {
+			const storage = create(atNow);
+			await storage.addRoutinesIfNone([oneRoundRoutine]);
+			await storage.createRoutine(
+				routineWith({ id: 'made', title: 'Made, "quoted"', customPosition: 1 })
+			);
+			await storage.saveRoutine(routineWith({ id: 'made', title: 'Edited', rounds: 'infinite' }));
+			await storage.createRoutine(
+				routineWith({ id: 'doomed', title: 'Doomed', customPosition: 2 })
+			);
+			await storage.deleteRoutine('doomed');
+
+			const start = Date.parse('2026-11-19T09:00:00.000Z');
+			let state: PressState = { run: createRun(oneRoundRoutine), record: null, revision: null };
+			state = await press(storage, state, play, start);
+			state = await press(storage, state, pause, start + minutes(10));
+			state = await press(storage, state, play, start + minutes(20));
+			await press(storage, state, next, start + minutes(30) + 123);
+
+			await storage.saveSettings({ theme: 'light', volume: 30, lastRoutineId: 'one-round' });
+			return storage;
+		}
+
+		it('is accepted by the validation, and importing it gives equal data', async () => {
+			const original = await storageUsedByTheApp();
+			const data = await original.readBackupData();
+
+			const text = serializeBackup(createBackup(data, new Date(NOW)));
+			const parsed = parseBackup(text);
+
+			expect(parsed.ok).toBe(true);
+			if (!parsed.ok) return;
+			const restored = create(atNow);
+			await restored.replaceAllData(parsed.backup, summarizeBackup(parsed.backup));
+			expect(await restored.readBackupData()).toEqual(data);
+		});
+
+		it('holds a run made by the engine, with its pause and its time worked to the millisecond', async () => {
+			const data = await (await storageUsedByTheApp()).readBackupData();
+
+			expect(data.runs).toHaveLength(1);
+			expect(data.workPeriods).toHaveLength(1);
+			expect(data.workPeriods[0]?.segments).toHaveLength(2);
+			expect(data.workPeriods[0]?.workedMs).toBe(minutes(20) + 123);
+			expect(data.routines.map((routine) => routine.id)).toEqual(['one-round', 'made', 'doomed']);
 		});
 	});
 });
