@@ -40,6 +40,20 @@ export default defineConfig(
 	includeIgnoreFile(gitignorePath),
 	js.configs.recommended,
 	ts.configs.recommended,
+	{
+		// Rules that need type information, such as catching a promise nobody awaits.
+		files: ['**/*.ts', '**/*.svelte'],
+		extends: [ts.configs.recommendedTypeChecked],
+		languageOptions: {
+			parserOptions: { projectService: true, extraFileExtensions: ['.svelte'] }
+		},
+		rules: {
+			// Off because it only flags `async` functions with no `await`, which is how the
+			// in-memory storage and the tests' fakes implement an interface that returns promises,
+			// and it catches nothing there. A forgotten `await` is caught by `no-floating-promises`.
+			'@typescript-eslint/require-await': 'off'
+		}
+	},
 	svelte.configs.recommended,
 	prettier,
 	svelte.configs.prettier,

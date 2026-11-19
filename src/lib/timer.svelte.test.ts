@@ -536,7 +536,7 @@ describe('recording runs', () => {
 		await vi.waitFor(() => {
 			expect(saveSpy).toHaveBeenCalledTimes(2);
 		});
-		await Promise.all(saveSpy.mock.results.map((result) => result.value));
+		await Promise.all(saveSpy.mock.results.map((result): unknown => result.value));
 
 		expect(await storage.getRuns()).toEqual([
 			expect.objectContaining({ id: 'id-1', outcome: 'completed' })
@@ -693,7 +693,7 @@ describe('keeping the run in progress', () => {
 			expect(clearSpy).toHaveBeenCalledOnce();
 		});
 		await Promise.all(
-			[...saveSpy.mock.results, ...clearSpy.mock.results].map((result) => result.value)
+			[...saveSpy.mock.results, ...clearSpy.mock.results].map((result): unknown => result.value)
 		);
 
 		expect(await storage.getRunInProgress()).toBeNull();
