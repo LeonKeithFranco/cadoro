@@ -9,12 +9,14 @@ Cadoro is a static SvelteKit single-page app. GitHub Pages, or any web server, s
 The code is in layers, each knowing only the one below it:
 
 1. **The run engine** in `src/lib` is plain TypeScript: a run is an immutable value, and every button is a pure function from one run and the current moment to the next run. It never reads the clock or touches the page.
-2. **Storage**, in `src/lib/storage`, is the `CadoroStorage` interface, kept in the browser's IndexedDB through Dexie. It holds the routines, every run and work period, and the run in progress.
+2. **Storage**, in `src/lib/storage`, is the `CadoroStorage` interface, kept in the browser's IndexedDB through Dexie. It holds the routines, every run and work period, the run in progress, and the settings.
 3. **`TimerSession`** keeps the current run in Svelte state, reads the clock, and applies the engine's functions when a button is pressed or the screen ticks. After each press it works out what to save with the pure `recordPress`, and hands it to storage with the run in progress, which each tick saves again as a heartbeat. It follows the saved run, so a change another tab saves replaces its run without being saved again. When the app opens with no other tab open, it restores the saved run, paused at its last heartbeat, and with another tab open it joins the run live.
 4. **Components** show views that pure functions work out from the run, such as `viewRun` for the screen and `viewBlock` for each block card, and call the session's methods.
-5. **Routes** frame the screens with the header, the navigation and the update prompt. The root layout's `load` reads the routines and the run in progress from storage, creating the starter routines on the first launch, and starts the app's one `TimerSession` before anything renders.
+5. **Routes** frame the screens with the header, the navigation, the update prompt and `ThemeSync`. The root layout's `load` reads the routines, the settings and the run in progress from storage, creating the starter routines on the first launch, and starts the app's one `TimerSession`, `SettingsSession`, `RunChimes` and `WakeLockKeeper` before anything renders.
 
-Every tab has its own session, and all of them follow the one saved run. Storage tells each tab when another tab changes the run, and a press that a tab makes from an out-of-date run is refused, so the tab takes the saved run instead.
+Every tab has its own sessions, and all of them follow the one saved run and the saved settings. Storage tells each tab when another tab changes either, and a press that a tab makes from an out-of-date run is refused, so the tab takes the saved run instead.
+
+Beside the timer, `RunChimes` and `WakeLockKeeper` watch the session's run and the settings, and act on the browser: the first schedules chimes on the audio clock, the second keeps the screen on. Neither changes the run.
 
 ## Codemap
 
@@ -31,35 +33,47 @@ Every tab has its own session, and all of them follow the one saved run. Storage
 - `time.ts`: unit conversions (`MS_PER_SECOND`, `minutesToMs`), `toUtcTimestamp` and `fromUtcTimestamp` for moments saved in storage, and time formatting (`formatElapsed` rounds down, `formatRemaining` rounds up).
 - `percent.ts`: `percentOf` and `asPercentOf`, multiplying before dividing.
 - `screens.ts`: `isCurrentScreen`, which link in the navigation is the current one.
-- `timer.svelte.ts`: `TimerSession`, built from the routines, `TimerSessionOptions` (`clock`, `storage`, `newId`, `newRevision`, `onWorkSaved`) and how the app opened (`saved`, `isAnotherTabOpen`), which decides whether it restores the saved run or joins it live. The root layout makes the app's one session.
+- `timer.svelte.ts`: `TimerSession`, built from the routines, `TimerSessionOptions` (`clock`, `storage`, `newId`, `newRevision`, `onWorkSaved`, `onPress`, `onRunStarted`) and how the app opened (`saved`, `isAnotherTabOpen`, `lastRoutineId`), which decides whether it restores the saved run or joins it live, and which routine it opens on: the last one used, else the first pickable. It has a `run` getter for the chimes, calls `onPress` from every button, and calls `onRunStarted` with the routine when a run starts. The root layout makes the app's one session.
+- `chime-schedule.ts`: `nextChime`, which works out from a run and the current moment the one chime still ahead (`DueChime`: its `ChimeAlert`, `target` or `break`, and its moment), or none. Pure.
+- `chime-player.ts`: `ChimePlayer`, which loads the chime files and schedules each chime on the audio clock (`AudioContext.currentTime`), through `ChimeAudioContext`, the parts of `AudioContext` it uses, so tests can fake it. It plays nothing until `unlock()`, which a button press calls, and `preview` plays a file at once without touching the schedule.
+- `chimes.ts`: the chime ids (`CHIME_IDS`), `DEFAULT_CHIME`, their names for Settings (`chimeName`), and the file each id or alert plays (`chimeFile`, `chimeFilesFor`), where an unknown id plays the default. Pure.
+- `run-chimes.svelte.ts`: `RunChimes`, which follows the session's run and the settings and has the player reschedule whenever the run or the chosen chime or volume changes, never on a tick. It joins the Web Lock queue `cadoro-chimes` on a tab's first press, so one tab sounds. Its `preview` is for Settings.
+- `wake-lock.svelte.ts`: `WakeLockKeeper`, which asks for the screen wake lock while a timer counts, the page is visible and the setting is on, releases it otherwise, and says whether the browser has the API (`isSupported`).
+- `settings.ts`: the `Settings` and `Theme` types from the spec, `DEFAULT_SETTINGS`, `settingsWithChanges`, which keeps only the changed settings, and `settingsFrom`, which fills in the defaults a saved row lacks. Pure.
+- `settings.svelte.ts`: `SettingsSession`, the settings as Svelte state that screens read: a change shows at once and is saved, and a change another tab saves is followed.
+- `theme.ts`: `resolveTheme`, which turns the theme setting and the device's preference into the light or dark theme to show. Pure.
 - `page-reload.ts`: `reloadPage`, alone in its module so tests can replace it.
 
 ### `src/lib/storage`: where data is kept
 
-- `storage.ts`: the `CadoroStorage` interface, the only way the app reads and saves data. It reads the routines and adds them on the first launch, saves the run in progress with a change's run and work periods together, only if the stored revision is the one the change was made from (`saveRunInProgress`), saves a heartbeat alone (`saveHeartbeat`), reads the run in progress back (`getRunInProgress`), calls back whenever it changes, in any tab (`watchRunInProgress`), forgets it (`clearRunInProgress`), reads the runs and work periods back oldest first, and says whether any work period is saved.
-- `dexie-storage.ts`: `DexieStorage`, the app's backend, in the IndexedDB database `cadoro`, with schema version 1 declaring `routines`, `runs`, `workPeriods` and `runInProgress`, and version 2 adding a revision to the saved run. The run in progress is one row under the key `current`, and Dexie's live query tells every tab when it changes.
-- `in-memory-storage.ts`: `InMemoryStorage`, for tests of code that uses storage, with plain subscribers for the watch.
-- `persistence.ts`: `askToPersistOnce`, which asks the browser for persistent storage at most once, and `askToPersistIfWorkSaved`, the check at startup.
+- `storage.ts`: the `CadoroStorage` interface, the only way the app reads and saves data. It reads the settings (`getSettings`), saves changes to them (`saveSettings`) and calls back when they change, in any tab (`watchSettings`). It reads the routines and adds them on the first launch, saves the run in progress with a change's run and work periods together, only if the stored revision is the one the change was made from (`saveRunInProgress`), saves a heartbeat alone (`saveHeartbeat`), reads the run in progress back (`getRunInProgress`), calls back whenever it changes, in any tab (`watchRunInProgress`), forgets it (`clearRunInProgress`), reads the runs and work periods back oldest first, and says whether any work period is saved.
+- `dexie-storage.ts`: `DexieStorage`, the app's backend, in the IndexedDB database `cadoro`, with schema version 1 declaring `routines`, `runs`, `workPeriods` and `runInProgress`, version 2 adding a revision to the saved run, and version 3 adding the `settings` table. The run in progress is one row under the key `current`, and so are the settings, which hold only the fields the user has changed. Dexie's live query tells every tab when either changes. It also writes the theme mirror whenever it saves or reads the settings.
+- `in-memory-storage.ts`: `InMemoryStorage`, for tests of code that uses storage, with plain subscribers for the watches.
+- `theme-mirror.ts`: `writeThemeMirror` and `THEME_MIRROR_KEY` (`cadoro-theme`), a copy of the theme setting in `localStorage`, which `app.html`'s inline script reads before the first paint. Only `DexieStorage` writes it.
+- `persistence.ts`: `askToPersistOnce`, which asks the browser for persistent storage at most once, `askToPersistIfWorkSaved`, the check at startup, and `isStoragePersistent` and `requestPersistentStorage`, which Settings uses to show the status and to ask again.
 
 ### `src/lib/components`: the Svelte components
 
 - `TimerScreen` lays out the Timer screen: `RoutinePicker`, a `BlockCard` per block, `TimerControls`, and the `FinishConfirmation` and `RunSummary` dialogs, both built on `ModalDialog`. It runs the one-second tick, ticks again as the page is hidden or closed (`<svelte:document>`, `<svelte:window>`), and pauses the run when it's removed.
 - `ScreenNav` is the navigation, `ScreenHeading` gives each screen its heading and tab title, and `ScreenPlaceholder` stands in for the screens not built yet.
 - `UpdatePrompt` registers the service worker and offers to reload when a new version is waiting.
+- `SettingsScreen` is the Settings screen: the theme, a chime picker with a Preview button for each alert, the volume (saved when the slider is released), keep the screen awake (disabled where the browser has no wake lock), the persistent storage status with "Ask again", and the version.
+- `ThemeSync` draws nothing: it sets `data-theme` on `<html>` from the theme setting, following the device's setting live for `system`.
 - `button-colours.ts` holds the main and outlined buttons' Tailwind classes, which every screen and dialog shares.
 
 ### `src/routes`: the screens
 
-- `+layout.ts` turns off server-side rendering, so the app renders only in the browser, and its `load` opens storage, reads the routines and the run in progress, and returns `{ timerSession }` as the layout's `data`, which every page receives. It also starts the check for persistent storage, without waiting for it.
-- `+layout.svelte` is the frame: the global styles from `layout.css`, the header, the navigation and `UpdatePrompt`.
-- `+page.svelte` is the Timer screen, showing the session from `data`. `routines/`, `stats/` and `settings/` hold the other screens. Settings shows the app's version.
+- `+layout.ts` turns off server-side rendering, so the app renders only in the browser, and its `load` opens storage, reads the routines, the settings and the run in progress, and returns `{ timerSession, settingsSession, wakeLockKeeper, chimes }` as the layout's `data`, which every page receives. It also starts the check for persistent storage, without waiting for it.
+- `+layout.svelte` is the frame: the global styles from `layout.css`, `ThemeSync`, the header, the navigation and `UpdatePrompt`.
+- `+page.svelte` is the Timer screen, showing the session from `data`. `routines/` and `stats/` hold the other screens, and `settings/` shows `SettingsScreen`.
+- `src/app.html` has a small inline script in its head that reads the theme mirror and sets `data-theme` before the first paint, making the same choice as `resolveTheme`.
 
 ### Tests and their helpers
 
 - Unit tests sit beside their module as `*.test.ts`, component tests beside their component as `*.svelte.test.ts`, and storage tests beside their backend as `*.browser.test.ts`.
 - `storage.browser.test.ts` is the suite every backend shares, and `dexie-storage.browser.test.ts` covers what only IndexedDB has: data kept after reopening, two connections at once, the saved schema and the database's name.
 - `src/lib/testing/` holds test helpers: `durations.ts` (`seconds`, `minutes`, `hours`), `ids.ts` (`numberedIds`), `routines.ts` (`oneRoundRoutine`, `routineWith`), `run-records.ts` (`runInProgress`, `firstWorkPeriod`, `runWith`, `workPeriodWith`), `run-in-progress.ts` (`savedRunInProgress`, `runInProgressWith`) and `run-summary.ts` (`shownTotals`).
-- `e2e/` holds the Playwright journeys (`*.spec.ts`), with `clock.ts` (`openOnPausedClock`, `followLink`), `storage.ts` (`savedWorkPeriods`, read from the page's IndexedDB; `shared-run.spec.ts` runs two tabs of one browser context, which share one fake clock), `service-worker.ts` (`waitForActiveWorker`), and `update-server.ts`, which serves the production build with a new service worker to browsers that ask. `e2e/production/` holds the journeys against the production build.
+- `e2e/` holds the Playwright journeys (`*.spec.ts`), with `clock.ts` (`openOnPausedClock`, `followLink`), `storage.ts` (`savedWorkPeriods`, read from the page's IndexedDB; `shared-run.spec.ts` runs two tabs of one browser context, which share one fake clock), `browser-apis.ts` (init scripts the alerts and Settings journeys install: `recordChimes`, a fake wake lock and a fake persistent storage answer), `service-worker.ts` (`waitForActiveWorker`), and `update-server.ts`, which serves the production build with a new service worker to browsers that ask. `e2e/production/` holds the journeys against the production build.
 
 ### Config and tooling
 
@@ -84,7 +98,11 @@ Every tab has its own session, and all of them follow the one saved run. Storage
 - A heartbeat writes only the time, never a whole run, so a stale tab's heartbeat can't undo another tab's press.
 - Work is recorded by the tab that pressed, and only when its save is accepted, so each work period and run is saved once however many tabs are open. A tab that follows a change never saves it.
 - A restored run comes back paused at its last heartbeat, so time after it never counts as work. A tab that opens while another tab is open joins the run live and doesn't pause it. A ready run is never saved.
-- What's stored survives upgrades: schema versions 1 and 2 never change now that they're deployed, so a change to what's stored takes a new Dexie version with an upgrade, and a test for it.
+- One tab sounds each chime. Each tab joins the Web Lock queue `cadoro-chimes` on its first press, and only the holder schedules chimes. Without Web Locks, or if the lock is refused, every unlocked tab sounds. A Preview plays in any tab and never takes the lock.
+- Chimes are scheduled once on the audio clock, ahead of their moment, whenever the run or the chosen chime or volume changes, never on a tick. A chime whose moment has passed is never scheduled, so a restore or another tab's change can't sound one late. Nothing sounds before a button press has unlocked the audio.
+- The wake lock is held only while a timer counts, the page is visible and the setting is on, and is asked for again whenever the page becomes visible.
+- The theme mirror in `localStorage` is the one use of `localStorage`, and storage owns it: only `DexieStorage` writes it, and IndexedDB stays the source of truth.
+- What's stored survives upgrades: schema versions 1 to 3 never change now that they're deployed, so a change to what's stored takes a new Dexie version with an upgrade, and a test for it.
 
 ## Cross-cutting concerns
 
@@ -107,7 +125,7 @@ Every tab has its own session, and all of them follow the one saved run. Storage
 ### Styling and themes
 
 - Tailwind classes only, with `@tailwindcss/forms` styling native controls. Native elements cover every widget, such as `<dialog>` and `<select>`.
-- The `dark:` variant follows `data-theme` on `<html>`, fixed to `dark` until Settings can change it. Every element carries both its light and its dark colours.
+- The `dark:` variant follows `data-theme` on `<html>`, which `app.html` starts as `dark`, its inline script sets from the theme mirror before the first paint, and `ThemeSync` then keeps in step with the theme setting. Every element carries both its light and its dark colours.
 - Rose is the accent and amber means overtime, and colour never carries meaning alone. Text keeps at least 5:1 contrast, and outlines and bars at least 3:1, in both themes.
 - The layout is one centred column up to `max-w-3xl`, with a bottom tab bar on phones and header links from `md` (48rem).
 
@@ -119,6 +137,8 @@ Every tab has its own session, and all of them follow the one saved run. Storage
 - Tests write times as `minutes(25)`, not `25 * 60_000`, and keep their data visible rather than importing it from the code they check.
 - Playwright's projects are `desktop` and `phone` against the dev server (`PORT`, 5173 by default), `production` against a build at `/cadoro` on port 4175, and `updates` against the update server on port 4176.
 - Journeys that run the timer start on a paused fake clock with `openOnPausedClock`, move it with `fastForward`, and follow links with `followLink`, since SvelteKit waits on a timer before navigating. The fake clock carries on across `page.reload()`, so the reload journey checks exact times.
+- Journeys observe chimes without listening: `recordChimes` makes `AudioContext.currentTime` follow `Date.now()`, so the fake clock moves the audio clock, and records each scheduled chime's start moment and file. A journey asserts those, which is the schedule, not real playback. Persistent storage and the wake lock are faked the same way.
+- Parallel Vitest browser runs, such as in two worktrees, can collide on a port ("Port 63315 already in use"), and running the command again fixes it.
 - The Timer screen's tests fake a hidden page by replacing `document.visibilityState`'s getter and sending `visibilitychange` themselves.
 
 ### Docs and lint
@@ -133,7 +153,7 @@ Every tab has its own session, and all of them follow the one saved run. Storage
 
 ### Builds, deploys and releases
 
-- The build is `adapter-static` with an `index.html` fallback, and nothing is prerendered. Workbox's service worker keeps every file and answers every address with the fallback page, so the app works offline.
+- The build is `adapter-static` with an `index.html` fallback, and nothing is prerendered. Workbox's service worker keeps every file, the chimes included, and answers every address with the fallback page, so the app works offline.
 - A new version waits until the user reloads, and the prompt stays hidden during a run.
 - CI runs the checks on every pull request, in Playwright's container image. A push to `main` that passes deploys to GitHub Pages, with a copy of the fallback page as `404.html`.
 - Releases follow the README's Releasing section: `task release:bump` on the pull request, then `ci:watch-main`, `pages:check` and `release:publish` after the merge.
