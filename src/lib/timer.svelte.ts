@@ -1,8 +1,9 @@
-// The timer screen's state: the routines to pick from, the chosen routine and its run. It lives
-// in a module rather than in the Timer page, which SvelteKit removes when another screen opens,
-// so the run is still there on the way back.
+// The timer screen's state: the routines to pick from, the chosen routine and its run. The root
+// layout's `load` makes the app's one session and keeps it in the layout's data, rather than the
+// Timer page making it, since SvelteKit removes the page when another screen opens, and the run
+// must still be there on the way back.
 
-import { createStarterRoutines, type Routine } from './routine';
+import type { Routine } from './routine';
 import { createRun, finish, next, pause, play, viewRun, type RunState, type RunView } from './run';
 
 /** A button's effect on a run, such as `play`, from the run engine. */
@@ -40,7 +41,8 @@ export class TimerSession {
 	 * Starts a session with the first routine chosen and its run ready.
 	 *
 	 * @param routines - The routines to pick from, in the picker's order. There's always at least
-	 * one, since the app starts with its starter routines.
+	 * one, since the first launch creates the starter routines, and routines can't be deleted
+	 * yet.
 	 * @param clock - Returns the current moment, in milliseconds since 1970 (UTC). Tests pass a
 	 * fake clock they move by hand.
 	 * @throws {@link Error} If there are no routines to pick from.
@@ -144,25 +146,3 @@ export class TimerSession {
 		this.#run = press(this.#run, this.#now);
 	}
 }
-
-/**
- * The routines to pick from: the starter routines, made afresh each time the app loads, until
- * routines are saved.
- *
- * @remarks
- * `crypto.randomUUID` is wrapped rather than passed as it is, because called on its own, away from
- * `crypto`, it throws "Illegal invocation" in browsers.
- */
-// Made outside the exported session, where the `Date` is plainly only read. Svelte's lint rule
-// `prefer-svelte-reactivity` assumes any `Date` built inside an export could be changed by
-// whoever imports it.
-const starterRoutines = createStarterRoutines(new Date(), () => crypto.randomUUID());
-
-/**
- * The app's one timer session, which every visit to the Timer screen shares.
- *
- * @remarks
- * A module-level value is shared by everyone who loads the module. On a server, that would mean
- * every visitor, but this app renders only in the browser, so each one is a single person's.
- */
-export const timerSession = new TimerSession(starterRoutines, () => Date.now());
