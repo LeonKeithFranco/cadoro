@@ -261,9 +261,23 @@ All stats come from saved work periods and runs.
 ### Export and import
 
 - **CSV export:** downloads every work period as one row, with its routine, block, start and end times, time worked and target. Times are UTC timestamps, and time worked is in seconds at full precision.
-- **JSON backup:** downloads everything: routines (including deleted ones), runs, work periods and settings.
-- **JSON import:** restores a backup. It shows how many routines, runs and work periods the file holds, then replaces all current data once confirmed.
-- A file that isn't a valid backup is rejected whole, and nothing changes.
+  - The columns are `routine`, `block`, `started_at`, `ended_at`, `worked_seconds` and `target_minutes`, oldest work period first. The file has no byte order mark, its lines end with CRLF, and a field with a comma, quote or line break is quoted, with quotes doubled, as RFC 4180 says.
+  - Routine and block titles are those the routine has now, or empty when the routine or the block no longer exists. A work period's start is its first segment's start and its end is its last segment's end, so pauses sit between them.
+  - Times are written as UTC ISO strings, such as `2026-11-19T09:00:00.000Z`, and `worked_seconds` is the milliseconds worked divided by 1,000, such as `1500.25`.
+- **JSON backup:** downloads everything: routines (including deleted ones), runs, work periods and settings. The run in progress and the activity log aren't in it.
+  - The file is one object, `{ app, formatVersion, exportedAt, routines, runs, workPeriods, settings }`. `app` is always `"cadoro"`, `formatVersion` is 1, and `exportedAt` is a UTC timestamp. A change to the format raises `formatVersion`, and an app rejects a version it doesn't know.
+- **JSON import:** restores a backup. It shows how many routines, runs and work periods the file holds, the days of its first and last runs and the day it was made, in the user's time zone, then replaces all current data once confirmed.
+  - Import replaces the run in progress, which it forgets, since it could name a routine the backup lacks. Every other tab follows the new data. The activity log is kept, and the import is added to it.
+  - Import is all or nothing: if it fails part way, the old data stays exactly as it was.
+- A file that isn't a valid backup is rejected whole with the reason, and nothing changes. It's rejected when:
+  - it isn't JSON, or isn't a Cadoro backup (`app` isn't `"cadoro"`), or has a `formatVersion` the app doesn't know;
+  - a field is missing or of the wrong type, or breaks a limit of the data model, so every routine must pass the same checks the Routines screen makes;
+  - a timestamp isn't an exact UTC ISO string;
+  - a work period's `workedMs` isn't the sum of its segments, a segment or run ends before it starts, or its routine isn't its run's routine;
+  - the `lastRoutineId` setting names no routine; or
+  - two routines, two runs or two work periods share an id.
+  - A work period's `blockId` may name a block its routine no longer has, since editing a routine can remove blocks.
+- The files are named after what they hold and the day they were made in the user's time zone, such as `cadoro-backup-2026-11-19.json`, `cadoro-work-periods-2026-11-19.csv` and `cadoro-activity-log-2026-11-19.json`.
 
 ### Settings
 
@@ -290,9 +304,11 @@ type LogEntry = {
 ```
 
 - **Changes:** every routine created, edited, duplicated, reordered and deleted, and every import, is recorded at the storage interface, so no feature can skip it. Edits include the old and new values, and a reorder that changes nothing isn't logged. Runs and work periods aren't logged, because the stats already hold them.
-- **Errors:** uncaught errors are recorded by a global handler and an error boundary.
+- **Errors:** uncaught errors are recorded by a global handler and an error boundary, and so are the errors SvelteKit catches while loading or navigating (but not a 404). So is every failed save, read or request the app handles itself, such as a failed save of the run, the settings or a routine, or a failed request for persistent storage. An entry's `message` says what failed, and its `details` hold the error's `name`, `message`, `stack` and, when it has one, `cause`, or, for something thrown that isn't an `Error`, its text as `value`. Recording an error never throws. If the log can't take the entry, it goes to the console instead.
+- When a screen throws while rendering, a message with a Try again button replaces it, and the error is recorded.
 - Entries are stored in IndexedDB, and only the newest 5,000 are kept.
-- A page within Settings lists entries, newest first, and can export them as a JSON file.
+- A page within Settings, reached from its Data card, lists entries, newest first, and can export them as a JSON file. It reads the log once when it opens and doesn't update while it's open, so an entry written meanwhile shows when the page is opened again.
+- An import's entry is a change with the backup's format version, when it was made, and how many routines, runs and work periods it held.
 - Log entries never leave the device, except through that export.
 - A failure to write a log entry never blocks the data change.
 
