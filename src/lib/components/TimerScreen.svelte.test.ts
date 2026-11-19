@@ -14,21 +14,31 @@ import TimerScreen from './TimerScreen.svelte';
 let nowMs = 0;
 
 /**
+ * Makes the revisions of every session in a test, so two sessions on one storage, as two tabs,
+ * never make the same one.
+ */
+let newRevision = numberedIds('revision');
+
+/**
  * Starts a session on the fake clock, so a test can drive the run the screen shows without real
  * time passing. Its `onWorkSaved` is a spy nothing checks.
  *
  * @param routines - The routines to pick from. The starter routines unless a test needs others.
- * @param storage - Where the session saves. New, empty storage unless a test reads what's saved.
+ * @param storage - Where the session saves. New, empty storage unless a test reads what's saved,
+ * or shares it with another session, as another tab.
+ * @param newId - Makes the ids of its runs and work periods. Two tabs each have their own.
  * @returns A new session, with the first routine chosen and its run ready.
  */
 function createSession(
 	routines: readonly Routine[] = createStarterRoutines(new Date(0), numberedIds()),
-	storage: InMemoryStorage = new InMemoryStorage()
+	storage: InMemoryStorage = new InMemoryStorage(),
+	newId: () => string = numberedIds()
 ): TimerSession {
 	return new TimerSession(routines, {
 		clock: () => nowMs,
 		storage,
-		newId: numberedIds(),
+		newId,
+		newRevision,
 		onWorkSaved: vi.fn()
 	});
 }
@@ -76,9 +86,11 @@ async function finishRun(): Promise<void> {
 		.click();
 }
 
-// Starts each test at the fake clock's 0, with the screen's interval faked so a test fires it.
+// Starts each test at the fake clock's 0, with revisions numbered afresh and the screen's interval
+// faked so a test fires it.
 beforeEach(() => {
 	nowMs = 0;
+	newRevision = numberedIds('revision');
 	vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
 });
 
@@ -458,6 +470,7 @@ describe('saving the run as the page goes away', () => {
 	it('saves nothing as the page becomes visible again', async () => {
 		const storage = new InMemoryStorage();
 		const saveSpy = vi.spyOn(storage, 'saveRunInProgress');
+		const heartbeatSpy = vi.spyOn(storage, 'saveHeartbeat');
 		render(TimerScreen, { session: createSession(undefined, storage) });
 		await page.getByRole('button', { name: 'Play' }).click();
 		nowMs = seconds(30);
@@ -471,6 +484,25 @@ describe('saving the run as the page goes away', () => {
 		await expect
 			.poll(() => storage.getRunInProgress())
 			.toMatchObject({ heartbeatAt: '1970-01-01T00:00:40.000Z' });
-		expect(saveSpy).toHaveBeenCalledTimes(2);
+		expect(saveSpy).toHaveBeenCalledOnce();
+		expect(heartbeatSpy).toHaveBeenCalledOnce();
+	});
+});
+
+describe('following the run from another tab', () => {
+	it('shows a press made in another tab, and counts on from it', async () => {
+		const storage = new InMemoryStorage();
+		const session = createSession(undefined, storage);
+		const otherTab = createSession(undefined, storage, numberedIds('other'));
+		render(TimerScreen, { session });
+
+		otherTab.play();
+
+		await expect.element(page.getByRole('button', { name: 'Pause' })).toBeVisible();
+		await expect.element(page.getByRole('combobox', { name: 'Routine' })).toBeDisabled();
+		elapse(minutes(1));
+		await expect
+			.element(page.getByRole('group', { name: 'Work' }))
+			.toHaveTextContent('1:00 / 25:00');
 	});
 });

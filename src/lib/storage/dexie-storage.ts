@@ -1,9 +1,14 @@
 // The app's storage: the browser's IndexedDB, through Dexie, which wraps IndexedDB's events in
 // promises and gives each table a typed API.
 
-import Dexie, { type EntityTable, type Table } from 'dexie';
+import Dexie, { liveQuery, type EntityTable, type Table, type Transaction } from 'dexie';
 import { pickableRoutines, type Routine } from '../routine';
-import type { StoredRunInProgress } from '../run-in-progress';
+import {
+	isRevision,
+	VERSION_1_REVISION,
+	withHeartbeat,
+	type StoredRunInProgress
+} from '../run-in-progress';
 import {
 	noRecords,
 	runsOldestFirst,
@@ -49,6 +54,30 @@ const SCHEMA_VERSION_1 = {
  */
 const RUN_IN_PROGRESS_KEY = 'current';
 
+/** The run in progress as schema version 1 saved it, before it had a revision. */
+type Version1RunInProgress = Omit<StoredRunInProgress, 'revision'> & {
+	/** Missing from every row version 1 saved, and set by version 2's upgrade. */
+	revision?: string;
+};
+
+/**
+ * Upgrades a database saved by schema version 1 to version 2, which gives the run in progress
+ * its revision. Dexie runs it once, when a version-2 app first opens a version-1 database, and
+ * no tab can read or save until it has finished.
+ *
+ * @param transaction - The upgrade's own transaction, over every table.
+ * @throws Rejects with IndexedDB's error when the row can't be read or saved, and then the
+ * database stays at version 1 and the app can't open it.
+ */
+async function upgradeToVersion2(transaction: Transaction): Promise<void> {
+	await transaction
+		.table<Version1RunInProgress, string>('runInProgress')
+		.toCollection()
+		.modify((row) => {
+			row.revision = VERSION_1_REVISION;
+		});
+}
+
 /**
  * The database, with a type for each table.
  *
@@ -80,6 +109,9 @@ type CadoroDatabase = Dexie & {
 function connect(name: string): CadoroDatabase {
 	const database = new Dexie(name) as CadoroDatabase;
 	database.version(1).stores(SCHEMA_VERSION_1);
+	// Version 2 keeps every table and key as version 1 has them, which the empty `stores` says:
+	// without it, Dexie would take version 2 to have no tables and delete them all.
+	database.version(2).stores({}).upgrade(upgradeToVersion2);
 	return database;
 }
 
@@ -127,15 +159,23 @@ export class DexieStorage implements CadoroStorage {
 
 	async saveRunInProgress(
 		runInProgress: StoredRunInProgress,
+		basedOn: string | null,
 		records: RunRecords = noRecords()
-	): Promise<void> {
+	): Promise<boolean> {
 		const { runInProgress: runInProgressTable, runs, workPeriods } = this.#database;
 
-		// One read-write transaction across the three tables, so the run in progress, the run and
-		// its work periods are saved together or not at all. A failed `bulkAdd` that isn't caught
-		// aborts the transaction, as Dexie's docs say, which undoes both `put`s too. Outside a
-		// transaction, the others would stay saved.
-		await this.#database.transaction('rw', [runInProgressTable, runs, workPeriods], async () => {
+		// One read-write transaction across the three tables, so the revision is checked and the
+		// run in progress, the run and its work periods are saved together or not at all.
+		// IndexedDB runs read-write transactions on the same tables one after another, even across
+		// tabs, so no other tab's save can come between the check and the writes. A failed
+		// `bulkAdd` that isn't caught aborts the transaction, as Dexie's docs say, which undoes
+		// both `put`s too. Outside a transaction, the others would stay saved.
+		return this.#database.transaction('rw', [runInProgressTable, runs, workPeriods], async () => {
+			const saved = await runInProgressTable.get(RUN_IN_PROGRESS_KEY);
+			if (!isRevision(saved ?? null, basedOn)) {
+				return false;
+			}
+
 			// The key is given, since it isn't a field of the row.
 			await runInProgressTable.put(runInProgress, RUN_IN_PROGRESS_KEY);
 			if (records.run !== null) {
@@ -144,6 +184,24 @@ export class DexieStorage implements CadoroStorage {
 			}
 			// `bulkAdd` refuses an id that's already saved, so a work period is never overwritten.
 			await workPeriods.bulkAdd(records.workPeriods);
+			return true;
+		});
+	}
+
+	async saveHeartbeat(revision: string, heartbeatAt: string): Promise<boolean> {
+		const table = this.#database.runInProgress;
+
+		// One read-write transaction, so no other tab's save can come between reading the row and
+		// saving its new heartbeat.
+		return this.#database.transaction('rw', table, async () => {
+			const saved = await table.get(RUN_IN_PROGRESS_KEY);
+			const changed = withHeartbeat(saved ?? null, revision, heartbeatAt);
+			if (changed === null) {
+				return false;
+			}
+
+			await table.put(changed, RUN_IN_PROGRESS_KEY);
+			return true;
 		});
 	}
 
@@ -152,8 +210,37 @@ export class DexieStorage implements CadoroStorage {
 		return runInProgress ?? null;
 	}
 
-	async clearRunInProgress(): Promise<void> {
-		await this.#database.runInProgress.delete(RUN_IN_PROGRESS_KEY);
+	watchRunInProgress(
+		onChange: (runInProgress: StoredRunInProgress | null) => void,
+		onError: (error: unknown) => void
+	): () => void {
+		const table = this.#database.runInProgress;
+		// Dexie runs the query again whenever a save changes the row, from this connection or,
+		// through a `BroadcastChannel`, another tab's.
+		const subscription = liveQuery(() => table.get(RUN_IN_PROGRESS_KEY)).subscribe({
+			next: (runInProgress) => {
+				onChange(runInProgress ?? null);
+			},
+			error: onError
+		});
+		return (): void => {
+			subscription.unsubscribe();
+		};
+	}
+
+	async clearRunInProgress(basedOn: string): Promise<boolean> {
+		const table = this.#database.runInProgress;
+
+		// One read-write transaction, so the row checked is the row deleted.
+		return this.#database.transaction('rw', table, async () => {
+			const saved = await table.get(RUN_IN_PROGRESS_KEY);
+			if (!isRevision(saved ?? null, basedOn)) {
+				return false;
+			}
+
+			await table.delete(RUN_IN_PROGRESS_KEY);
+			return true;
+		});
 	}
 
 	async getRuns(): Promise<Run[]> {

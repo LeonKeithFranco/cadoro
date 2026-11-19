@@ -83,7 +83,7 @@ describe('askToPersistOnce', () => {
 describe('askToPersistIfWorkSaved', () => {
 	it('asks when a work period is saved, as on a launch after the first work', async () => {
 		const storage = new InMemoryStorage();
-		await storage.saveRunInProgress(savedRunInProgress, {
+		await storage.saveRunInProgress(savedRunInProgress, null, {
 			run: runInProgress,
 			workPeriods: [firstWorkPeriod]
 		});
@@ -99,7 +99,10 @@ describe('askToPersistIfWorkSaved', () => {
 		const askToPersist = vi.fn(async () => {});
 
 		await askToPersistIfWorkSaved(storage, askToPersist);
-		await storage.saveRunInProgress(savedRunInProgress, { run: runInProgress, workPeriods: [] });
+		await storage.saveRunInProgress(savedRunInProgress, null, {
+			run: runInProgress,
+			workPeriods: []
+		});
 		await askToPersistIfWorkSaved(storage, askToPersist);
 
 		expect(askToPersist).not.toHaveBeenCalled();

@@ -1,3 +1,4 @@
+import { joinOpenTabs } from '#lib/open-tabs.ts';
 import { loadRoutines } from '#lib/routine-loading.ts';
 import { DexieStorage } from '#lib/storage/dexie-storage.ts';
 import { askToPersistIfWorkSaved, askToPersistOnce } from '#lib/storage/persistence.ts';
@@ -24,7 +25,9 @@ let timerSessionOpening: Promise<TimerSession> | undefined;
 /**
  * Opens storage, creates the starter routines on the first launch, and starts the timer session
  * with the routines saved and the run in progress, if one is saved, saving its runs in the same
- * storage. It also asks for persistent storage, once, as soon as work is saved.
+ * storage. It marks this tab as open, and tells the session whether another tab was, so a run
+ * live in another tab isn't paused. It also asks for persistent storage, once, as soon as work is
+ * saved.
  *
  * @remarks
  * `crypto.randomUUID` is wrapped rather than passed as it is, because called on its own, away from
@@ -32,6 +35,9 @@ let timerSessionOpening: Promise<TimerSession> | undefined;
  *
  * The check for saved work isn't waited for, so a slow answer from the browser, or Firefox's
  * prompt, never holds up the first render.
+ *
+ * TypeScript's DOM types say `navigator.locks` is always there, but it's missing outside HTTPS
+ * and `localhost`, as `navigator.storage` is.
  *
  * @returns The new timer session.
  * @throws Rejects with storage's own error when the routines or the run in progress can't be
@@ -41,16 +47,24 @@ async function openTimerSession(): Promise<TimerSession> {
 	const storage = new DexieStorage();
 	const newId = (): string => crypto.randomUUID();
 	const askToPersist = askToPersistOnce(navigator.storage);
+	const locks: LockManager | undefined = navigator.locks;
 
 	void askToPersistIfWorkSaved(storage, askToPersist);
-	const [routines, saved] = await Promise.all([
+	const [routines, saved, isAnotherTabOpen] = await Promise.all([
 		loadRoutines(storage, new Date(), newId),
-		storage.getRunInProgress()
+		storage.getRunInProgress(),
+		joinOpenTabs(locks)
 	]);
 	return new TimerSession(
 		routines,
-		{ clock: () => Date.now(), storage, newId, onWorkSaved: () => void askToPersist() },
-		saved
+		{
+			clock: () => Date.now(),
+			storage,
+			newId,
+			newRevision: newId,
+			onWorkSaved: () => void askToPersist()
+		},
+		{ saved, isAnotherTabOpen }
 	);
 }
 
