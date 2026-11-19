@@ -3,7 +3,7 @@ import { RunChimes } from './run-chimes.svelte';
 import { DEFAULT_SETTINGS, type Settings } from './settings';
 import { SettingsSession } from './settings.svelte';
 import { InMemoryStorage } from './storage/in-memory-storage';
-import { FakeAudioContext, fakeFiles } from './testing/audio';
+import { FakeAudioContext, fakeFiles, type FakeSound } from './testing/audio';
 import { minutes, seconds } from './testing/durations';
 import { numberedIds } from './testing/ids';
 import { routineWith } from './testing/routines';
@@ -284,6 +284,39 @@ describe('the chimes and volume from Settings', () => {
 
 		await expect.poll(() => gain?.gain.value).toBe(0.4);
 		expect(tab.audio.sources).toHaveLength(1);
+	});
+});
+
+describe('previewing a chime', () => {
+	it('plays the chime at once without a run, and without taking the turn to sound', async () => {
+		const tab = openTab(new InMemoryStorage());
+
+		await tab.chimes.preview('bell-ding-2');
+
+		expect(tab.audio.sources).toHaveLength(1);
+		expect((tab.audio.sources[0]?.buffer as FakeSound).decodedFrom).toBe('bell-ding-2');
+		expect(tab.audio.sources[0]?.startedAt).toBe(0);
+		expect(tab.chimes.isSounding).toBe(false);
+		expect(tab.chimes.scheduled).toEqual([]);
+	});
+
+	it('plays the default chime for an id the app doesn’t have', async () => {
+		const tab = openTab(new InMemoryStorage());
+
+		await tab.chimes.preview('a-removed-chime');
+
+		expect((tab.audio.sources[0]?.buffer as FakeSound).decodedFrom).toBe('bell-ding-1');
+	});
+
+	it('leaves the run’s scheduled chime in place', async () => {
+		const tab = openTab(new InMemoryStorage());
+		tab.timer.play();
+		await expect.poll(() => tab.chimes.scheduled).toHaveLength(1);
+
+		await tab.chimes.preview('bell-ding-3');
+
+		expect(tab.chimes.scheduled).toHaveLength(1);
+		expect(tab.audio.sources[0]?.isStopped).toBe(false);
 	});
 });
 

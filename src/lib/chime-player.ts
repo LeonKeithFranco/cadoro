@@ -244,6 +244,36 @@ export class ChimePlayer {
 	}
 
 	/**
+	 * Plays a chime file at once, through the volume, as a preview.
+	 *
+	 * @remarks
+	 * Call it from a user gesture, such as pressing a Preview button, since browsers allow audio to
+	 * start only then. It unlocks the player itself, so a preview needs no earlier press, and it
+	 * leaves the scheduled chimes alone, so previewing during a run changes nothing about the run's
+	 * chime. A file that can't be loaded is logged, and nothing plays.
+	 *
+	 * @param file - The chime file's address, such as one of {@link ChimeFiles}'s.
+	 * @returns A promise that settles once the chime has started, or once it's clear it can't.
+	 * It never rejects.
+	 */
+	async preview(file: string): Promise<void> {
+		this.unlock();
+		const output = this.#output;
+		if (output === null) {
+			return;
+		}
+		const sound = await this.#soundFor(output.context, file);
+		if (sound === null) {
+			return;
+		}
+		const source = output.context.createBufferSource();
+		source.buffer = sound;
+		source.connect(output.volume);
+		// A moment that has passed starts the chime at once.
+		source.start(0);
+	}
+
+	/**
 	 * Changes the volume, for the chimes already scheduled and every later one.
 	 *
 	 * @param volume - The volume, as a gain from 0 for silence to 1 for the chimes as recorded.
