@@ -144,11 +144,11 @@ They can be edited and deleted like any other routine, and aren't created again 
 - **Pause** stops the work or break timer. Paused time doesn't count as work, and a paused break keeps its remaining time.
 - **Finish** asks for confirmation, then ends the run. The run keeps counting while it asks, so the current work period, if any, is saved up to the moment Finish is confirmed. Cancel or Escape leaves the run as it was. This is how an infinite routine ends, and how a finite one ends early.
 - Before a run starts, Next and Finish are disabled.
-- A routine can't be edited or deleted while it's running, and the routine picker is locked until the run ends.
+- A routine can't be edited or deleted while it's running, and the routine picker is locked until the run ends. The run is shared between tabs, so this holds in every tab. On the Routines screen its Edit and Delete are disabled, with a hint. A routine already open for editing when its run starts can't be saved until the run ends, and a delete confirmed after that is ignored.
 
 ### The timer screen
 
-- The routine picker at the top selects which routine to run. The app opens on the routine the last run started with, saved when that run started, or on the first routine in the picker when there is none or it's been deleted.
+- The routine picker at the top selects which routine to run, in the order chosen for the Routines screen. The app opens on the routine the last run started with, saved when that run started, or on the first routine in the picker when there is none or it's been deleted.
 - The blocks stack in one column, in the order the run goes through them, on every screen size.
 - Each block shows its title, its target and break percentage, and two boxes: the work timer above the break timer, as in the original sketch.
 - The active timer is highlighted, and the screen shows exactly where the run is in both rounds and cycles, such as "Round 2 of 4 · Block 2 of 3 · Cycle 1 of 3". For an infinite routine it shows "Round 5" with no total. A part whose total is 1 never changes, so it's left out: Classic shows just "Round 5", and a block of 1 cycle shows no cycle.
@@ -158,7 +158,8 @@ They can be edited and deleted like any other routine, and aren't created again 
 - Past the target, the work box's outline, time and bar turn amber, its bar stays full, and its label reads "Work · Overtime", so overtime isn't shown by colour alone.
 - During a break, the break box counts down, and its bar shows the break left out of the break earned. The block's work box keeps the time that earned the break, with its bar as it was. At 0:00 the break box reads "Break over".
 - Times show as `m:ss` under an hour and `h:mm:ss` from an hour.
-- Play/Pause, Next and Finish sit below the blocks.
+- Play/Pause, Next and Finish sit below the blocks. When the blocks are taller than the screen, they stay pinned at the bottom of it, above the phone's tab bar.
+- When the run moves to a block that's out of view, the page scrolls it into view. Nothing scrolls when every block fits.
 
 ### Run summary
 
@@ -205,19 +206,23 @@ Done or Escape closes the dialog and returns the routine to its starting state, 
 
 - The Routines screen lists every routine that hasn't been deleted.
 - **Sorting:** the list can be sorted by custom order, title (A–Z or Z–A), last used, most work time, newest or oldest. The chosen sort is remembered, and the timer screen's picker uses the same order.
+  - Titles compare ignoring case and accents. Last used is the start of a routine's latest run, with routines never run last. Most work time sums the work of every work period of the routine, most first. Newest and oldest go by creation date.
+  - Routines that tie in a sort stay in custom order.
 - **Custom order:** routines can be reordered with a drag handle, or with Move up and Move down buttons for keyboard and screen reader users. These controls only show while the sort is set to custom order.
-- **New routine:** a "+ New routine" button adds a new routine at the top of the list, already open for editing, with a blank title that must be filled in, infinite rounds, and one block of 25 minutes at 20% for 1 cycle. Cancel removes it.
-- **Duplicate:** makes a copy named "<title> (copy)" with the same blocks. Its stats start empty.
+- **New routine:** a "+ New routine" button adds a new routine at the top of the list, already open for editing, with a blank title that must be filled in, infinite rounds, and one block titled "Focus" of 25 minutes at 20% for 1 cycle. Cancel removes it.
+- **Duplicate:** makes a copy named "<title> (copy)" with the same rounds and blocks, placed just below the original in custom order. A title too long to fit 50 characters with the suffix is cut, so the copy's title is still valid. Its stats start empty.
 - **Delete:** asks for confirmation. A deleted routine's work stays in the stats, labelled as deleted. Delete is disabled on the only remaining routine, with a hint saying why, so there is always one to run.
 
 ### Editing a routine
 
 - Editing happens in place: Edit expands the routine within the Routines list into a form.
 - Only one routine is open for editing at a time. Opening another, or leaving the screen, with unsaved changes asks "Discard changes?" first.
-- Changes apply only on Save. Cancel undoes all of them.
+- Changes apply only on Save. Cancel undoes all of them. Save on a routine with no changes closes the form and saves and logs nothing.
+- Titles are trimmed of spaces at both ends before they're checked, so a title of only spaces is blank, and they're saved trimmed.
+- Editing never changes a routine's place in the custom order.
 - The form edits the routine's title and rounds, and each block's title, target, break percentage and cycles.
-- Each block has a drag handle, Move up and Move down buttons, Duplicate, which inserts a copy below it, and Delete, which asks for confirmation. Delete is disabled when only one block is left.
-- An "Add block" button below the blocks adds a new block at the end.
+- Each block has a drag handle, Move up and Move down buttons, Duplicate, which inserts a copy below it with every field kept, and Delete, which asks for confirmation. Delete is disabled when only one block is left.
+- An "Add block" button below the blocks adds a new block at the end, titled "Focus", with a 25-minute target, a 20% break and 1 cycle. It's disabled at 20 blocks.
 - While a routine has one block, its cycles field shows 1 and is disabled, with a hint that rounds repeat a single block. Deleting blocks down to one resets the remaining block's cycles to 1, and rounds stay as they were.
 - Every field is validated against the limits in the data model before Save is allowed.
 - Renaming a routine keeps its history attached.
@@ -273,7 +278,7 @@ type LogEntry = {
 };
 ```
 
-- **Changes:** every routine created, edited, duplicated, reordered and deleted, and every import, is recorded at the storage interface, so no feature can skip it. Edits include the old and new values. Runs and work periods aren't logged, because the stats already hold them.
+- **Changes:** every routine created, edited, duplicated, reordered and deleted, and every import, is recorded at the storage interface, so no feature can skip it. Edits include the old and new values, and a reorder that changes nothing isn't logged. Runs and work periods aren't logged, because the stats already hold them.
 - **Errors:** uncaught errors are recorded by a global handler and an error boundary.
 - Entries are stored in IndexedDB, and only the newest 5,000 are kept.
 - A page within Settings lists entries, newest first, and can export them as a JSON file.
