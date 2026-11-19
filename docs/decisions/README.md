@@ -10,6 +10,8 @@ The decision log: what was decided as Cadoro was built, why, and the options rej
 - `03-pwa-and-github-pages.md`: milestone 3's steps, long routines, the base path, the service worker, the icon, the offline test, the reload prompt, testing updates, the Taskfile, the Pages deploy, releases, and 0.1.0 and 0.2.0 on real devices.
 - `04-keep-runs.md`: milestone 4's steps, tabs sharing one run, storage, loading before the app renders, the docs' layout, the workflow against agentic engineering guides, the storage interface's first methods, the Dexie backend, testing storage, loading the routines, the records each press saves, saving runs and work periods together, the session saving each press, asking for persistent storage, the stored run in progress, restoring paused at the heartbeat, saving the run in progress, hidden pages and background tabs, the reload journey, the autonomous replan with its guardrails, and step 4's stale presses, open-tab lock, work recorded once and known limit.
 
+- `05-alerts-and-settings.md`: milestone 5, the chime files, settings in storage, the theme without a flash, the chimes' schedule and the one tab that sounds them, the wake lock, the Settings screen, and testing the chimes.
+
 ## Adding a decision
 
 - Add it to the current milestone's file as a `###` topic with bullets, under its step's heading, such as `## Step 2: the app shell (feat/app-shell), 2026-11-10`. Work before a milestone's first step goes under `## Planning`, and work between steps under `## Between steps 3 and 4`, with its branch.
