@@ -79,7 +79,7 @@ type Run = {
 	startedAt: string; // UTC timestamp.
 	endedAt: string | null; // null while the run is in progress.
 	outcome: 'completed' | 'finished' | null; // completed: the last work period ended. finished: Finish was pressed.
-	roundsReached: number;
+	roundsReached: number; // Counting the round it ended in. 0 while the run is in progress.
 };
 
 type WorkPeriod = {
