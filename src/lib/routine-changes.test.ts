@@ -102,6 +102,19 @@ describe('planDuplicate', () => {
 		expect(written(change).toSorted()).toEqual(['b:2', 'c:3', 'copy:1']);
 	});
 
+	it('places the copy just below the original when deletes left gaps in the positions', () => {
+		const routines = [
+			routineWith({ id: 'a', customPosition: 0, deletedAt: '2026-11-01T00:00:00.000Z' }),
+			routineWith({ id: 'b', customPosition: 1 }),
+			routineWith({ id: 'c', customPosition: 2 })
+		];
+		const copy = routineWith({ id: 'copy', title: 'B (copy)' });
+
+		const change = planDuplicate(routines, copy, 'b', now);
+
+		expect(written(change).toSorted()).toEqual(['b:0', 'copy:1']);
+	});
+
 	it('logs a duplicate with the original’s id', () => {
 		const copy = routineWith({ id: 'copy', title: 'A (copy)' });
 

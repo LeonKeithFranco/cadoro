@@ -98,11 +98,12 @@ export function planDuplicate(
 	now: Date
 ): RoutineChange {
 	const original = findLiveRoutine(routines, originalId);
-	const created = planCreate(
-		routines,
-		{ ...copy, customPosition: original.customPosition + 1 },
-		now
+	// A delete leaves a gap in the positions, so the original's place in the list is its index
+	// among the routines not deleted, not its `customPosition`.
+	const originalIndex = pickableRoutines(routines).findIndex(
+		(routine) => routine.id === originalId
 	);
+	const created = planCreate(routines, { ...copy, customPosition: originalIndex + 1 }, now);
 	const placedCopy = created.writes.find((candidate) => candidate.id === copy.id) ?? copy;
 	return {
 		writes: created.writes,

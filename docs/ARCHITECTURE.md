@@ -33,7 +33,7 @@ Beside the timer, `RunChimes` and `WakeLockKeeper` watch the session's run and t
 - `routine-validation.ts`: `validateRoutine`, which checks a routine and its blocks against those limits, trimming titles first, and says what's wrong with each field (`RoutineProblems`, `BlockProblems`), and `isValid`. A routine's only block must have 1 cycle.
 - `routine-sort.ts`: `sortRoutines`, the seven `RoutineSort` orders, with `RoutineUsage` (the runs and work periods that last used and most work are worked out from). Routines that tie fall back to custom order.
 - `list-order.ts`: `moveToIndex`, `moveUp` and `moveDown` for any list of items with an `id`.
-- `routine-order.ts`: the same moves for routines, with `renumberRoutines` and `insertRoutine`, which keep `customPosition` as 0 to n-1.
+- `routine-order.ts`: the same moves for routines, with `renumberRoutines` and `insertRoutine`, which renumber the routines they're given as 0 to n-1. A delete leaves a gap until the next create, duplicate or reorder, so code that places a routine uses its index among the routines not deleted, never its `customPosition`.
 - `routine-blocks.ts`: `addBlock`, `duplicateBlock`, `deleteBlock`, `moveBlockUp`, `moveBlockDown`, `moveBlockToIndex`, `canAddBlock`, `canDeleteBlock` and `resetSingleBlockCycles`.
 - `routine-duplication.ts`: `duplicateRoutine` and `copyTitle`, which makes the copy's title and cuts the original's to fit 50 characters with the suffix.
 - `routine-changes.ts`: `planCreate`, `planDuplicate`, `planSave`, `planDelete` and `planReorder`, which work out from the saved routines a `RoutineChange`: the routines to write and the log entry that describes the change. Both backends apply them, so the rules live once.

@@ -11,7 +11,7 @@ The Routines screen, editing routines and blocks in place, the activity log of r
 - Sort ties fall back to custom order, so every sort is a total order and the list never jumps between renders. Last used is the latest run's `startedAt`, with never-used routines last. Most work sums `workedMs`.
 - A copy's title is cut to fit 50 characters with the suffix, so a duplicate is always valid.
 - A block's copy keeps every field and goes just below the original. A new block is titled "Focus", the same 25 minutes at 20% for 1 cycle as a new routine's block.
-- `insertRoutine` renumbers every position to 0 to n-1, with a new routine at 0 and a copy at the original's position plus 1, so gaps never build up.
+- `insertRoutine` renumbers every position to 0 to n-1, with a new routine at 0 and a copy at the original's position plus 1, so gaps never build up. (This entry first said so, and it was wrong: a delete only sets `deletedAt` and leaves a gap in the positions until the next create, duplicate or reorder renumbers them. The copy's place is the original's index among the routines not deleted, which `planDuplicate` finds, not its `customPosition` plus 1.)
 - The moves of a list are one generic `list-order.ts`, and routines and blocks call it, so dragging and the Move buttons share one rule.
 
 ### Storage and the log
