@@ -1,4 +1,5 @@
-// Formatting durations for the timer: `m:ss` under an hour and `h:mm:ss` from an hour.
+// Time units and formats: converting minutes, stamping moments for storage, and formatting
+// durations for the timer as `m:ss` under an hour and `h:mm:ss` from an hour.
 
 /** The milliseconds in one second. */
 export const MS_PER_SECOND = 1000;
@@ -17,6 +18,21 @@ const SECONDS_PER_HOUR = 60 * SECONDS_PER_MINUTE;
  */
 export function minutesToMs(minutes: number): number {
 	return minutes * SECONDS_PER_MINUTE * MS_PER_SECOND;
+}
+
+/**
+ * Converts a moment from the run engine's milliseconds to the UTC timestamp storage keeps.
+ *
+ * @remarks
+ * The engine works in milliseconds, which are easy to add and compare, while storage keeps exact
+ * moments as UTC timestamps, which stay readable in a backup and in DevTools.
+ *
+ * @param ms - The moment, in milliseconds since 1970 (UTC), as `Date.now()` gives.
+ * @returns The moment as an ISO 8601 timestamp in UTC, to the millisecond, such as
+ * `2026-11-19T09:30:00.000Z`.
+ */
+export function toUtcTimestamp(ms: number): string {
+	return new Date(ms).toISOString();
 }
 
 /**
