@@ -10,11 +10,11 @@ The code is in layers, each knowing only the one below it:
 
 1. **The run engine** in `src/lib` is plain TypeScript: a run is an immutable value, and every button is a pure function from one run and the current moment to the next run. It never reads the clock or touches the page.
 2. **Storage**, in `src/lib/storage`, is the `CadoroStorage` interface, kept in the browser's IndexedDB through Dexie. It holds the routines, every run and work period, and the run in progress.
-3. **`TimerSession`** keeps the current run in Svelte state, reads the clock, and applies the engine's functions when a button is pressed or the screen ticks. After each press it works out what to save with the pure `recordPress`, and hands it to storage with the run in progress, which each tick saves again as a heartbeat. When the app opens, it restores the saved run, paused at its last heartbeat.
+3. **`TimerSession`** keeps the current run in Svelte state, reads the clock, and applies the engine's functions when a button is pressed or the screen ticks. After each press it works out what to save with the pure `recordPress`, and hands it to storage with the run in progress, which each tick saves again as a heartbeat. It follows the saved run, so a change another tab saves replaces its run without being saved again. When the app opens with no other tab open, it restores the saved run, paused at its last heartbeat, and with another tab open it joins the run live.
 4. **Components** show views that pure functions work out from the run, such as `viewRun` for the screen and `viewBlock` for each block card, and call the session's methods.
 5. **Routes** frame the screens with the header, the navigation and the update prompt. The root layout's `load` reads the routines and the run in progress from storage, creating the starter routines on the first launch, and starts the app's one `TimerSession` before anything renders.
 
-Each tab keeps its own session for now, so two tabs each run their own copy of the saved run. Step 4 of milestone 4 has every tab follow the saved run.
+Every tab has its own session, and all of them follow the one saved run. Storage tells each tab when another tab changes the run, and a press that a tab makes from an out-of-date run is refused, so the tab takes the saved run instead.
 
 ## Codemap
 
@@ -22,7 +22,8 @@ Each tab keeps its own session for now, so two tabs each run their own copy of t
 
 - `run.ts`: the run engine. The `RunState` union (ready, working, break, ended), the buttons (`play`, `pause`, `next`, `finish`), moving through rounds, blocks and cycles (`nextPosition`), the position label, work time from segments (`workedMs`), the earned break (`earnedBreakMs`), the view the timer screen shows (`viewRun`) and the run summary (`summarizeRun`).
 - `run-records.ts`: the `Run` and `WorkPeriod` records from the spec's data model, `recordPress`, which compares a run before and after a press to work out what to save, `noRecords` for a change that keeps nothing new, the segment conversions `storedSegment` and `segmentFromStored`, and the oldest-first orders `runsOldestFirst` and `workPeriodsOldestFirst`.
-- `run-in-progress.ts`: `StoredRunInProgress`, the run in progress as storage keeps it (its record, the run without its routine, and `heartbeatAt`), with every moment as a UTC string; `toStoredRunInProgress`; and `restoreRunInProgress`, which finds the run's routine and pauses the run at its heartbeat with the engine's `pause`.
+- `run-in-progress.ts`: `StoredRunInProgress`, the run in progress as storage keeps it (its record, the run without its routine, and `heartbeatAt`), with every moment as a UTC string and a `revision` that every change renews; `toStoredRunInProgress`; `followRunInProgress`, which takes a run another tab saved on as it is; `restoreRunInProgress`, which finds the run's routine and pauses the run at its heartbeat with the engine's `pause`; and `isRevision` and `withHeartbeat`, the checks and the heartbeat-only change that storage applies.
+- `open-tabs.ts`: `joinOpenTabs`, which asks the browser's Web Locks API whether another tab holds the lock `cadoro-open-tab`, then takes it for this tab until it closes.
 - `defined.ts`: `requireDefined`, which returns a value that must exist and throws when it's `undefined`, for indexes `noUncheckedIndexedAccess` can't prove. `run.ts` also has `blockAt` for a position's block.
 - `block-view.ts`: `viewBlock`, what each block card shows, worked out from the run's view.
 - `routine.ts`: the `Routine` and `Block` types from the spec's data model, `pickableRoutines` (those not deleted, in custom order) and `createStarterRoutines`.
@@ -30,14 +31,14 @@ Each tab keeps its own session for now, so two tabs each run their own copy of t
 - `time.ts`: unit conversions (`MS_PER_SECOND`, `minutesToMs`), `toUtcTimestamp` and `fromUtcTimestamp` for moments saved in storage, and time formatting (`formatElapsed` rounds down, `formatRemaining` rounds up).
 - `percent.ts`: `percentOf` and `asPercentOf`, multiplying before dividing.
 - `screens.ts`: `isCurrentScreen`, which link in the navigation is the current one.
-- `timer.svelte.ts`: `TimerSession`, built from the routines, `TimerSessionOptions` (`clock`, `storage`, `newId`, `onWorkSaved`) and the run in progress saved, if any, which it restores. The root layout makes the app's one session.
+- `timer.svelte.ts`: `TimerSession`, built from the routines, `TimerSessionOptions` (`clock`, `storage`, `newId`, `newRevision`, `onWorkSaved`) and how the app opened (`saved`, `isAnotherTabOpen`), which decides whether it restores the saved run or joins it live. The root layout makes the app's one session.
 - `page-reload.ts`: `reloadPage`, alone in its module so tests can replace it.
 
 ### `src/lib/storage`: where data is kept
 
-- `storage.ts`: the `CadoroStorage` interface, the only way the app reads and saves data. It reads the routines and adds them on the first launch, saves the run in progress with a change's run and work periods together (`saveRunInProgress`), reads the run in progress back and forgets it, reads the runs and work periods back oldest first, and says whether any work period is saved.
-- `dexie-storage.ts`: `DexieStorage`, the app's backend, in the IndexedDB database `cadoro`, with schema version 1 declaring `routines`, `runs`, `workPeriods` and `runInProgress`. The run in progress is one row under the key `current`.
-- `in-memory-storage.ts`: `InMemoryStorage`, for tests of code that uses storage.
+- `storage.ts`: the `CadoroStorage` interface, the only way the app reads and saves data. It reads the routines and adds them on the first launch, saves the run in progress with a change's run and work periods together, only if the stored revision is the one the change was made from (`saveRunInProgress`), saves a heartbeat alone (`saveHeartbeat`), reads the run in progress back (`getRunInProgress`), calls back whenever it changes, in any tab (`watchRunInProgress`), forgets it (`clearRunInProgress`), reads the runs and work periods back oldest first, and says whether any work period is saved.
+- `dexie-storage.ts`: `DexieStorage`, the app's backend, in the IndexedDB database `cadoro`, with schema version 1 declaring `routines`, `runs`, `workPeriods` and `runInProgress`, and version 2 adding a revision to the saved run. The run in progress is one row under the key `current`, and Dexie's live query tells every tab when it changes.
+- `in-memory-storage.ts`: `InMemoryStorage`, for tests of code that uses storage, with plain subscribers for the watch.
 - `persistence.ts`: `askToPersistOnce`, which asks the browser for persistent storage at most once, and `askToPersistIfWorkSaved`, the check at startup.
 
 ### `src/lib/components`: the Svelte components
@@ -58,7 +59,7 @@ Each tab keeps its own session for now, so two tabs each run their own copy of t
 - Unit tests sit beside their module as `*.test.ts`, component tests beside their component as `*.svelte.test.ts`, and storage tests beside their backend as `*.browser.test.ts`.
 - `storage.browser.test.ts` is the suite every backend shares, and `dexie-storage.browser.test.ts` covers what only IndexedDB has: data kept after reopening, two connections at once, the saved schema and the database's name.
 - `src/lib/testing/` holds test helpers: `durations.ts` (`seconds`, `minutes`, `hours`), `ids.ts` (`numberedIds`), `routines.ts` (`oneRoundRoutine`, `routineWith`), `run-records.ts` (`runInProgress`, `firstWorkPeriod`, `runWith`, `workPeriodWith`), `run-in-progress.ts` (`savedRunInProgress`, `runInProgressWith`) and `run-summary.ts` (`shownTotals`).
-- `e2e/` holds the Playwright journeys (`*.spec.ts`), with `clock.ts` (`openOnPausedClock`, `followLink`), `storage.ts` (`savedWorkPeriods`, read from the page's IndexedDB), `service-worker.ts` (`waitForActiveWorker`), and `update-server.ts`, which serves the production build with a new service worker to browsers that ask. `e2e/production/` holds the journeys against the production build.
+- `e2e/` holds the Playwright journeys (`*.spec.ts`), with `clock.ts` (`openOnPausedClock`, `followLink`), `storage.ts` (`savedWorkPeriods`, read from the page's IndexedDB; `shared-run.spec.ts` runs two tabs of one browser context, which share one fake clock), `service-worker.ts` (`waitForActiveWorker`), and `update-server.ts`, which serves the production build with a new service worker to browsers that ask. `e2e/production/` holds the journeys against the production build.
 
 ### Config and tooling
 
@@ -79,8 +80,11 @@ Each tab keeps its own session for now, so two tabs each run their own copy of t
 - Every link and asset address goes through SvelteKit's `resolve()` or `%sveltekit.assets%`, so the app works under a base path such as `/cadoro`.
 - Data goes only through `CadoroStorage`. Nothing else opens IndexedDB.
 - A change's run in progress, run and work periods are saved together or not at all, so a run is never saved as ended without its last work period, and a restored run never ends a work period that's already saved. Writes reach storage in the order they were made, so a late heartbeat can't bring back a run that Done forgot.
-- A restored run comes back paused at its last heartbeat, so time after it never counts as work. A ready run is never saved.
-- What's stored survives upgrades: schema version 1 never changes now that it's deployed, so a change to what's stored takes a new Dexie version with an upgrade, and a test for it.
+- A press is saved only if the stored run is still the one it was made from: every change gets a unique revision, and the save checks it in the same transaction. A tab that's refused takes the stored run, and keeps nothing of its own.
+- A heartbeat writes only the time, never a whole run, so a stale tab's heartbeat can't undo another tab's press.
+- Work is recorded by the tab that pressed, and only when its save is accepted, so each work period and run is saved once however many tabs are open. A tab that follows a change never saves it.
+- A restored run comes back paused at its last heartbeat, so time after it never counts as work. A tab that opens while another tab is open joins the run live and doesn't pause it. A ready run is never saved.
+- What's stored survives upgrades: schema versions 1 and 2 never change now that they're deployed, so a change to what's stored takes a new Dexie version with an upgrade, and a test for it.
 
 ## Cross-cutting concerns
 
@@ -94,6 +98,8 @@ Each tab keeps its own session for now, so two tabs each run their own copy of t
 ### Saving
 
 - The buttons stay synchronous, and the screen changes at once. `TimerSession` puts every write, saves and Done's clear alike, on one promise chain (`#enqueue`), so each starts once the one before has finished, and doesn't wait for it.
+- Each tab holds a shared Web Lock for as long as it's open, which the browser lets go when the tab closes or crashes. A tab opening checks for it before taking its own, since a heartbeat's age can't say whether another tab is alive.
+- Leaving the Timer screen pauses the run, which is a press, so it pauses the run in every tab.
 - The run in progress is saved on every press that changes the run, on each tick while a timer counts, and as the page is hidden or closed. In a tab hidden for over 5 minutes, Chrome runs the tick about once a minute, so heartbeats come less often there.
 - A failed save, or a failed request for persistent storage, is logged with `console.error`, and the app carries on. Milestone 8's activity log records errors.
 - Persistent storage is asked for at most once per launch: at startup when work is saved, or else after the first work period is saved.
