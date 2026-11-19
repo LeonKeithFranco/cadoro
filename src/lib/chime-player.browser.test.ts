@@ -9,6 +9,8 @@ const start = Date.UTC(2026, 10, 19, 9, 0, 0);
 
 // The failures are covered in Node, in `chime-player.test.ts`. This checks the defaults: that the
 // browser's own `AudioContext` and `fetch` work with the player, and that a real chime decodes.
+// The wall clock stays at the run's start, so the run's chime is still ahead whenever the player
+// reads it, and the unlock isn't waited for, since without a gesture the context never resumes.
 describe('ChimePlayer in the browser', () => {
 	let logged: MockInstance<typeof console.error>;
 
@@ -25,11 +27,12 @@ describe('ChimePlayer in the browser', () => {
 	it('decodes a real chime and schedules it with the browser’s own audio context', async () => {
 		const player = new ChimePlayer({
 			files: { target: '/chimes/bell-ding-1.mp3', break: '/chimes/bell-ding-2.mp3' },
-			volume: 0
+			volume: 0,
+			clock: (): number => start
 		});
 		const run = play(createRun(routineWith({ rounds: 'infinite' })), start);
 
-		player.unlock();
+		void player.unlock();
 		await player.reschedule(run, start);
 
 		expect(logged).not.toHaveBeenCalled();
@@ -48,10 +51,14 @@ describe('ChimePlayer in the browser', () => {
 		'/chimes/bell-ding-3.mp3',
 		'/chimes/bell-ding-4.mp3'
 	])('decodes the chime %s', async (file) => {
-		const player = new ChimePlayer({ files: { target: file, break: file }, volume: 0 });
+		const player = new ChimePlayer({
+			files: { target: file, break: file },
+			volume: 0,
+			clock: (): number => start
+		});
 		const run = play(createRun(routineWith({ rounds: 'infinite' })), start);
 
-		player.unlock();
+		void player.unlock();
 		await player.reschedule(run, start);
 
 		expect(logged).not.toHaveBeenCalled();

@@ -320,6 +320,37 @@ describe('previewing a chime', () => {
 	});
 });
 
+describe('when the audio clock stood still', () => {
+	it('places the chime again from the wall clock as the page shows again', async () => {
+		const tab = openTab(new InMemoryStorage());
+		tab.timer.play();
+		await expect.poll(() => tab.chimes.scheduled).toHaveLength(1);
+
+		// 20 minutes pass, but the audio clock ran for only 15 of them, as when a laptop sleeps.
+		nowMs = minutes(20);
+		tab.audio.currentTime = 15 * 60;
+		document.dispatchEvent(new Event('visibilitychange'));
+
+		await expect
+			.poll(() => tab.chimes.scheduled)
+			.toEqual([expect.objectContaining({ alert: 'target', at: minutes(25), startsAt: 20 * 60 })]);
+	});
+
+	it('leaves the chime as it is when the page is hidden', async () => {
+		const tab = openTab(new InMemoryStorage());
+		tab.timer.play();
+		await expect.poll(() => tab.chimes.scheduled).toHaveLength(1);
+		vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+
+		nowMs = minutes(20);
+		tab.audio.currentTime = 15 * 60;
+		document.dispatchEvent(new Event('visibilitychange'));
+		await afterPendingWork();
+
+		expect(tab.chimes.scheduled).toEqual([expect.objectContaining({ startsAt: 25 * 60 })]);
+	});
+});
+
 describe('one tab sounding', () => {
 	it('sounds each chime in the first tab a button was pressed in, and not in the others', async () => {
 		const storage = new InMemoryStorage();
