@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { minutes } from '../src/lib/testing/durations';
+import { minutes, seconds } from '../src/lib/testing/durations';
 import { chimeEvents, chimeStarts, recordChimes } from './browser-apis';
 import { openOnPausedClock } from './clock';
 import { saveSettingsRow } from './storage';
@@ -55,56 +55,58 @@ test.describe('the alerts', () => {
 	}) => {
 		await openWithChosenChimes(page);
 
-		await test.step('Play schedules the target chime for 25 minutes ahead', async () => {
+		await test.step('Play at 9:01 schedules the target chime for 9:26, 25 minutes on', async () => {
+			expect(await pageNow(page)).toBe(Date.parse('2026-11-10T09:01:00Z'));
 			await page.getByRole('button', { name: 'Play' }).click();
 
 			await expect.poll(async () => (await chimeStarts(page)).length).toBe(1);
-			const playedAt = await pageNow(page);
 			expect(await chimeStarts(page)).toEqual([
-				{ kind: 'start', file: TARGET_CHIME_FILE, whenMs: playedAt + minutes(25) }
+				{ kind: 'start', file: TARGET_CHIME_FILE, whenMs: Date.parse('2026-11-10T09:26:00Z') }
 			]);
 		});
 
-		await test.step('the chime’s moment is the one the work reaches its target', async () => {
-			const [targetChime] = await chimeStarts(page);
+		await test.step('the work reaches its target at 9:26, the chime’s moment', async () => {
+			await page.clock.fastForward(minutes(24) + seconds(59));
+			expect(await pageNow(page)).toBe(Date.parse('2026-11-10T09:25:59Z'));
+			await expect(box(page, 'Work')).toContainText('24:59 / 25:00');
 
-			await page.clock.fastForward(minutes(25));
+			await page.clock.fastForward(seconds(1));
 
+			expect(await pageNow(page)).toBe(Date.parse('2026-11-10T09:26:00Z'));
 			await expect(box(page, 'Work')).toContainText('25:00 / 25:00');
-			expect(await pageNow(page)).toBe(targetChime?.whenMs);
 		});
 
-		await test.step('Next schedules the break chime for when the 5 minute break ends', async () => {
+		await test.step('Next at 9:26 schedules the break chime for 9:31, as the 5 minute break ends', async () => {
 			await page.getByRole('button', { name: 'Next' }).click();
 
 			await expect.poll(async () => (await chimeStarts(page)).length).toBe(2);
-			const startedBreakAt = await pageNow(page);
 			expect((await chimeStarts(page))[1]).toEqual({
 				kind: 'start',
 				file: BREAK_CHIME_FILE,
-				whenMs: startedBreakAt + minutes(5)
+				whenMs: Date.parse('2026-11-10T09:31:00Z')
 			});
 		});
 
-		await test.step('the chime’s moment is the one the break reaches 0:00', async () => {
-			const breakChime = (await chimeStarts(page))[1];
+		await test.step('the break reaches 0:00 at 9:31, the chime’s moment', async () => {
+			await page.clock.fastForward(minutes(4) + seconds(59));
+			expect(await pageNow(page)).toBe(Date.parse('2026-11-10T09:30:59Z'));
+			await expect(box(page, 'Break')).toContainText('0:01');
 
-			await page.clock.fastForward(minutes(5));
+			await page.clock.fastForward(seconds(1));
 
+			expect(await pageNow(page)).toBe(Date.parse('2026-11-10T09:31:00Z'));
 			await expect(box(page, 'Break')).toContainText('0:00');
-			expect(await pageNow(page)).toBe(breakChime?.whenMs);
 			expect(await chimeStarts(page)).toHaveLength(2);
 		});
 
-		await test.step('Play then starts the next work period with the target chime again', async () => {
+		await test.step('Play at 9:31 starts the next work period with its target chime at 9:56', async () => {
 			await page.getByRole('button', { name: 'Play' }).click();
 
 			await expect.poll(async () => (await chimeStarts(page)).length).toBe(3);
-			const startedAt = await pageNow(page);
 			expect((await chimeStarts(page))[2]).toEqual({
 				kind: 'start',
 				file: TARGET_CHIME_FILE,
-				whenMs: startedAt + minutes(25)
+				whenMs: Date.parse('2026-11-10T09:56:00Z')
 			});
 		});
 	});
@@ -124,20 +126,20 @@ test.describe('the alerts', () => {
 			.toEqual(['start', 'stop']);
 		expect((await chimeEvents(page))[1]?.file).toBe(TARGET_CHIME_FILE);
 
-		// 5 minutes paused don't count as work, so 15 of the 25 minutes are left.
+		// Played at 9:01 and paused at 9:11, then 5 minutes paused, which don't count as work, so
+		// Play at 9:16 leaves 15 of the 25 minutes, to 9:31.
 		await page.clock.fastForward(minutes(5));
 		await page.getByRole('button', { name: 'Play' }).click();
 
 		await expect.poll(async () => (await chimeStarts(page)).length).toBe(2);
-		const resumedAt = await pageNow(page);
 		expect((await chimeStarts(page))[1]).toEqual({
 			kind: 'start',
 			file: TARGET_CHIME_FILE,
-			whenMs: resumedAt + minutes(15)
+			whenMs: Date.parse('2026-11-10T09:31:00Z')
 		});
 	});
 
-	test('a run restored after a reload schedules no chime until Play, and then counts the work it had', async ({
+	test('a run restored after a reload schedules its chime from the work it had once Play is pressed', async ({
 		page
 	}) => {
 		await openWithChosenChimes(page);
@@ -146,17 +148,16 @@ test.describe('the alerts', () => {
 		await page.clock.fastForward(minutes(10));
 
 		await page.reload();
-
 		await expect(page.getByRole('button', { name: 'Play' })).toBeVisible();
 		await expect(box(page, 'Work')).toContainText('10:00 / 25:00');
-		expect(await chimeEvents(page)).toEqual([]);
-
+		// Played at 9:01 and restored at 9:11 with 10 minutes worked, so Play at 9:16 leaves 15
+		// minutes, to 9:31.
+		await page.clock.fastForward(minutes(5));
 		await page.getByRole('button', { name: 'Play' }).click();
 
 		await expect.poll(async () => (await chimeStarts(page)).length).toBe(1);
-		const resumedAt = await pageNow(page);
 		expect(await chimeStarts(page)).toEqual([
-			{ kind: 'start', file: TARGET_CHIME_FILE, whenMs: resumedAt + minutes(15) }
+			{ kind: 'start', file: TARGET_CHIME_FILE, whenMs: Date.parse('2026-11-10T09:31:00Z') }
 		]);
 	});
 
