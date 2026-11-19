@@ -14,6 +14,14 @@ How the code fits together: @docs/ARCHITECTURE.md
 - `docs/ARCHITECTURE.md`: the codemap, the invariants and the cross-cutting concerns, as the code is now. Update it in a step's docs round whenever the step changes what it describes.
 - `docs/decisions/`: the decision log, one file per milestone, listed in its `README.md` with the rules for adding to it. Read the current milestone's file at the start of each step, and search the folder before settling something that may already be decided. Add to the current milestone's file whenever a decision is made or changed, with the reason and any options rejected. A changed decision is a new entry, and the old one gets a note pointing to it.
 
+## Commands
+
+- `task check:quick`: lint, the format check, the typecheck and the Vitest tests, in seconds. Run it before each commit.
+- `task check`: everything CI runs, in its order, adding the build and the Playwright tests. Run it before pushing.
+- One test file: `npm test -- src/lib/run.test.ts`, or `npm run test:e2e -- e2e/timer.spec.ts --project desktop`.
+- `task fix` formats every file and applies ESLint's fixes. `task --list` shows the rest. Under `timeout`, call `go-task`, since `task` is a shell alias.
+- Outside CI, Playwright reuses a dev server already on the port, 5173 by default. If the user's own server is running older code, set `PORT` to a free port, such as `PORT=5198 task check`.
+
 ## Working style
 
 - Build in vertical slices. Each milestone is cut into steps, each on its own branch and pull request, and each step is built in small rounds of about one commit. Each round makes a small set of changes, explains them and the related concepts listed in `docs/PLAN.md`, then stops for the user's questions before continuing.
