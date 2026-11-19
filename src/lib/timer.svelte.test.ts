@@ -46,7 +46,9 @@ let newRevision = numberedIds('revision');
  */
 function createSession(
 	choices: readonly Routine[] = routines,
-	options: Partial<Pick<TimerSessionOptions, 'storage' | 'newId' | 'onWorkSaved' | 'onPress'>> = {},
+	options: Partial<
+		Pick<TimerSessionOptions, 'storage' | 'newId' | 'onWorkSaved' | 'onPress' | 'onRunStarted'>
+	> = {},
 	opening: Partial<AppOpening> = {}
 ): TimerSession {
 	return new TimerSession(
@@ -93,6 +95,66 @@ describe('TimerSession', () => {
 
 	it('refuses to start without a routine to pick', () => {
 		expect(() => createSession([])).toThrow('A timer session needs at least one routine.');
+	});
+});
+
+describe('opening on the last routine used', () => {
+	it('chooses the routine the last run used', () => {
+		const session = createSession(routines, {}, { lastRoutineId: classicWithLongBreak.id });
+
+		expect(session.routine).toBe(classicWithLongBreak);
+		expect(session.view.status).toBe('ready');
+	});
+
+	it('falls back to the first routine when the last one is gone', () => {
+		const session = createSession(routines, {}, { lastRoutineId: 'a-deleted-routine' });
+
+		expect(session.routine).toBe(classic);
+	});
+
+	it('chooses the first routine when no run has started yet', () => {
+		const session = createSession(routines, {}, { lastRoutineId: null });
+
+		expect(session.routine).toBe(classic);
+	});
+});
+
+describe('telling when a run starts', () => {
+	it('reports the routine when Play starts the run, once', () => {
+		const onRunStarted = vi.fn();
+		const session = createSession(routines, { onRunStarted });
+		session.select(classicWithLongBreak.id);
+
+		session.play();
+		session.pause();
+		session.play();
+
+		expect(onRunStarted).toHaveBeenCalledExactlyOnceWith(classicWithLongBreak.id);
+	});
+
+	it('reports nothing for a press that starts no run', () => {
+		const onRunStarted = vi.fn();
+		const session = createSession(routines, { onRunStarted });
+
+		session.pause();
+		session.next();
+		session.finish();
+
+		expect(onRunStarted).not.toHaveBeenCalled();
+	});
+
+	it('reports again when a new run is started after one ended', () => {
+		const onRunStarted = vi.fn();
+		const session = createSession(routines, { onRunStarted });
+		session.play();
+		session.finish();
+		session.readyNewRun();
+		session.select(classicWithLongBreak.id);
+
+		session.play();
+
+		expect(onRunStarted).toHaveBeenCalledTimes(2);
+		expect(onRunStarted).toHaveBeenLastCalledWith(classicWithLongBreak.id);
 	});
 });
 
