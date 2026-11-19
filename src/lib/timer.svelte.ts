@@ -345,6 +345,19 @@ export class TimerSession {
 	}
 
 	/**
+	 * The id of the routine whose run has started and whose summary isn't closed yet, or `null`
+	 * while the run is ready.
+	 *
+	 * @remarks
+	 * It holds the routine through the ended run's summary too, since a reload restores the summary
+	 * from the routine, and forgets the run if the routine is gone. The Routines screen locks this
+	 * routine, so it can't be edited or deleted.
+	 */
+	get heldRoutineId(): string | null {
+		return this.#run.status === 'ready' ? null : this.#routine.id;
+	}
+
+	/**
 	 * The chosen routine's run as it is now, which the chimes are scheduled from. It's reactive
 	 * state, which changes only when a button, a restore or another tab's change replaces the
 	 * run, never on a tick. Runs are immutable, so reading it can't change the session.

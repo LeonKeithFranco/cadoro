@@ -13,5 +13,5 @@
 	storage={data.storage}
 	settingsSession={data.settingsSession}
 	initialRoutines={data.timerSession.routines}
-	runningRoutineId={data.timerSession.view.isInProgress ? data.timerSession.routine.id : null}
+	runningRoutineId={data.timerSession.heldRoutineId}
 />

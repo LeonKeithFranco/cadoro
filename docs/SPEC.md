@@ -144,7 +144,7 @@ They can be edited and deleted like any other routine, and aren't created again 
 - **Pause** stops the work or break timer. Paused time doesn't count as work, and a paused break keeps its remaining time.
 - **Finish** asks for confirmation, then ends the run. The run keeps counting while it asks, so the current work period, if any, is saved up to the moment Finish is confirmed. Cancel or Escape leaves the run as it was. This is how an infinite routine ends, and how a finite one ends early.
 - Before a run starts, Next and Finish are disabled.
-- A routine can't be edited or deleted while it's running, and the routine picker is locked until the run ends. The run is shared between tabs, so this holds in every tab. On the Routines screen its Edit and Delete are disabled, with a hint. A routine already open for editing when its run starts can't be saved until the run ends, and a delete confirmed after that is ignored.
+- A routine can't be edited or deleted while it's running, or while its ended run's summary is still open, and the routine picker is locked until the run ends. The run is shared between tabs, so this holds in every tab. On the Routines screen its Edit and Delete are disabled, with a hint. A routine already open for editing when its run starts can't be saved until the run ends, and a delete confirmed after that is ignored.
 
 ### The timer screen
 

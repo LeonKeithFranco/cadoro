@@ -216,6 +216,40 @@ describe('choosing a routine', () => {
 	});
 });
 
+describe('the routine a run holds', () => {
+	it('is none while the run is ready', () => {
+		const session = createSession();
+
+		expect(session.heldRoutineId).toBeNull();
+	});
+
+	it('is the routine while the run works, is paused or is on a break', () => {
+		const session = createSession();
+		session.play();
+		expect(session.heldRoutineId).toBe(classic.id);
+
+		session.pause();
+		expect(session.heldRoutineId).toBe(classic.id);
+
+		session.play();
+		session.next();
+		expect(session.view.status).toBe('break');
+		expect(session.heldRoutineId).toBe(classic.id);
+	});
+
+	it('is still the routine once the run has ended, until its summary is closed', () => {
+		const session = createSession();
+		session.play();
+		session.finish();
+		expect(session.view.status).toBe('ended');
+
+		expect(session.heldRoutineId).toBe(classic.id);
+
+		session.readyNewRun();
+		expect(session.heldRoutineId).toBeNull();
+	});
+});
+
 describe('the controls', () => {
 	it('starts the work period from the moment Play is pressed', () => {
 		const session = createSession();

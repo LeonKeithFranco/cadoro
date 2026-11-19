@@ -76,9 +76,9 @@
 		/** The routines not deleted as the app opened, so the first render already lists them. */
 		initialRoutines: readonly Routine[];
 		/**
-		 * The id of the routine a run in progress, in this tab or another, is running, or `null`
-		 * when none is. That routine can't be edited or deleted, because a saved run is restored
-		 * from its routine and is forgotten if the routine is gone.
+		 * The id of the routine a run in this tab or another is running, or whose ended run's summary
+		 * is still open, or `null` when none is. That routine can't be edited or deleted, because a
+		 * saved run is restored from its routine and is forgotten if the routine is gone.
 		 */
 		runningRoutineId?: string | null;
 		/** Returns a new unique id each time it's called. `crypto.randomUUID` unless a test gives its own. */

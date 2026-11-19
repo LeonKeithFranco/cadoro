@@ -39,6 +39,7 @@ The Routines screen, editing routines and blocks in place, the activity log of r
 
 - Edit and Delete are disabled on the routine of the run in progress, in any tab, with a hint. The Routines screen reads the shared run, so a run another tab starts locks it too. Save is disabled if the run starts mid-edit, with a line saying why, and a delete confirmed after that is ignored.
 - This is in the UI only, with no guard in storage. Restoring a run whose routine was deleted forgets the run, which is why the screen has to stop it. Storage has no guard for it, so a caller that skips the screen could still edit or delete the routine, and that's a known limit.
+- The lock also holds while an ended run's summary is open, through `TimerSession.heldRoutineId`, which is the routine of any run that isn't ready. The first version locked only while the run was in progress, so a routine could be deleted with its summary open, and a reload then forgot the run and lost the summary, against the spec. Restoring a run from all routines, deleted ones included, was rejected: it would need every restore and follow path to read `getAllRoutines`, and a run of a deleted routine in the picker's state, for a window of a few seconds; keeping the lock until the summary is closed is one line in the page.
 
 ### Timer changes
 
