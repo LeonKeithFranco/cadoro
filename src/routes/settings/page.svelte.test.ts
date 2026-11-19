@@ -14,7 +14,8 @@ describe('the Settings screen', () => {
 		const data = {
 			settingsSession: new SettingsSession(new InMemoryStorage(), DEFAULT_SETTINGS),
 			chimes: { preview: vi.fn() },
-			wakeLockKeeper: { isSupported: true }
+			wakeLockKeeper: { isSupported: true },
+			storage: new InMemoryStorage()
 		} as unknown as PageProps['data'];
 
 		render(SettingsPage, { data, params: {} });

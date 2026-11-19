@@ -77,7 +77,10 @@ async function renderScreen({
 		settingsSession: session,
 		chimes: { preview },
 		isWakeLockSupported: isSupported,
-		storageManager: manager ?? undefined
+		storageManager: manager ?? undefined,
+		storage,
+		saveFile: vi.fn(),
+		now: () => new Date(2026, 10, 19)
 	});
 	return { storage, session, preview, manager: manager ?? undefined };
 }

@@ -1,8 +1,8 @@
 <!--
   @component
   The Settings screen: the theme, the chime for each alert with a Preview button, the volume,
-  whether to keep the screen awake, whether the browser keeps the app's storage persistent, and
-  the app's version. A change is saved as it's made, and shows in every open tab.
+  whether to keep the screen awake, whether the browser keeps the app's storage persistent, the
+  data card (exports, backup, import and the activity log's link), and the app's version. A change is saved as it's made, and shows in every open tab.
 -->
 <script module lang="ts">
 	import type { Theme } from '../settings';
@@ -25,7 +25,10 @@
 		requestPersistentStorage,
 		type PersistenceManager
 	} from '../storage/persistence';
+	import type { SaveFile } from '../file-download';
+	import type { CadoroStorage } from '../storage/storage';
 	import { SECONDARY_BUTTON_COLOURS } from './button-colours';
+	import DataSection from './DataSection.svelte';
 	import ScreenHeading from './ScreenHeading.svelte';
 
 	/** The props the Settings screen takes. */
@@ -38,9 +41,23 @@
 		isWakeLockSupported: boolean;
 		/** The browser's storage manager, or `undefined` where there's none. */
 		storageManager: PersistenceManager | undefined;
+		/** Where the data is exported from and imported into, and the activity log is read. */
+		storage: CadoroStorage;
+		/** Hands the user a file to save. */
+		saveFile: SaveFile;
+		/** Returns the current moment, for the exported files' names and dates. */
+		now: () => Date;
 	};
 
-	let { settingsSession, chimes, isWakeLockSupported, storageManager }: Props = $props();
+	let {
+		settingsSession,
+		chimes,
+		isWakeLockSupported,
+		storageManager,
+		storage,
+		saveFile,
+		now
+	}: Props = $props();
 
 	let settings = $derived(settingsSession.settings);
 
@@ -235,6 +252,8 @@
 			Clearing the site's data, uninstalling or changing devices still erases it.
 		</p>
 	</section>
+
+	<DataSection {storage} {saveFile} {now} />
 
 	<p class="text-sm text-zinc-600 dark:text-zinc-400">Version {__APP_VERSION__}</p>
 </div>
