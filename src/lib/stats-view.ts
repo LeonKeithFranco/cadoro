@@ -33,6 +33,12 @@ export type StatsInput = {
 	preset: RangePreset;
 	/** The current moment, in milliseconds since 1970 (UTC). */
 	now: number;
+	/**
+	 * The work so far in the run in progress's work period, as `workInProgress` works it out, or
+	 * `null` or left out when there is none. It counts in work time and streaks but not in the
+	 * target figures, since it hasn't ended.
+	 */
+	workInProgress?: WorkPeriod | null;
 };
 
 /** A row of a list of totals: one week, month or routine. */
@@ -95,12 +101,13 @@ export type StatsView = {
  */
 export function viewStats(input: StatsInput): StatsView {
 	const { now } = input;
-	const allSlices = daySlicesOf(input.workPeriods);
+	const everyWork = [...input.workPeriods, ...(input.workInProgress ? [input.workInProgress] : [])];
+	const allSlices = daySlicesOf(everyWork);
 	const workPeriods = filterByRoutine(input.workPeriods, input.routineId);
-	const slices = daySlicesOf(workPeriods);
+	const slices = daySlicesOf(filterByRoutine(everyWork, input.routineId));
 	const range = rangeForPreset(input.preset, now, slices);
 	const streaks = streaksOf(slices, now);
-	const allTime = allTimeTotals(workPeriods, input.routines);
+	const allTime = allTimeTotals(filterByRoutine(everyWork, input.routineId), input.routines);
 
 	return {
 		hasWork: allSlices.length > 0,

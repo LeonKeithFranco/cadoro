@@ -14,6 +14,7 @@ import { load } from './+page';
 async function loadStats(storage: InMemoryStorage): Promise<{
 	routines: { id: string }[];
 	workPeriods: { routineId: string }[];
+	runInProgress: { revision: string } | null;
 }> {
 	// `load` only uses `parent`, so the rest of SvelteKit's event is left out.
 	const event = { parent: async () => ({ storage }) } as unknown as Parameters<typeof load>[0];
@@ -37,5 +38,23 @@ describe('the Stats page load', () => {
 
 		expect(data.routines.map((routine) => routine.id)).toEqual(['focus', 'old']);
 		expect(data.workPeriods.map((period) => period.routineId)).toEqual(['old']);
+	});
+
+	it('returns the run in progress, so its work so far can count', async () => {
+		const storage = new InMemoryStorage();
+		await storage.saveRunInProgress(savedRunInProgress, null, {
+			run: runWith({ id: 'run-1' }),
+			workPeriods: []
+		});
+
+		const data = await loadStats(storage);
+
+		expect(data.runInProgress?.revision).toBe(savedRunInProgress.revision);
+	});
+
+	it('returns no run in progress when none is saved', async () => {
+		const data = await loadStats(new InMemoryStorage());
+
+		expect(data.runInProgress).toBeNull();
 	});
 });

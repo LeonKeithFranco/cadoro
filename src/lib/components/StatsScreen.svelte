@@ -23,9 +23,11 @@
 		routines: Routine[];
 		/** The current moment, in milliseconds since 1970 (UTC), which decides what "today" is. */
 		now: number;
+		/** The work so far in the run in progress's work period, which counts as work done, or `null`. */
+		workInProgress?: WorkPeriod | null;
 	};
 
-	let { workPeriods, routines, now }: Props = $props();
+	let { workPeriods, routines, now, workInProgress = null }: Props = $props();
 
 	/** The value of the filter's "All routines" option, which no routine id can be. */
 	const ALL_ROUTINES = '';
@@ -51,7 +53,8 @@
 			routines,
 			routineId: filterValue === ALL_ROUTINES ? null : filterValue,
 			preset,
-			now
+			now,
+			workInProgress
 		})
 	);
 </script>

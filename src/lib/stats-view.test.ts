@@ -201,6 +201,49 @@ describe('viewStats with a deleted routine', () => {
 	});
 });
 
+describe('viewStats with a work period in progress', () => {
+	/** 20 minutes of Focus today, still going, with a 25 minute target. */
+	const inProgress = period(
+		'focus',
+		'2026-11-19T18:00:00.000Z',
+		'2026-11-19T18:20:00.000Z',
+		20,
+		25
+	);
+
+	it('counts its work in today, the chart, the totals and the streak', () => {
+		const shown = view({ workInProgress: inProgress });
+
+		expect(shown.today).toBe('1:30:00');
+		expect(shown.days.map((bar) => bar.minutes)).toEqual([0, 0, 0, 0, 0, 25, 90]);
+		expect(shown.weeks[0]).toMatchObject({ duration: '1:55:00' });
+		expect(shown.months[0]).toMatchObject({ duration: '1:55:00' });
+		expect(shown.allTime).toBe('2:05:00');
+		expect(shown.routineTotals[0]).toEqual({ key: 'focus', label: 'Focus', duration: '1:25:00' });
+	});
+
+	it('leaves it out of the target figures, since it has not ended', () => {
+		const shown = view({ workInProgress: inProgress });
+
+		expect(shown.timeAgainstTarget).toBe('84%');
+		expect(shown.targetsReached).toBe('50%');
+	});
+
+	it('is left out when the routine filter is another routine', () => {
+		const shown = view({ routineId: 'reading', workInProgress: inProgress });
+
+		expect(shown.today).toBe('40:00');
+	});
+
+	it('makes the work show, even with no work saved', () => {
+		const shown = view({ workPeriods: [], workInProgress: inProgress });
+
+		expect(shown.hasWork).toBe(true);
+		expect(shown.today).toBe('20:00');
+		expect(shown.currentStreak).toBe('1 day');
+	});
+});
+
 describe('viewStats singular days', () => {
 	it('says 1 day for a streak of one', () => {
 		const shown = view({
