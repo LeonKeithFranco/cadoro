@@ -1,4 +1,4 @@
-// Time units and formats: converting minutes, stamping moments for storage, and formatting
+// Time units and formats: converting minutes, stamping moments for storage and reading them back, and formatting
 // durations for the timer as `m:ss` under an hour and `h:mm:ss` from an hour.
 
 /** The milliseconds in one second. */
@@ -33,6 +33,18 @@ export function minutesToMs(minutes: number): number {
  */
 export function toUtcTimestamp(ms: number): string {
 	return new Date(ms).toISOString();
+}
+
+/**
+ * Converts a UTC timestamp from storage back to the run engine's milliseconds, undoing
+ * {@link toUtcTimestamp}.
+ *
+ * @param timestamp - The moment as an ISO 8601 timestamp, such as `2026-11-19T09:30:00.000Z`.
+ * @returns The moment, in milliseconds since 1970 (UTC), to the millisecond. A string that isn't
+ * a timestamp gives `NaN`, as `Date.parse` does.
+ */
+export function fromUtcTimestamp(timestamp: string): number {
+	return Date.parse(timestamp);
 }
 
 /**
