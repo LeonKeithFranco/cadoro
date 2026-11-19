@@ -15,7 +15,8 @@ let nowMs = 0;
 
 /**
  * Starts a session on the fake clock, so a test can drive the run the screen shows without real
- * time passing. It saves to new, empty storage, which the screen's tests don't read.
+ * time passing. It saves to new, empty storage, which the screen's tests don't read, and its
+ * `onWorkSaved` is a spy nothing checks.
  *
  * @param routines - The routines to pick from. The starter routines unless a test needs others.
  * @returns A new session, with the first routine chosen and its run ready.
@@ -26,7 +27,8 @@ function createSession(
 	return new TimerSession(routines, {
 		clock: () => nowMs,
 		storage: new InMemoryStorage(),
-		newId: numberedIds()
+		newId: numberedIds(),
+		onWorkSaved: vi.fn()
 	});
 }
 

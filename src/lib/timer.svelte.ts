@@ -23,6 +23,11 @@ export type TimerSessionOptions = {
 	storage: CadoroStorage;
 	/** Returns a new unique id each time it's called, such as `crypto.randomUUID`. */
 	newId: () => string;
+	/**
+	 * Called each time a save that held work periods has finished, which the app uses to ask
+	 * for persistent storage. It isn't waited for.
+	 */
+	onWorkSaved: () => void;
 };
 
 /**
@@ -47,6 +52,9 @@ export class TimerSession {
 
 	/** Returns a new unique id each time it's called. */
 	readonly #newId: () => string;
+
+	/** Called each time a save that held work periods has finished. */
+	readonly #onWorkSaved: () => void;
 
 	/**
 	 * The record of the latest run Play started, or `null` before the first. It isn't state,
@@ -75,11 +83,14 @@ export class TimerSession {
 	 * @param routines - The routines to pick from, in the picker's order. There's always at least
 	 * one, since the first launch creates the starter routines, and routines can't be deleted
 	 * yet.
-	 * @param options - The clock, the storage runs are saved in and the id generator, as
-	 * {@link TimerSessionOptions} describes them.
+	 * @param options - The clock, the storage runs are saved in, the id generator and what to do
+	 * once work is saved, as {@link TimerSessionOptions} describes them.
 	 * @throws {@link Error} If there are no routines to pick from.
 	 */
-	constructor(routines: readonly Routine[], { clock, storage, newId }: TimerSessionOptions) {
+	constructor(
+		routines: readonly Routine[],
+		{ clock, storage, newId, onWorkSaved }: TimerSessionOptions
+	) {
 		const [firstRoutine] = routines;
 		if (firstRoutine === undefined) {
 			throw new Error('A timer session needs at least one routine.');
@@ -89,6 +100,7 @@ export class TimerSession {
 		this.#clock = clock;
 		this.#storage = storage;
 		this.#newId = newId;
+		this.#onWorkSaved = onWorkSaved;
 		this.#routine = $state.raw(firstRoutine);
 		this.#run = $state.raw(createRun(firstRoutine));
 		this.#now = $state(clock());
@@ -202,18 +214,24 @@ export class TimerSession {
 	 * the timer. Each save waits for the one before, so saves reach storage in the order the
 	 * buttons were pressed whatever the backend, and a run's start is never saved after its end.
 	 * A failed save is logged and the next one still runs, until milestone 8's activity log
-	 * records errors.
+	 * records errors. Once a save that held work periods has finished, `onWorkSaved` is called.
 	 *
 	 * @param records - What a press left to save. Nothing is handed to storage when it's empty.
 	 */
 	#save(records: RunRecords): void {
-		const hasRecords = records.run !== null || records.workPeriods.length > 0;
+		const hasWorkPeriods = records.workPeriods.length > 0;
+		const hasRecords = records.run !== null || hasWorkPeriods;
 		if (!hasRecords) {
 			return;
 		}
 
 		this.#saving = this.#saving
-			.then(() => this.#storage.saveRunRecords(records))
+			.then(async () => {
+				await this.#storage.saveRunRecords(records);
+				if (hasWorkPeriods) {
+					this.#onWorkSaved();
+				}
+			})
 			.catch((error: unknown) => {
 				console.error('The run could not be saved.', error);
 			});
