@@ -4,7 +4,8 @@
   routine's blocks, and the buttons that run it. While a timer is counting, the screen updates
   every second, saving the run's heartbeat, which it also saves as the page is hidden or closed.
   Finish asks first, and a run that ends shows its summary. Leaving the screen pauses the run, so
-  time spent on another screen isn't counted.
+  time spent on another screen isn't counted. A change from another tab shows as soon as the
+  session takes it on.
 -->
 <script module lang="ts">
 	import { MS_PER_SECOND } from '../time';
@@ -56,6 +57,17 @@
 	// Whether Finish is waiting for the user to confirm. It belongs to this screen rather than the
 	// session, so leaving the screen drops the question, while the run itself is kept.
 	let isConfirmingFinish = $state(false);
+
+	// Derived, like `isRunning`, so the effect below runs again only when it changes.
+	let isInProgress = $derived(session.view.isInProgress);
+
+	// Another tab can end the run, or close its summary, while this one asks, so the question is
+	// dropped then rather than asked again of the next run.
+	$effect(() => {
+		if (!isInProgress) {
+			isConfirmingFinish = false;
+		}
+	});
 
 	/** Ends the run once the user confirms Finish, at the moment they confirm. */
 	function confirmFinish(): void {
