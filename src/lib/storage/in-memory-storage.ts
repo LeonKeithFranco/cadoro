@@ -1,7 +1,7 @@
 // A backend that keeps data in memory, for tests of the code that uses storage. Data lasts only
 // as long as the object.
 
-import type { Routine } from '../routine';
+import { pickableRoutines, type Routine } from '../routine';
 import type { CadoroStorage } from './storage';
 
 /**
@@ -16,9 +16,7 @@ export class InMemoryStorage implements CadoroStorage {
 	#routines: Routine[] = [];
 
 	async getRoutines(): Promise<Routine[]> {
-		const shown = this.#routines.filter((routine) => routine.deletedAt === null);
-		const inCustomOrder = shown.toSorted((a, b) => a.customPosition - b.customPosition);
-		return structuredClone(inCustomOrder);
+		return structuredClone(pickableRoutines(this.#routines));
 	}
 
 	async addRoutinesIfNone(routines: Routine[]): Promise<boolean> {

@@ -35,6 +35,17 @@ export type Routine = {
 	deletedAt: string | null;
 };
 
+/**
+ * Picks out the routines the user can choose from, in the order they're listed.
+ *
+ * @param routines - Routines in any order, deleted ones included.
+ * @returns A new list of the routines not deleted, lowest `customPosition` first.
+ */
+export function pickableRoutines(routines: Routine[]): Routine[] {
+	const notDeleted = routines.filter((routine) => routine.deletedAt === null);
+	return notDeleted.toSorted((a, b) => a.customPosition - b.customPosition);
+}
+
 /** A routine's content without what's unique to each copy, such as ids. */
 type RoutineTemplate = Pick<Routine, 'title' | 'rounds'> & {
 	/** The blocks, in run order, without ids. */
