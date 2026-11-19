@@ -158,6 +158,8 @@ test.describe('a new version of the app', () => {
 		await test.step('while the shared run is in progress, neither tab offers to reload', async () => {
 			await expect(updateOffer(firstTab)).toBeHidden();
 			await expect(updateOffer(secondTab)).toBeHidden();
+			await expect(firstTab.getByRole('button', { name: 'Reload' })).toBeHidden();
+			await expect(secondTab.getByRole('button', { name: 'Reload' })).toBeHidden();
 			expect(navigations).toEqual([]);
 		});
 
