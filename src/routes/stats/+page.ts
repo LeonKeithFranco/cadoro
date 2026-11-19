@@ -1,8 +1,9 @@
 import type { PageLoad } from './$types';
 
 /**
- * Reads the routines, deleted ones included, and every work period for the Stats screen, each time
- * the screen is opened, so it shows work saved since it was last open.
+ * Reads the routines, deleted ones included, every work period and the run in progress for the
+ * Stats screen, each time the screen is opened, so it shows work saved since it was last open. The
+ * run in progress is where the work period that's still going is, which the page then follows.
  *
  * @remarks
  * Deleted routines are kept so their work stays in the stats, labelled as deleted.
@@ -13,9 +14,10 @@ import type { PageLoad } from './$types';
  */
 export const load: PageLoad = async ({ parent }) => {
 	const { storage } = await parent();
-	const [routines, workPeriods] = await Promise.all([
+	const [routines, workPeriods, runInProgress] = await Promise.all([
 		storage.getAllRoutines(),
-		storage.getWorkPeriods()
+		storage.getWorkPeriods(),
+		storage.getRunInProgress()
 	]);
-	return { routines, workPeriods };
+	return { routines, workPeriods, runInProgress };
 };
