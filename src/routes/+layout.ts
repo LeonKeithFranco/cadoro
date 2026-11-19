@@ -23,8 +23,8 @@ let timerSessionOpening: Promise<TimerSession> | undefined;
 
 /**
  * Opens storage, creates the starter routines on the first launch, and starts the timer session
- * with the routines saved, saving its runs in the same storage. It also asks for persistent
- * storage, once, as soon as work is saved.
+ * with the routines saved and the run in progress, if one is saved, saving its runs in the same
+ * storage. It also asks for persistent storage, once, as soon as work is saved.
  *
  * @remarks
  * `crypto.randomUUID` is wrapped rather than passed as it is, because called on its own, away from
@@ -34,7 +34,8 @@ let timerSessionOpening: Promise<TimerSession> | undefined;
  * prompt, never holds up the first render.
  *
  * @returns The new timer session.
- * @throws Rejects with storage's own error when the routines can't be read or saved.
+ * @throws Rejects with storage's own error when the routines or the run in progress can't be
+ * read, or the routines can't be saved.
  */
 async function openTimerSession(): Promise<TimerSession> {
 	const storage = new DexieStorage();
@@ -42,13 +43,15 @@ async function openTimerSession(): Promise<TimerSession> {
 	const askToPersist = askToPersistOnce(navigator.storage);
 
 	void askToPersistIfWorkSaved(storage, askToPersist);
-	const routines = await loadRoutines(storage, new Date(), newId);
-	return new TimerSession(routines, {
-		clock: () => Date.now(),
-		storage,
-		newId,
-		onWorkSaved: () => void askToPersist()
-	});
+	const [routines, saved] = await Promise.all([
+		loadRoutines(storage, new Date(), newId),
+		storage.getRunInProgress()
+	]);
+	return new TimerSession(
+		routines,
+		{ clock: () => Date.now(), storage, newId, onWorkSaved: () => void askToPersist() },
+		saved
+	);
 }
 
 /**
