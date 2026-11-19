@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { minutes } from '../src/lib/testing/durations';
+import { minutes, seconds } from '../src/lib/testing/durations';
 import { followLink, openOnPausedClock } from './clock';
 import { savedWorkPeriods } from './storage';
 
@@ -53,6 +53,13 @@ test('two tabs share one run: a press shows in both, joining doesn’t pause, wo
 		await expect(secondTab.getByRole('combobox', { name: 'Routine' })).toBeDisabled();
 		await expect(workBox(secondTab)).toContainText('10:00 / 25:00');
 		await expect(firstTab.getByRole('button', { name: 'Pause' })).toBeVisible();
+
+		// Still counting: a minute later, both tabs show it.
+		await firstTab.clock.fastForward(minutes(1));
+
+		await expect(workBox(firstTab)).toContainText('11:00 / 25:00');
+		await expect(workBox(secondTab)).toContainText('11:00 / 25:00');
+		await expect(secondTab.getByRole('button', { name: 'Pause' })).toBeVisible();
 	});
 
 	await test.step('Pause in one tab shows in the other', async () => {
@@ -69,8 +76,8 @@ test('two tabs share one run: a press shows in both, joining doesn’t pause, wo
 		await firstTab.clock.fastForward(minutes(5));
 
 		await expect(firstTab.getByRole('button', { name: 'Pause' })).toBeVisible();
-		await expect(workBox(firstTab)).toContainText('15:00 / 25:00');
-		await expect(workBox(secondTab)).toContainText('15:00 / 25:00');
+		await expect(workBox(firstTab)).toContainText('16:00 / 25:00');
+		await expect(workBox(secondTab)).toContainText('16:00 / 25:00');
 	});
 
 	await test.step('Next in one tab ends the work, and its period is saved once', async () => {
@@ -79,7 +86,8 @@ test('two tabs share one run: a press shows in both, joining doesn’t pause, wo
 
 		const breakBox = secondTab.getByRole('group', { name: 'Break' });
 		await expect(breakBox).toBeVisible();
-		await expect(breakBox).toContainText('3:00');
+		// 20% of 16 minutes is 3:12.
+		await expect(breakBox).toContainText('3:12');
 		await expect.poll(async () => (await savedWorkPeriods(firstTab)).length).toBe(1);
 		expect(await savedWorkPeriods(secondTab)).toHaveLength(1);
 	});
@@ -94,6 +102,11 @@ test('two tabs share one run: a press shows in both, joining doesn’t pause, wo
 	});
 
 	await test.step('with every tab closed, reopening restores the run paused', async () => {
+		// Start the break counting again, so a restore that doesn't pause it would show.
+		await secondTab.getByRole('button', { name: 'Play' }).click();
+		await letTabsSettle(secondTab);
+		await secondTab.clock.fastForward(seconds(10));
+		await expect(secondTab.getByRole('button', { name: 'Pause' })).toBeVisible();
 		const context = firstTab.context();
 		await secondTab.close();
 		await firstTab.close();
