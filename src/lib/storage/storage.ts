@@ -73,7 +73,8 @@ export interface CadoroStorage {
 	 *
 	 * @remarks
 	 * The change is written to the activity log, as every routine change is. A failure to write the
-	 * log entry is reported with `console.error`, and never undoes or blocks the change.
+	 * log entry is recorded as an error in the activity log, or written to `console.error` when
+	 * the log can't take it, and never undoes or blocks the change.
 	 *
 	 * @param routine - The routine to add, with an id no routine has, deleted ones included. Its
 	 * `customPosition` is the place it goes, and 0 puts it first.
@@ -334,7 +335,8 @@ export interface CadoroStorage {
 	 * The run in progress isn't in a backup, and it would refer to a routine that may be gone, so
 	 * it's forgotten. The activity log is kept. Once the data is replaced, the import is written to
 	 * the log, with the counts in `summary`, as every change is: a failure to write the entry is
-	 * reported with `console.error`, and never undoes the import. Everything following the routines,
+	 * recorded as an error in the log, or written to `console.error` when the log can't take it,
+	 * and never undoes the import. Everything following the routines,
 	 * the settings or the run in progress is told of the change.
 	 *
 	 * @param data - A valid backup's data, as `parseBackup` checks it.
