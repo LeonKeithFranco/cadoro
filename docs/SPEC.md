@@ -175,8 +175,10 @@ Done or Escape closes the dialog and returns the routine to its starting state, 
 - The run in progress is saved whenever it changes, and a heartbeat records the time every second while the app is open, on the same tick that updates the display, and when the page is hidden.
 - If the app is closed, reloaded, or stopped by the phone mid-run, reopening it restores the run, paused at the last heartbeat. Time after that doesn't count as work.
 - While the app stays open in a background tab, the timer keeps running and stays accurate.
-- Opening another screen in the app, such as Stats, pauses the run, work or break, and Play resumes it on the way back. Switching screens counts as stepping away, unlike a background tab.
+- Opening another screen in the app, such as Stats, pauses the run, work or break, and Play resumes it on the way back. Switching screens counts as stepping away, unlike a background tab. The run is shared between tabs, so leaving the Timer screen in one tab pauses the run in every tab.
 - With the app open in several tabs, or installed and in a browser tab too, every tab shows the same run. A press in one shows in the others, and each work period is recorded once.
+- A tab that opens while another tab is open joins the run live, without pausing it. A saved run comes back paused at its last heartbeat only when no other tab is open.
+- A press in a tab that's behind, because another tab changed the run first, is refused, and that tab shows the saved run instead.
 
 ### Alerts
 
