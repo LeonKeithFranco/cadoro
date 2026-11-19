@@ -221,6 +221,31 @@ describe('the routine filter', () => {
 		await expect.element(rowOf('All time per routine', 'Reading')).not.toBeInTheDocument();
 	});
 
+	it('labels a deleted routine "(deleted)" in the filter, and filters by it', async () => {
+		const deleted = routineWith({
+			id: 'old',
+			title: 'Old routine',
+			deletedAt: '2026-11-01T12:00:00.000Z'
+		});
+		render(StatsScreen, {
+			workPeriods: [
+				...workPeriods,
+				period('old', '2026-11-17T12:00:00.000Z', '2026-11-17T12:05:00.000Z', 5 * MINUTE, 25)
+			],
+			routines: [...routines, deleted],
+			now: NOW
+		});
+
+		await expect
+			.element(page.getByRole('option', { name: 'Old routine (deleted)' }))
+			.toBeInTheDocument();
+		await expect.element(page.getByRole('option', { name: 'Focus' })).toBeInTheDocument();
+
+		await page.getByRole('combobox', { name: 'Routine' }).selectOptions('Old routine (deleted)');
+
+		await expect.poll(figure('All time')).toBe('5:00');
+	});
+
 	it('shows no work in the sections of a routine that has none, rather than the empty state', async () => {
 		render(StatsScreen, {
 			workPeriods,
