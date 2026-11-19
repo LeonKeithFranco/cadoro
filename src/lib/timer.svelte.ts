@@ -49,6 +49,12 @@ export type TimerSessionOptions = {
 	 * called when left out.
 	 */
 	onPress?: () => void;
+	/**
+	 * Called with the routine's id when a press starts a run, as the first Play does, which the
+	 * app uses to remember the last routine used. A press from another tab doesn't call it, since
+	 * that tab's own session does. Nothing is called when left out.
+	 */
+	onRunStarted?: (routineId: string) => void;
 };
 
 /** What the app found as it opened, which a session carries on from. */
@@ -60,6 +66,12 @@ export type AppOpening = {
 	 * left when the app last closed.
 	 */
 	isAnotherTabOpen: boolean;
+	/**
+	 * The id of the routine the last run used, from Settings, which the session chooses when
+	 * there's no run to carry on, if that routine is still among the routines. The first routine
+	 * when it's `null`, left out, or gone.
+	 */
+	lastRoutineId?: string | null;
 };
 
 /**
@@ -100,6 +112,9 @@ export class TimerSession {
 
 	/** Called as any button is pressed, before the press changes the run. */
 	readonly #onPress: () => void;
+
+	/** Called with the routine's id when a press starts a run. */
+	readonly #onRunStarted: (routineId: string) => void;
 
 	/**
 	 * The record of the run in progress, as Play started it, as restored or as taken on from
@@ -167,10 +182,11 @@ export class TimerSession {
 	 * one, since the first launch creates the starter routines, and routines can't be deleted
 	 * yet.
 	 * @param options - The clock, the storage runs are saved in, the id generators, what to do
-	 * once work is saved and what to do as a button is pressed, as {@link TimerSessionOptions}
-	 * describes them.
-	 * @param opening - The run in progress storage held as the app opened, and whether another tab
-	 * was open. No run and no other tab when left out.
+	 * once work is saved, what to do as a button is pressed and what to do as a run starts, as
+	 * {@link TimerSessionOptions} describes them.
+	 * @param opening - The run in progress storage held as the app opened, whether another tab
+	 * was open, and the routine the last run used. No run, no other tab and no last routine when
+	 * left out.
 	 * @throws {@link Error} If there are no routines to pick from.
 	 */
 	constructor(
@@ -181,9 +197,13 @@ export class TimerSession {
 			newId,
 			newRevision,
 			onWorkSaved,
-			onPress = (): void => {}
+			onPress = (): void => {},
+			onRunStarted = (): void => {}
 		}: TimerSessionOptions,
-		{ saved, isAnotherTabOpen }: AppOpening = { saved: null, isAnotherTabOpen: false }
+		{ saved, isAnotherTabOpen, lastRoutineId = null }: AppOpening = {
+			saved: null,
+			isAnotherTabOpen: false
+		}
 	) {
 		const [firstRoutine] = routines;
 		if (firstRoutine === undefined) {
@@ -197,9 +217,11 @@ export class TimerSession {
 		this.#newRevision = newRevision;
 		this.#onWorkSaved = onWorkSaved;
 		this.#onPress = onPress;
+		this.#onRunStarted = onRunStarted;
 
 		const carriedOn = TimerSession.#carryOn(saved, routines, isAnotherTabOpen);
-		const routine = carriedOn?.routine ?? firstRoutine;
+		const lastRoutine = routines.find((candidate) => candidate.id === lastRoutineId);
+		const routine = carriedOn?.routine ?? lastRoutine ?? firstRoutine;
 		this.#record = carriedOn?.record ?? null;
 		this.#routine = $state.raw(routine);
 		this.#run = $state.raw(carriedOn?.run ?? createRun(routine));
@@ -385,6 +407,9 @@ export class TimerSession {
 			return;
 		}
 		this.#run = after;
+		if (before.status === 'ready') {
+			this.#onRunStarted(this.#routine.id);
+		}
 
 		const records = recordPress(
 			{ before, after, now: this.#now, routineId: this.#routine.id, record: this.#record },
