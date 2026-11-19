@@ -1,12 +1,10 @@
 # Progress
 
-**Status:** milestone 4's step 3 is done, as version 0.5.0, which goes live on GitHub Pages once its pull request merges. Step 2 is live as 0.4.0. The app is installed on the desktop and the phone. It runs both starter routines through work, overtime, breaks and Finish, works offline, and offers to reload when a new version is ready. The starter routines are saved in IndexedDB on the first launch, every run and work period is saved as it starts and ends, and persistent storage is asked for once work is saved. The run in progress is saved on every change, every second while counting and as the page is hidden, and a reload restores it paused at that moment. Each tab still keeps its own run.
+**Status:** milestone 0 (guardrails and the new workflow, `build/agent-guardrails`, 0.5.1) is in progress. Milestone 4's step 3 is live as 0.5.0. The app is installed on the desktop and the phone. It runs both starter routines through work, overtime, breaks and Finish, works offline, and offers to reload when a new version is ready. The starter routines are saved in IndexedDB on the first launch, every run and work period is saved as it starts and ends, and persistent storage is asked for once work is saved. The run in progress is saved on every change, every second while counting and as the page is hidden, and a reload restores it paused at that moment. Each tab still keeps its own run.
 
-**Next:** after 0.5.0 is released, check on the phone that killing the installed app mid-run and reopening it finds the run paused at about the moment it was left. Then milestone 4, step 4, share the run across tabs (`feat/shared-run`), planned against the code once step 3 is merged and released.
+**Next:** merge and release milestone 0 as 0.5.1, then milestone 4's step 4, share the run across tabs (`feat/shared-run`). `docs/PLAN.md` has the plan for every remaining milestone. Device check pending: killing the installed app mid-run and reopening it finds the run paused at about the moment it was left.
 
 **Open:**
-
-- The spec doesn't say what the Timer screen shows when every routine is deleted, and `TimerSession` needs at least one. Milestone 6 adds deleting, so it settles this.
 
 - Milestone 6 also pins the timer's controls for long routines, as planned in `docs/decisions/03-pwa-and-github-pages.md`.
 - Banking unused break time is an open spec item, to revisit after using the app.
@@ -31,15 +29,16 @@ Each finished milestone lists its steps' branches. Its decisions are in its file
 
 - [x] 2. Run a routine: `build/lint-doc-comments`, `feat/run-engine`, `feat/app-shell`, `build/dev-server-port`, `feat/timer-screen`, `feat/run-summary`
 - [x] 3. PWA and GitHub Pages: `build/base-path`, `feat/offline`, `feat/update-prompt`, `build/taskfile`, `ci/pages-deploy` (0.1.0), `feat/app-version` (0.2.0)
-- [ ] 4. Keep runs
-- [ ] 5. Alerts and Settings
-- [ ] 6. Routines
-- [ ] 7. Stats
-- [ ] 8. Backup and activity log
+- [ ] 0. Guardrails and the new workflow: `build/agent-guardrails` (0.5.1)
+- [ ] 4. Keep runs: its last step is `feat/shared-run` (0.6.0)
+- [ ] 5. Alerts and Settings: `feat/alerts-and-settings` (0.7.0)
+- [ ] 6. Routines: `feat/routines` (0.8.0)
+- [ ] 7. Stats: `feat/stats` (0.9.0)
+- [ ] 8. Backup and activity log: `feat/backup-and-log` (0.10.0)
 
 ### Phase 3: Release
 
-- [ ] 9. Release 1.0
+- [ ] 9. Release 1.0: `docs/release-1-0` (1.0.0)
 
 ### Phase 4: Optional
 
