@@ -183,3 +183,15 @@ Runs survive reloads, every work period is recorded, and every open tab shows th
 - The Vitest and Playwright lint plugins check the tests. Inline ESLint configuration is ignored (`noInlineConfig`, which ESLint reports as a warning while the rule it tried to disable still errors), and `@ts-expect-error` is banned.
 - `noUncheckedIndexedAccess` is on. `requireDefined` in `src/lib/defined.ts` and `blockAt` in `run.ts` cover indexes that must exist, rather than a blanket `!`.
 - `.claude/settings.json` asks before Edit on `eslint.config.js`, `tsconfig.json`, `playwright.config.ts`, `.github/workflows/**` and itself. Claude Code didn't apply it to the first edit right after the file was written, only to later edits, so a new rule should be proven with a second edit.
+
+## Step 4: share the run across tabs (`feat/shared-run`), 2026-11-19
+
+### The decisions
+
+- A stale press is refused. Every change gets a unique revision, and `saveRunInProgress(row, basedOn, records?)` saves only if the stored revision is `basedOn`, in one transaction. A refused tab re-reads storage and takes the stored run. A heartbeat writes only the time (`saveHeartbeat`), so it can't overwrite a press. The revision needs Dexie schema version 2, with an upgrade and a test.
+- A new tab asks whether another is open, with a Web Lock. Each tab holds the shared lock `cadoro-open-tab` while it's open, and `joinOpenTabs` checks `navigator.locks.query()` before taking its own. With another tab open, the new tab joins the run live, unpaused and unsaved. A heartbeat's age was rejected, since a hidden tab's heartbeats can be a minute apart. Without the Web Locks API, the tab restores the run paused, as when it opens alone.
+- Work is recorded once. Refused saves keep nothing, and `onWorkSaved` fires only on an accepted save, so only the pressing tab records it.
+- Leaving the Timer screen in one tab pauses the run in every tab, since the pause is a press on the shared run.
+- The update prompt needed no change. Every tab's run is in progress while the shared run is, so every tab hides the prompt, and Reload in one reloads all. The update journey's "in another tab mid-run" test was rewritten to say so.
+- The journey uses one fake clock for both tabs, because a browser context has one. A paused clock also holds back Dexie's live query timer, so the journey runs the clock for 100 ms to let a tab notice a change.
+- **Known limit:** a tab still on 0.5.x mid-run can't save once a 0.6 tab has upgraded the database. The service worker keeps every tab on one version until a reload, and the reload is only offered outside a run, so this is accepted.
