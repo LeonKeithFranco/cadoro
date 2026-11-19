@@ -23,6 +23,7 @@ Each tab keeps its own session for now, so two tabs each run their own copy of t
 - `run.ts`: the run engine. The `RunState` union (ready, working, break, ended), the buttons (`play`, `pause`, `next`, `finish`), moving through rounds, blocks and cycles (`nextPosition`), the position label, work time from segments (`workedMs`), the earned break (`earnedBreakMs`), the view the timer screen shows (`viewRun`) and the run summary (`summarizeRun`).
 - `run-records.ts`: the `Run` and `WorkPeriod` records from the spec's data model, `recordPress`, which compares a run before and after a press to work out what to save, `noRecords` for a change that keeps nothing new, the segment conversions `storedSegment` and `segmentFromStored`, and the oldest-first orders `runsOldestFirst` and `workPeriodsOldestFirst`.
 - `run-in-progress.ts`: `StoredRunInProgress`, the run in progress as storage keeps it (its record, the run without its routine, and `heartbeatAt`), with every moment as a UTC string; `toStoredRunInProgress`; and `restoreRunInProgress`, which finds the run's routine and pauses the run at its heartbeat with the engine's `pause`.
+- `defined.ts`: `requireDefined`, which returns a value that must exist and throws when it's `undefined`, for indexes `noUncheckedIndexedAccess` can't prove. `run.ts` also has `blockAt` for a position's block.
 - `block-view.ts`: `viewBlock`, what each block card shows, worked out from the run's view.
 - `routine.ts`: the `Routine` and `Block` types from the spec's data model, `pickableRoutines` (those not deleted, in custom order) and `createStarterRoutines`.
 - `routine-loading.ts`: `loadRoutines`, which creates the starter routines when storage holds none, then reads the routines.
@@ -118,6 +119,11 @@ Each tab keeps its own session for now, so two tabs each run their own copy of t
 
 - Every module-level declaration, type, field and prop has a TSDoc comment, checked by ESLint with `eslint-plugin-tsdoc` and `eslint-plugin-jsdoc`. Each component starts with a `<!-- @component -->` comment. Variables made with `$state`, `$derived` or `$props` are exempt.
 - `npm run typecheck` fails on any Svelte warning.
+- Signatures need explicit return types. typescript-eslint's typed rules are on, with `no-floating-promises`, `no-misused-promises` and `await-thenable` among them, and `require-await` off because promise-interface fakes have `async` methods that don't await.
+- `noUncheckedIndexedAccess` is on, so an index that must exist goes through `blockAt` or `requireDefined`, never a bare `!`.
+- Tests are linted with `@vitest/eslint-plugin` and `eslint-plugin-playwright`: no skipped or focused tests, every test asserts, and Playwright calls are awaited.
+- Inline ESLint configuration is ignored (`noInlineConfig`) and `@ts-expect-error` is banned.
+- `.claude/settings.json` is checked in. It asks before an edit to `eslint.config.js`, `tsconfig.json`, `playwright.config.ts`, `.github/workflows/**` or itself.
 
 ### Builds, deploys and releases
 
