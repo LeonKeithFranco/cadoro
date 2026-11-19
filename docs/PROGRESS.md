@@ -1,10 +1,12 @@
 # Progress
 
-**Status:** version 0.2.0 is live on GitHub Pages, installed on the desktop and the phone. It runs both starter routines through work, overtime, breaks and Finish, works offline, and offers to reload when a new version is ready. Nothing is saved yet: a reload loses the run, and the starter routines are made afresh on every load.
+**Status:** milestone 4's step 1 is done, as version 0.3.0, which goes live on GitHub Pages once its pull request merges. The app is installed on the desktop and the phone. It runs both starter routines through work, overtime, breaks and Finish, works offline, and offers to reload when a new version is ready. The starter routines are saved in IndexedDB on the first launch and kept from then on, but runs aren't saved yet, so a reload loses the run.
 
-**Next:** milestone 4, Keep runs, step 1, routines in storage (`feat/routine-storage`). The milestone is planned and approved, with its reasons in `docs/decisions/04-keep-runs.md`.
+**Next:** milestone 4, step 2, record runs (`feat/run-records`), planned against the code once step 1 is merged and released.
 
 **Open:**
+
+- The spec doesn't say what the Timer screen shows when every routine is deleted, and `TimerSession` needs at least one. Milestone 6 adds deleting, so it settles this.
 
 - Milestone 6 also pins the timer's controls for long routines, as planned in `docs/decisions/03-pwa-and-github-pages.md`.
 - Banking unused break time is an open spec item, to revisit after using the app.
@@ -12,7 +14,7 @@
 
 ## Milestone 4: Keep runs
 
-1. [ ] Routines in storage (`feat/routine-storage`), 0.3.0: the storage interface, its Dexie and in-memory backends, schema version 1, the starter routines created once on first launch, and the app loading them before it renders
+1. [x] Routines in storage (`feat/routine-storage`), 0.3.0: the storage interface, its Dexie and in-memory backends, schema version 1, the starter routines created once on first launch, and the app loading them before it renders
 2. [ ] Record runs (`feat/run-records`), 0.4.0: each run and work period saved as it starts and ends, and persistent storage asked for
 3. [ ] Keep the run in progress (`feat/restore-run`), 0.5.0: saved on every change and every second, and restored paused at the last heartbeat
 4. [ ] Share the run across tabs (`feat/shared-run`), 0.6.0: every tab following the saved run through a Dexie live query
