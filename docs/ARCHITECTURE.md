@@ -9,32 +9,34 @@ Cadoro is a static SvelteKit single-page app. GitHub Pages, or any web server, s
 The code is in layers, each knowing only the one below it:
 
 1. **The run engine** in `src/lib` is plain TypeScript: a run is an immutable value, and every button is a pure function from one run and the current moment to the next run. It never reads the clock or touches the page.
-2. **Storage**, in `src/lib/storage`, is the `CadoroStorage` interface, kept in the browser's IndexedDB through Dexie. It holds the routines so far.
-3. **`TimerSession`** keeps the current run in Svelte state, reads the clock, and applies the engine's functions when a button is pressed or the screen ticks.
+2. **Storage**, in `src/lib/storage`, is the `CadoroStorage` interface, kept in the browser's IndexedDB through Dexie. It holds the routines, and every run and work period.
+3. **`TimerSession`** keeps the current run in Svelte state, reads the clock, and applies the engine's functions when a button is pressed or the screen ticks. After each press it works out what to save with the pure `recordPress` and hands it to storage.
 4. **Components** show views that pure functions work out from the run, such as `viewRun` for the screen and `viewBlock` for each block card, and call the session's methods.
 5. **Routes** frame the screens with the header, the navigation and the update prompt. The root layout's `load` reads the routines from storage, creating the starter routines on the first launch, and starts the app's one `TimerSession` before anything renders.
 
-The run itself isn't saved yet, so a reload loses it. Steps 2 and 3 of milestone 4 save it.
+Each run and work period is saved as it starts and ends, but the run in progress isn't saved yet, so a reload loses the current run. Step 3 of milestone 4 saves it.
 
 ## Codemap
 
 ### `src/lib`: the logic
 
 - `run.ts`: the run engine. The `RunState` union (ready, working, break, ended), the buttons (`play`, `pause`, `next`, `finish`), moving through rounds, blocks and cycles (`nextPosition`), the position label, work time from segments (`workedMs`), the earned break (`earnedBreakMs`), the view the timer screen shows (`viewRun`) and the run summary (`summarizeRun`).
+- `run-records.ts`: the `Run` and `WorkPeriod` records from the spec's data model, `recordPress`, which compares a run before and after a press to work out what to save, and the oldest-first orders `runsOldestFirst` and `workPeriodsOldestFirst`.
 - `block-view.ts`: `viewBlock`, what each block card shows, worked out from the run's view.
 - `routine.ts`: the `Routine` and `Block` types from the spec's data model, `pickableRoutines` (those not deleted, in custom order) and `createStarterRoutines`.
 - `routine-loading.ts`: `loadRoutines`, which creates the starter routines when storage holds none, then reads the routines.
-- `time.ts`: unit conversions (`MS_PER_SECOND`, `minutesToMs`) and time formatting (`formatElapsed` rounds down, `formatRemaining` rounds up).
+- `time.ts`: unit conversions (`MS_PER_SECOND`, `minutesToMs`), `toUtcTimestamp` for moments saved in storage, and time formatting (`formatElapsed` rounds down, `formatRemaining` rounds up).
 - `percent.ts`: `percentOf` and `asPercentOf`, multiplying before dividing.
 - `screens.ts`: `isCurrentScreen`, which link in the navigation is the current one.
-- `timer.svelte.ts`: `TimerSession`. The root layout makes the app's one session.
+- `timer.svelte.ts`: `TimerSession`, built from the routines and `TimerSessionOptions` (`clock`, `storage`, `newId`, `onWorkSaved`). The root layout makes the app's one session.
 - `page-reload.ts`: `reloadPage`, alone in its module so tests can replace it.
 
 ### `src/lib/storage`: where data is kept
 
-- `storage.ts`: the `CadoroStorage` interface, the only way the app reads and saves data. So far it reads the routines and adds them on the first launch.
-- `dexie-storage.ts`: `DexieStorage`, the app's backend, in the IndexedDB database `cadoro`, with schema version 1 declaring `routines`, `runs`, `workPeriods` and `runInProgress`.
+- `storage.ts`: the `CadoroStorage` interface, the only way the app reads and saves data. It reads the routines and adds them on the first launch, saves a press's run and work periods together (`saveRunRecords`), reads them back oldest first, and says whether any work period is saved.
+- `dexie-storage.ts`: `DexieStorage`, the app's backend, in the IndexedDB database `cadoro`, with schema version 1 declaring `routines`, `runs`, `workPeriods` and `runInProgress`. `runInProgress` is the only table not read or written yet.
 - `in-memory-storage.ts`: `InMemoryStorage`, for tests of code that uses storage.
+- `persistence.ts`: `askToPersistOnce`, which asks the browser for persistent storage at most once, and `askToPersistIfWorkSaved`, the check at startup.
 
 ### `src/lib/components`: the Svelte components
 
@@ -45,7 +47,7 @@ The run itself isn't saved yet, so a reload loses it. Steps 2 and 3 of milestone
 
 ### `src/routes`: the screens
 
-- `+layout.ts` turns off server-side rendering, so the app renders only in the browser, and its `load` opens storage and returns `{ timerSession }` as the layout's `data`, which every page receives.
+- `+layout.ts` turns off server-side rendering, so the app renders only in the browser, and its `load` opens storage and returns `{ timerSession }` as the layout's `data`, which every page receives. It also starts the check for persistent storage, without waiting for it.
 - `+layout.svelte` is the frame: the global styles from `layout.css`, the header, the navigation and `UpdatePrompt`.
 - `+page.svelte` is the Timer screen, showing the session from `data`. `routines/`, `stats/` and `settings/` hold the other screens. Settings shows the app's version.
 
@@ -53,7 +55,7 @@ The run itself isn't saved yet, so a reload loses it. Steps 2 and 3 of milestone
 
 - Unit tests sit beside their module as `*.test.ts`, component tests beside their component as `*.svelte.test.ts`, and storage tests beside their backend as `*.browser.test.ts`.
 - `storage.browser.test.ts` is the suite every backend shares, and `dexie-storage.browser.test.ts` covers what only IndexedDB has: data kept after reopening, two connections at once, the saved schema and the database's name.
-- `src/lib/testing/` holds test helpers: `durations.ts` (`seconds`, `minutes`, `hours`), `ids.ts` (`numberedIds`), `routines.ts` (`oneRoundRoutine`, `routineWith`) and `run-summary.ts` (`shownTotals`).
+- `src/lib/testing/` holds test helpers: `durations.ts` (`seconds`, `minutes`, `hours`), `ids.ts` (`numberedIds`), `routines.ts` (`oneRoundRoutine`, `routineWith`), `run-records.ts` (`runInProgress`, `firstWorkPeriod`, `runWith`, `workPeriodWith`) and `run-summary.ts` (`shownTotals`).
 - `e2e/` holds the Playwright journeys (`*.spec.ts`), with `clock.ts` (`openOnPausedClock`, `followLink`), `service-worker.ts` (`waitForActiveWorker`), and `update-server.ts`, which serves the production build with a new service worker to browsers that ask. `e2e/production/` holds the journeys against the production build.
 
 ### Config and tooling
@@ -74,6 +76,7 @@ The run itself isn't saved yet, so a reload loses it. Steps 2 and 3 of milestone
 - Work time is kept to the millisecond. Only the earned break is rounded, once, to whole seconds, when the break starts.
 - Every link and asset address goes through SvelteKit's `resolve()` or `%sveltekit.assets%`, so the app works under a base path such as `/cadoro`.
 - Data goes only through `CadoroStorage`. Nothing else opens IndexedDB.
+- A press's run and work periods are saved together or not at all, so a run is never saved as ended without its last work period. Saves reach storage in the order the buttons were pressed.
 - What's stored survives upgrades: schema version 1 never changes now that it's deployed, so a change to what's stored takes a new Dexie version with an upgrade, and a test for it.
 
 ## Cross-cutting concerns
@@ -84,6 +87,12 @@ The run itself isn't saved yet, so a reload loses it. Steps 2 and 3 of milestone
 - The run is held in `$state.raw`, because the engine replaces it whole. The view is `$derived` from the run and the last tick's moment.
 - An effect that should restart only when something changes reads a `$derived` of that thing, such as `isRunning`, not a value that changes on every tick.
 - State about a screen rather than the run, such as whether Finish is asking, is the screen's own `$state`.
+
+### Saving
+
+- The buttons stay synchronous, and the screen changes at once. `TimerSession` puts each save on a promise chain, so each starts once the one before has finished, and doesn't wait for it.
+- A failed save, or a failed request for persistent storage, is logged with `console.error`, and the app carries on. Milestone 8's activity log records errors.
+- Persistent storage is asked for at most once per launch: at startup when work is saved, or else after the first work period is saved.
 
 ### Styling and themes
 
@@ -96,6 +105,7 @@ The run itself isn't saved yet, so a reload loses it. Steps 2 and 3 of milestone
 
 - Vitest's `server` project runs `*.test.ts` in Node, and its `client` project runs `*.svelte.test.ts` and `*.browser.test.ts` in Chromium through browser mode, where storage tests use the real IndexedDB, with a new database per test.
 - Component tests find elements by role and label. The timer's tests drive the session with a fake clock and fake only `setInterval` and `clearInterval`, and the update prompt's replace the PWA plugin's module with `vi.mock`.
+- The session's tests give it `InMemoryStorage` and read what was saved with `expect.poll`, since saves finish after the press. The persistence tests use a fake `StorageManager`, since the real one's answer depends on the browser's own judgement.
 - Tests write times as `minutes(25)`, not `25 * 60_000`, and keep their data visible rather than importing it from the code they check.
 - Playwright's projects are `desktop` and `phone` against the dev server (`PORT`, 5173 by default), `production` against a build at `/cadoro` on port 4175, and `updates` against the update server on port 4176.
 - Journeys that run the timer start on a paused fake clock with `openOnPausedClock`, move it with `fastForward`, and follow links with `followLink`, since SvelteKit waits on a timer before navigating.
