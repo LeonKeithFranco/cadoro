@@ -6,6 +6,7 @@ import { SettingsSession } from '#lib/settings.svelte.ts';
 import { DexieStorage } from '#lib/storage/dexie-storage.ts';
 import { askToPersistIfWorkSaved, askToPersistOnce } from '#lib/storage/persistence.ts';
 import { TimerSession, type TimerSessionOptions } from '#lib/timer.svelte.ts';
+import { WakeLockKeeper } from '#lib/wake-lock.svelte.ts';
 import type { LayoutLoad } from './$types';
 
 /**
@@ -31,6 +32,8 @@ type AppSessions = {
 	timerSession: TimerSession;
 	/** The user's settings, following storage. */
 	settingsSession: SettingsSession;
+	/** Keeps the screen on during a run, and says whether the browser can. */
+	wakeLockKeeper: WakeLockKeeper;
 };
 
 /**
@@ -48,7 +51,8 @@ type AppSessions = {
  * prompt, never holds up the first render.
  *
  * TypeScript's DOM types say `navigator.locks` is always there, but it's missing outside HTTPS
- * and `localhost`, as `navigator.storage` is.
+ * and `localhost`, as `navigator.storage` is. `navigator.wakeLock` is also missing there, and in
+ * browsers without the Screen Wake Lock API.
  *
  * The settings are read with the routines, so the first render already has them.
  *
@@ -57,7 +61,7 @@ type AppSessions = {
  * nothing has rendered yet. The chimes follow the session for as long as the app is open, so
  * nothing else needs to keep them.
  *
- * @returns The new timer session and settings session.
+ * @returns The new timer session, settings session and wake lock keeper.
  * @throws Rejects with storage's own error when the routines, the settings or the run in
  * progress can't be read, or the routines can't be saved.
  */
@@ -94,7 +98,14 @@ async function openApp(): Promise<AppSessions> {
 		locks,
 		address: asset
 	});
-	return { timerSession, settingsSession };
+	const wakeLock: WakeLock | undefined = navigator.wakeLock;
+	const wakeLockKeeper = new WakeLockKeeper({
+		timer: timerSession,
+		settings: settingsSession,
+		wakeLock,
+		page: document
+	});
+	return { timerSession, settingsSession, wakeLockKeeper };
 }
 
 /**
