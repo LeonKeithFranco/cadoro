@@ -271,7 +271,9 @@ export class DexieStorage implements CadoroStorage {
 	 * The routines are read and saved in one read-write transaction, so two tabs changing them at
 	 * once each plan against the routines the other left. The log entry is written afterwards, in
 	 * a transaction of its own, since an entry that couldn't be written must never undo the change
-	 * or stop it, as the spec says. A failed log write is reported with `console.error`.
+	 * or stop it, as the spec says. A failed log write is recorded as an
+	 * error entry through `recordErrorIn`, which writes to `console.error` when the log can't take
+	 * even that.
 	 *
 	 * @param plan - Works out the change from every routine saved, or returns `null` for none.
 	 * @returns The change that was saved, or `null` when the plan found nothing to change.
