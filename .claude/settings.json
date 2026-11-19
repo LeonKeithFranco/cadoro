@@ -1,0 +1,11 @@
+{
+	"permissions": {
+		"ask": [
+			"Edit(/eslint.config.js)",
+			"Edit(/tsconfig.json)",
+			"Edit(/playwright.config.ts)",
+			"Edit(/.github/workflows/**)",
+			"Edit(/.claude/settings.json)"
+		]
+	}
+}
