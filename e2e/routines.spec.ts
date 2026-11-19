@@ -349,11 +349,23 @@ test('the routine being run can’t be edited or deleted, in any tab, until the 
 		await expect(other.getByRole('button', { name: 'Delete' })).toBeEnabled();
 	});
 
-	await test.step('both come back once the run ends', async () => {
+	await test.step('both stay off while the ended run’s summary is open, so a reload still finds it', async () => {
 		await firstTab.getByRole('button', { name: 'Finish' }).click();
 		await firstTab
 			.getByRole('dialog', { name: 'Finish this run?' })
 			.getByRole('button', { name: 'Finish' })
+			.click();
+		await settle(firstTab);
+
+		const running = cardOf(secondTab, 'Classic');
+		await expect(running.getByRole('button', { name: 'Edit' })).toBeDisabled();
+		await expect(running.getByRole('button', { name: 'Delete' })).toBeDisabled();
+	});
+
+	await test.step('both come back once the summary is closed', async () => {
+		await firstTab
+			.getByRole('dialog', { name: 'Run summary' })
+			.getByRole('button', { name: 'Done' })
 			.click();
 		await settle(firstTab);
 
