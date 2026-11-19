@@ -95,11 +95,11 @@ type WorkPeriod = {
 type Settings = {
 	theme: 'system' | 'light' | 'dark'; // Defaults to "dark".
 	volume: number; // 0–100. Defaults to 70.
-	targetChime: string; // Chime id, played when a work period reaches its target.
-	breakChime: string; // Chime id, played when a break reaches 0:00. Defaults to the same chime as targetChime.
+	targetChime: string; // Chime id, played when a work period reaches its target. Defaults to "bell-ding-1".
+	breakChime: string; // Chime id, played when a break reaches 0:00. Defaults to "bell-ding-1", the same as targetChime.
 	keepScreenAwake: boolean; // Defaults to true.
 	routineSort: RoutineSort; // Defaults to "custom".
-	lastRoutineId: string | null;
+	lastRoutineId: string | null; // The routine the last run started with. null until a run has started.
 };
 
 type RoutineSort =
@@ -109,6 +109,7 @@ type RoutineSort =
 - Exact moments, such as when a work period started, are stored as UTC timestamps. Days, weeks and months are worked out in the device's local time zone when stats are shown.
 - Work time is stored to the millisecond and rounded only for display.
 - A work period stores its unpaused segments, so paused time is never counted as work, and a period that runs past midnight can be split exactly between the two days.
+- Storage keeps only the settings that have been changed, and every other setting reads as its default, so a default changed in a later version reaches users who never touched it. A chime id the app doesn't have, such as one a later version removed, plays and shows as the default chime.
 
 ## Features
 
@@ -147,7 +148,7 @@ They can be edited and deleted like any other routine, and aren't created again 
 
 ### The timer screen
 
-- The routine picker at the top selects which routine to run. The app opens on the last routine used.
+- The routine picker at the top selects which routine to run. The app opens on the routine the last run started with, saved when that run started, or on the first routine in the picker when there is none or it's been deleted.
 - The blocks stack in one column, in the order the run goes through them, on every screen size.
 - Each block shows its title, its target and break percentage, and two boxes: the work timer above the break timer, as in the original sketch.
 - The active timer is highlighted, and the screen shows exactly where the run is in both rounds and cycles, such as "Round 2 of 4 · Block 2 of 3 · Cycle 1 of 3". For an infinite routine it shows "Round 5" with no total. A part whose total is 1 never changes, so it's left out: Classic shows just "Round 5", and a block of 1 cycle shows no cycle.
@@ -183,16 +184,22 @@ Done or Escape closes the dialog and returns the routine to its starting state, 
 ### Alerts
 
 - Alerts are sound only: one chime when a work period reaches its target, and one when a break reaches 0:00.
-- The app has a small set of openly licensed or royalty-free chimes, all normalised to the same loudness. Settings has one picker for each alert, which use the same chime by default, a preview button for each, and one volume slider.
+- The app has four openly licensed (CC0) chimes, all normalised to the same loudness, and both alerts play the first by default. Settings has one picker for each alert, a Preview button for each, and one volume slider, saved when the slider is released.
 - Each chime's source and licence are recorded in the repo.
-- Chimes play on time in a background tab on desktop.
+- Chimes are scheduled ahead, on the audio clock, so they play on time in a background tab on desktop. They're kept offline with the app.
+- A chime is due only while its moment is still ahead. Reaching a target after a reload, or a break that was already over, never plays one late, and a break that earned 0 seconds is silent. Pause, Next, Finish and another tab's change move or cancel the scheduled chime, and a chime already playing finishes.
+- Browsers allow sound only after a gesture, so nothing sounds until a button has been pressed in the tab. Every button press counts, not only Play.
+- With the app open in several tabs, only one tab sounds each chime, and the next tab takes over when it closes. Where the browser can't take turns, every tab that has had a button pressed sounds it.
+- A Preview plays at once in the tab where it's pressed, at the chosen volume, whether or not that tab holds the chimes' turn, and doesn't change the run's scheduled chimes.
+- A chime file that fails to load is logged once and not retried.
 - While the phone is locked or the app is closed, chimes can't be relied on, because a static PWA can't run on a schedule without a server. This is documented as a limitation. The optional Web Push work after 1.0 would address it.
 
 ### Keeping the screen awake
 
-- While a run is in progress, the app asks the browser to keep the screen on with the Screen Wake Lock API, unless that's turned off in Settings. It's on by default.
-- The browser drops the lock when the page is hidden, so the app asks again when it's visible.
-- Where the API isn't supported, the setting says so and the app works the same.
+- While a work period or break is counting, the app asks the browser to keep the screen on with the Screen Wake Lock API, unless that's turned off in Settings. It's on by default.
+- The lock is released on Pause, when the run ends, when the setting is turned off, and when the page is hidden. The app asks again when the page is visible and a timer is counting.
+- A refused request is logged, and the app carries on.
+- Where the API isn't supported, the checkbox is disabled and unchecked, with a note that the screen may turn off during a run, and the app works the same.
 
 ### Routines screen
 
@@ -244,13 +251,15 @@ All stats come from saved work periods and runs.
 
 ### Settings
 
-- Theme: System, Light or Dark, defaulting to Dark
-- The chime for each alert, and the volume
+- Theme: System, Light or Dark, defaulting to Dark. System follows the device's light or dark setting live. The saved theme shows before the first paint, so there's no flash of the wrong one.
+- The chime for each alert, with a Preview button, and the volume
 - Keep the screen awake during a run
 - CSV export, JSON backup and import
 - Persistent storage status
 - The activity log
 - The app's version
+
+A change is saved as it's made, and shows in every open tab.
 
 ### Activity log
 
@@ -286,7 +295,7 @@ type LogEntry = {
 
 - The app asks the browser for persistent storage with `navigator.storage.persist()`, so a browser low on space doesn't delete the data without asking.
 - It asks after the first work period is saved, and again at startup while storage isn't persistent yet. It doesn't ask on an empty first visit, because Firefox shows a prompt for it.
-- Settings shows whether storage is persistent, with a button to ask again when it isn't.
+- Settings shows whether storage is persistent as On or Off, or Unknown where the browser can't say, with an "Ask again" button while it's Off. A refusal shows a note that the browser declined.
 - The browser can refuse, and the app works the same either way.
 - Persistent storage doesn't protect against clearing site data, uninstalling or changing devices, so the JSON backup is still the backup.
 
