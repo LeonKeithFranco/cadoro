@@ -8,22 +8,62 @@ import { runInProgressWith, savedRunInProgress } from '../testing/run-in-progres
 import { firstWorkPeriod, runInProgress, runWith, workPeriodWith } from '../testing/run-records';
 import { DexieStorage } from './dexie-storage';
 import { InMemoryStorage } from './in-memory-storage';
-import type { CadoroStorage } from './storage';
+import type { CadoroStorage, StorageOptions } from './storage';
 
 /** A backend the shared suite checks. */
 type Backend = {
 	/** The backend's class name, which names its group of tests. */
 	name: string;
 	/** Makes a new, empty storage, so no test sees another's data. */
-	create: () => CadoroStorage;
+	create: (options?: StorageOptions) => CadoroStorage;
 };
 
 /** Every backend, each checked against the same tests, so they all keep the same contract. */
 const backends: Backend[] = [
-	{ name: 'InMemoryStorage', create: () => new InMemoryStorage() },
+	{ name: 'InMemoryStorage', create: (options) => new InMemoryStorage(options) },
 	// A new database for each test. The test browser starts with no data on every run.
-	{ name: 'DexieStorage', create: () => new DexieStorage(`test-${crypto.randomUUID()}`) }
+	{
+		name: 'DexieStorage',
+		create: (options) => new DexieStorage(`test-${crypto.randomUUID()}`, options)
+	}
 ];
+
+/** The moment every storage in these tests believes it is, so log timestamps can be checked. */
+const NOW = '2026-11-19T10:00:00.000Z';
+
+/** Options that give a storage the fixed moment {@link NOW}. */
+const atNow: StorageOptions = { now: () => new Date(NOW) };
+
+/**
+ * Makes storage that holds three routines, a, b and c, in that order.
+ *
+ * @param create - Makes the backend's storage.
+ * @param options - What to give the storage, such as the fixed moment.
+ * @returns The storage, with an empty log, since adding the first routines isn't a change.
+ */
+async function storageWithAbc(
+	create: (options?: StorageOptions) => CadoroStorage,
+	options: StorageOptions = atNow
+): Promise<CadoroStorage> {
+	const storage = create(options);
+	await storage.addRoutinesIfNone([
+		routineWith({ id: 'a', title: 'A', customPosition: 0 }),
+		routineWith({ id: 'b', title: 'B', customPosition: 1 }),
+		routineWith({ id: 'c', title: 'C', customPosition: 2 })
+	]);
+	return storage;
+}
+
+/**
+ * Reads each routine's id and position, for the routines not deleted.
+ *
+ * @param storage - The storage to read.
+ * @returns `id:position` for each, in custom order.
+ */
+async function placed(storage: CadoroStorage): Promise<string[]> {
+	const routines = await storage.getRoutines();
+	return routines.map((routine) => `${routine.id}:${routine.customPosition}`);
+}
 
 /** What a test following the run in progress has been told so far. */
 type Reports = {
@@ -157,6 +197,429 @@ describe.each(backends)('$name', ({ create }) => {
 			const [saved] = await storage.getRoutines();
 
 			expect(saved?.title).toBe('Writing');
+		});
+	});
+
+	describe('getAllRoutines', () => {
+		it('returns nothing from empty storage', async () => {
+			expect(await create().getAllRoutines()).toEqual([]);
+		});
+
+		it('returns deleted routines too, in custom order', async () => {
+			const storage = create();
+			await storage.addRoutinesIfNone([
+				routineWith({ id: 'second', customPosition: 1 }),
+				routineWith({ id: 'deleted', customPosition: 2, deletedAt: '2026-01-05T09:00:00.000Z' }),
+				routineWith({ id: 'first', customPosition: 0 })
+			]);
+
+			const routines = await storage.getAllRoutines();
+
+			expect(routines.map((routine) => routine.id)).toEqual(['first', 'second', 'deleted']);
+		});
+
+		it('returns copies, so changing one leaves the saved routine unchanged', async () => {
+			const storage = create();
+			await storage.addRoutinesIfNone([routineWith({ title: 'Writing' })]);
+			requireDefined((await storage.getAllRoutines())[0], 'the saved routine').title = 'Changed';
+
+			expect((await storage.getAllRoutines())[0]?.title).toBe('Writing');
+		});
+	});
+
+	describe('createRoutine', () => {
+		it('puts the routine at its position and moves down those from there on', async () => {
+			const storage = await storageWithAbc(create);
+
+			await storage.createRoutine(routineWith({ id: 'new', customPosition: 0 }));
+
+			expect(await placed(storage)).toEqual(['new:0', 'a:1', 'b:2', 'c:3']);
+		});
+
+		it('saves every field of the routine', async () => {
+			const storage = await storageWithAbc(create);
+			const routine = routineWith({
+				id: 'new',
+				title: 'New',
+				rounds: 'infinite',
+				customPosition: 3,
+				createdAt: NOW
+			});
+
+			await storage.createRoutine(routine);
+
+			expect((await storage.getRoutines()).at(-1)).toEqual(routine);
+		});
+
+		it('saves a copy, so changing the routine afterwards leaves the saved one unchanged', async () => {
+			const storage = await storageWithAbc(create);
+			const routine = routineWith({ id: 'new', title: 'New', customPosition: 3 });
+			await storage.createRoutine(routine);
+			routine.title = 'Changed';
+
+			expect((await storage.getRoutines()).at(-1)?.title).toBe('New');
+		});
+
+		it('refuses an id that is saved already, even a deleted routine’s, and changes nothing', async () => {
+			const storage = await storageWithAbc(create);
+			await storage.deleteRoutine('c');
+
+			await expect(
+				storage.createRoutine(routineWith({ id: 'c', customPosition: 0 }))
+			).rejects.toThrow('already saved');
+			await expect(
+				storage.createRoutine(routineWith({ id: 'a', customPosition: 0 }))
+			).rejects.toThrow('already saved');
+
+			expect(await placed(storage)).toEqual(['a:0', 'b:1']);
+			expect(await storage.getLogEntries()).toHaveLength(1);
+		});
+	});
+
+	describe('duplicateRoutine', () => {
+		it('puts the copy just below the original, whatever position the copy has', async () => {
+			const storage = await storageWithAbc(create);
+
+			await storage.duplicateRoutine(routineWith({ id: 'copy', customPosition: 0 }), 'a');
+
+			expect(await placed(storage)).toEqual(['a:0', 'copy:1', 'b:2', 'c:3']);
+		});
+
+		it('refuses an original that is missing or deleted, and changes nothing', async () => {
+			const storage = await storageWithAbc(create);
+			await storage.deleteRoutine('c');
+
+			await expect(storage.duplicateRoutine(routineWith({ id: 'copy' }), 'c')).rejects.toThrow(
+				'none is saved'
+			);
+			await expect(storage.duplicateRoutine(routineWith({ id: 'copy' }), 'x')).rejects.toThrow(
+				'none is saved'
+			);
+
+			expect(await placed(storage)).toEqual(['a:0', 'b:1']);
+		});
+	});
+
+	describe('saveRoutine', () => {
+		it('saves the new title, rounds and blocks', async () => {
+			const storage = await storageWithAbc(create);
+			const blocks = [
+				{ id: 'only', title: 'Deep work', targetMinutes: 50, breakPercent: 10, cycles: 1 }
+			];
+
+			await storage.saveRoutine(routineWith({ id: 'b', title: 'Renamed', rounds: 4, blocks }));
+
+			const saved = requireDefined(
+				(await storage.getRoutines()).find((routine) => routine.id === 'b'),
+				'routine b'
+			);
+			expect(saved.title).toBe('Renamed');
+			expect(saved.rounds).toBe(4);
+			expect(saved.blocks).toEqual(blocks);
+		});
+
+		it('keeps the saved position, creation date and deletion, so an old edit can’t undo a reorder', async () => {
+			const storage = await storageWithAbc(create);
+			await storage.reorderRoutines(['c', 'b', 'a']);
+
+			await storage.saveRoutine(
+				routineWith({
+					id: 'a',
+					title: 'Edited',
+					customPosition: 0,
+					createdAt: '2000-01-01T00:00:00.000Z',
+					deletedAt: NOW
+				})
+			);
+
+			const saved = requireDefined(
+				(await storage.getRoutines()).find((routine) => routine.id === 'a'),
+				'routine a'
+			);
+			expect(saved).toEqual(routineWith({ id: 'a', title: 'Edited', customPosition: 2 }));
+		});
+
+		it('refuses a routine that is missing or deleted, and changes nothing', async () => {
+			const storage = await storageWithAbc(create);
+			await storage.deleteRoutine('c');
+
+			await expect(storage.saveRoutine(routineWith({ id: 'c', title: 'X' }))).rejects.toThrow(
+				'none is saved'
+			);
+			await expect(storage.saveRoutine(routineWith({ id: 'x', title: 'X' }))).rejects.toThrow(
+				'none is saved'
+			);
+
+			expect((await storage.getAllRoutines()).map((routine) => routine.title)).toEqual([
+				'A',
+				'B',
+				'C'
+			]);
+		});
+	});
+
+	describe('deleteRoutine', () => {
+		it('sets deletedAt to the moment of the deletion and hides the routine from getRoutines', async () => {
+			const storage = await storageWithAbc(create);
+
+			const deleted = await storage.deleteRoutine('b');
+
+			expect(deleted).toBe(true);
+			expect(await placed(storage)).toEqual(['a:0', 'c:2']);
+			const all = await storage.getAllRoutines();
+			expect(all.find((routine) => routine.id === 'b')?.deletedAt).toBe(NOW);
+		});
+
+		it('refuses to delete the only routine not deleted, saying so, and changes nothing', async () => {
+			const storage = await storageWithAbc(create);
+			await storage.deleteRoutine('a');
+			await storage.deleteRoutine('b');
+
+			const deleted = await storage.deleteRoutine('c');
+
+			expect(deleted).toBe(false);
+			expect(await placed(storage)).toEqual(['c:2']);
+			expect(await storage.getLogEntries()).toHaveLength(2);
+		});
+
+		it('allows deleting down to the last routine, whatever the number of deleted ones', async () => {
+			const storage = create();
+			await storage.addRoutinesIfNone([
+				routineWith({ id: 'gone', deletedAt: '2026-01-05T09:00:00.000Z' }),
+				routineWith({ id: 'one', customPosition: 1 }),
+				routineWith({ id: 'two', customPosition: 2 })
+			]);
+
+			expect(await storage.deleteRoutine('one')).toBe(true);
+			expect(await storage.deleteRoutine('two')).toBe(false);
+		});
+
+		it('refuses a routine that is missing or already deleted', async () => {
+			const storage = await storageWithAbc(create);
+			await storage.deleteRoutine('c');
+
+			await expect(storage.deleteRoutine('c')).rejects.toThrow('none is saved');
+			await expect(storage.deleteRoutine('x')).rejects.toThrow('none is saved');
+		});
+	});
+
+	describe('reorderRoutines', () => {
+		it('saves the new order', async () => {
+			const storage = await storageWithAbc(create);
+
+			const changed = await storage.reorderRoutines(['c', 'a', 'b']);
+
+			expect(changed).toBe(true);
+			expect(await placed(storage)).toEqual(['c:0', 'a:1', 'b:2']);
+		});
+
+		it('leaves deleted routines where they were', async () => {
+			const storage = await storageWithAbc(create);
+			await storage.deleteRoutine('b');
+
+			await storage.reorderRoutines(['c', 'a']);
+
+			const all = await storage.getAllRoutines();
+			expect(all.map((routine) => `${routine.id}:${routine.customPosition}`)).toEqual([
+				'c:0',
+				'a:1',
+				'b:1'
+			]);
+		});
+
+		it('says no, and saves and logs nothing, when the order is the saved one', async () => {
+			const storage = await storageWithAbc(create);
+
+			const changed = await storage.reorderRoutines(['a', 'b', 'c']);
+
+			expect(changed).toBe(false);
+			expect(await storage.getLogEntries()).toEqual([]);
+		});
+
+		it('refuses ids that are not exactly the routines not deleted, each once, and changes nothing', async () => {
+			const storage = await storageWithAbc(create);
+			await storage.deleteRoutine('c');
+
+			await expect(storage.reorderRoutines(['b', 'a', 'c'])).rejects.toThrow('each once');
+			await expect(storage.reorderRoutines(['b'])).rejects.toThrow('each once');
+			await expect(storage.reorderRoutines(['b', 'b'])).rejects.toThrow('each once');
+
+			expect(await placed(storage)).toEqual(['a:0', 'b:1']);
+		});
+	});
+
+	describe('watchRoutines', () => {
+		/**
+		 * Follows a storage's routines, keeping each report.
+		 *
+		 * @param storage - The storage to follow.
+		 * @returns The routines' ids reported so far, which grow, and the way to stop.
+		 */
+		function followRoutines(storage: CadoroStorage): { changes: string[][]; stop: () => void } {
+			const changes: string[][] = [];
+			const stop = storage.watchRoutines(
+				(routines) => {
+					changes.push(routines.map((routine) => routine.id));
+				},
+				(error: unknown) => {
+					throw new Error('Following the routines failed.', { cause: error });
+				}
+			);
+			return { changes, stop };
+		}
+
+		it('reports the routines soon after following starts, and not during the call', async () => {
+			const storage = await storageWithAbc(create);
+
+			const reports = followRoutines(storage);
+
+			expect(reports.changes).toEqual([]);
+			await expect.poll(() => reports.changes).toEqual([['a', 'b', 'c']]);
+		});
+
+		it('reports each kind of change, leaving out deleted routines', async () => {
+			const storage = await storageWithAbc(create);
+			const reports = followRoutines(storage);
+			await expect.poll(() => reports.changes).toHaveLength(1);
+
+			await storage.createRoutine(routineWith({ id: 'new', customPosition: 0 }));
+			await expect.poll(() => reports.changes.at(-1)).toEqual(['new', 'a', 'b', 'c']);
+
+			await storage.reorderRoutines(['a', 'new', 'b', 'c']);
+			await expect.poll(() => reports.changes.at(-1)).toEqual(['a', 'new', 'b', 'c']);
+
+			await storage.deleteRoutine('new');
+			await expect.poll(() => reports.changes.at(-1)).toEqual(['a', 'b', 'c']);
+
+			await storage.saveRoutine(routineWith({ id: 'a', title: 'Renamed' }));
+			await expect.poll(() => reports.changes.length).toBeGreaterThan(3);
+			await storage.duplicateRoutine(routineWith({ id: 'copy' }), 'a');
+			await expect.poll(() => reports.changes.at(-1)).toEqual(['a', 'copy', 'b', 'c']);
+		});
+
+		it('reports the starter routines when they are added', async () => {
+			const storage = create();
+			const reports = followRoutines(storage);
+			await expect.poll(() => reports.changes).toEqual([[]]);
+
+			await storage.addRoutinesIfNone([routineWith({ id: 'starter' })]);
+
+			await expect.poll(() => reports.changes.at(-1)).toEqual(['starter']);
+		});
+
+		it('reports to everything following, as each open tab follows', async () => {
+			const storage = await storageWithAbc(create);
+			const first = followRoutines(storage);
+			const second = followRoutines(storage);
+
+			await storage.deleteRoutine('c');
+
+			await expect.poll(() => first.changes.at(-1)).toEqual(['a', 'b']);
+			await expect.poll(() => second.changes.at(-1)).toEqual(['a', 'b']);
+		});
+
+		it('reports nothing more once stopped', async () => {
+			const storage = await storageWithAbc(create);
+			const stopped = followRoutines(storage);
+			const still = followRoutines(storage);
+			await expect.poll(() => stopped.changes).toHaveLength(1);
+
+			stopped.stop();
+			await storage.deleteRoutine('c');
+
+			await expect.poll(() => still.changes.at(-1)).toEqual(['a', 'b']);
+			expect(stopped.changes).toHaveLength(1);
+		});
+	});
+
+	describe('getLogEntries', () => {
+		it('returns nothing from empty storage, and nothing for adding the first routines', async () => {
+			const storage = await storageWithAbc(create);
+
+			expect(await storage.getLogEntries()).toEqual([]);
+		});
+
+		it('logs each change as a change entry stamped with the moment of the change, newest first', async () => {
+			const storage = await storageWithAbc(create);
+
+			await storage.createRoutine(routineWith({ id: 'new', title: 'New', customPosition: 0 }));
+			await storage.deleteRoutine('new');
+
+			const entries = await storage.getLogEntries();
+			expect(entries.map((entry) => entry.message)).toEqual([
+				'Deleted routine "New"',
+				'Created routine "New"'
+			]);
+			expect(entries.map((entry) => entry.type)).toEqual(['change', 'change']);
+			expect(entries.map((entry) => entry.timestamp)).toEqual([NOW, NOW]);
+			const [newer, older] = entries;
+			expect(requireDefined(newer, 'the newer entry').id).toBeGreaterThan(
+				requireDefined(older, 'the older entry').id
+			);
+		});
+
+		it('logs an edit with the old and new title, rounds and blocks', async () => {
+			const storage = await storageWithAbc(create);
+			const blocks = routineWith({}).blocks;
+
+			await storage.saveRoutine(routineWith({ id: 'b', title: 'Renamed', rounds: 'infinite' }));
+
+			const [entry] = await storage.getLogEntries();
+			expect(entry?.message).toBe('Edited routine "Renamed"');
+			expect(entry?.details).toEqual({
+				action: 'edit',
+				routineId: 'b',
+				old: { title: 'B', rounds: 1, blocks },
+				new: { title: 'Renamed', rounds: 'infinite', blocks }
+			});
+		});
+
+		it('logs a creation, a duplicate, a deletion and a reorder, each with its details', async () => {
+			const storage = await storageWithAbc(create);
+
+			await storage.createRoutine(routineWith({ id: 'new', title: 'New', customPosition: 3 }));
+			await storage.duplicateRoutine(routineWith({ id: 'copy', title: 'A (copy)' }), 'a');
+			await storage.reorderRoutines(['copy', 'a', 'b', 'c', 'new']);
+			await storage.deleteRoutine('new');
+
+			const entries = await storage.getLogEntries();
+			expect(entries.map((entry) => entry.details?.['action'])).toEqual([
+				'delete',
+				'reorder',
+				'duplicate',
+				'create'
+			]);
+			expect(entries[0]?.details).toMatchObject({ routineId: 'new' });
+			expect(entries[1]?.details).toEqual({
+				action: 'reorder',
+				old: ['a', 'copy', 'b', 'c', 'new'],
+				new: ['copy', 'a', 'b', 'c', 'new']
+			});
+			expect(entries[2]?.details).toMatchObject({ routineId: 'copy', originalId: 'a' });
+			expect(entries[3]?.details).toMatchObject({ routineId: 'new' });
+		});
+
+		it('returns copies, so changing one leaves the saved entry unchanged', async () => {
+			const storage = await storageWithAbc(create);
+			await storage.deleteRoutine('c');
+			requireDefined((await storage.getLogEntries())[0], 'the entry').message = 'Changed';
+
+			expect((await storage.getLogEntries())[0]?.message).toBe('Deleted routine "C"');
+		});
+
+		it('keeps only the newest entries once the log is over its limit', async () => {
+			const storage = await storageWithAbc(create, { ...atNow, logLimit: 3 });
+
+			for (const title of ['one', 'two', 'three', 'four', 'five']) {
+				await storage.saveRoutine(routineWith({ id: 'a', title }));
+			}
+
+			const entries = await storage.getLogEntries();
+			expect(entries.map((entry) => entry.message)).toEqual([
+				'Edited routine "five"',
+				'Edited routine "four"',
+				'Edited routine "three"'
+			]);
 		});
 	});
 

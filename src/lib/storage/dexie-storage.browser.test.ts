@@ -82,10 +82,44 @@ describe('DexieStorage', () => {
 		expect(await upgraded.getRuns()).toEqual([runInProgress]);
 		expect(await upgraded.getWorkPeriods()).toEqual([firstWorkPeriod]);
 		expect(await upgraded.getRunInProgress()).toEqual(savedRunInProgress);
-		expect((await openAsSaved(name)).verno).toBe(3);
+		expect((await openAsSaved(name)).verno).toBe(4);
 	});
 
-	it('creates schema version 3, with every table the spec defines, each with its key', async () => {
+	it('upgrades a version-3 database, adding the log table and keeping every row', async () => {
+		const name = newDatabaseName();
+		const version3 = new Dexie(name);
+		// Version 3's schema as 0.7 declared it, written out here so a change to the app's can't
+		// change what this test starts from.
+		version3
+			.version(1)
+			.stores({ routines: 'id', runs: 'id', workPeriods: 'id', runInProgress: '' });
+		version3.version(2).stores({});
+		version3.version(3).stores({ settings: '' });
+		await version3.table('routines').add(routineWith({ id: 'kept' }));
+		await version3.table('runs').add(runInProgress);
+		await version3.table('workPeriods').add(firstWorkPeriod);
+		await version3.table('runInProgress').put(savedRunInProgress, 'current');
+		await version3.table('settings').put({ volume: 10 }, 'current');
+		version3.close();
+
+		const upgraded = new DexieStorage(name, {
+			now: (): Date => new Date('2026-11-19T10:00:00.000Z')
+		});
+
+		expect(await upgraded.getLogEntries()).toEqual([]);
+		await upgraded.saveRoutine(routineWith({ id: 'kept', title: 'Edited' }));
+		const [entry] = await upgraded.getLogEntries();
+		expect(entry?.id).toBe(1);
+		expect(entry?.message).toBe('Edited routine "Edited"');
+		expect(await upgraded.getAllRoutines()).toEqual([routineWith({ id: 'kept', title: 'Edited' })]);
+		expect((await upgraded.getSettings()).volume).toBe(10);
+		expect(await upgraded.getRuns()).toEqual([runInProgress]);
+		expect(await upgraded.getWorkPeriods()).toEqual([firstWorkPeriod]);
+		expect(await upgraded.getRunInProgress()).toEqual(savedRunInProgress);
+		expect((await openAsSaved(name)).verno).toBe(4);
+	});
+
+	it('creates schema version 4, with every table the spec defines, each with its key', async () => {
 		const name = newDatabaseName();
 		await new DexieStorage(name).getRoutines();
 
@@ -97,8 +131,9 @@ describe('DexieStorage', () => {
 		const transaction = database.transaction(storeNames);
 		const keyPaths = storeNames.map((store) => [store, transaction.objectStore(store).keyPath]);
 
-		expect(saved.verno).toBe(3);
+		expect(saved.verno).toBe(4);
 		expect(keyPaths).toEqual([
+			['log', 'id'],
 			['routines', 'id'],
 			['runInProgress', null],
 			['runs', 'id'],
@@ -133,7 +168,7 @@ describe('DexieStorage', () => {
 		expect(await upgraded.getRoutines()).toEqual([routineWith({ id: 'kept' })]);
 		expect(await upgraded.getRuns()).toEqual([runInProgress]);
 		expect(await upgraded.getWorkPeriods()).toEqual([firstWorkPeriod]);
-		expect((await openAsSaved(name)).verno).toBe(3);
+		expect((await openAsSaved(name)).verno).toBe(4);
 	});
 
 	it('upgrades a version-1 database with no run in progress, leaving it with none', async () => {
@@ -353,6 +388,176 @@ describe('DexieStorage', () => {
 
 			expect(localStorage.getItem(THEME_MIRROR_KEY)).toBe('light');
 		});
+	});
+
+	it('reports a routine change made through another connection, as another tab’s', async () => {
+		const name = newDatabaseName();
+		const firstTab = new DexieStorage(name);
+		const secondTab = new DexieStorage(name);
+		await firstTab.addRoutinesIfNone([
+			routineWith({ id: 'a', customPosition: 0 }),
+			routineWith({ id: 'b', customPosition: 1 })
+		]);
+		const reports: string[][] = [];
+		firstTab.watchRoutines(
+			(routines) => reports.push(routines.map((routine) => routine.id)),
+			() => {}
+		);
+		await expect.poll(() => reports).toEqual([['a', 'b']]);
+
+		await secondTab.deleteRoutine('a');
+
+		await expect.poll(() => reports.at(-1)).toEqual(['b']);
+	});
+
+	it('reports an error, and no routines, when the routines can’t be read', async () => {
+		const storage = new DexieStorage(newDatabaseName());
+		await storage.getRoutines();
+		vi.spyOn(IDBObjectStore.prototype, 'getAll').mockImplementation(() => {
+			throw new DOMException('The disk could not be read.', 'UnknownError');
+		});
+		vi.spyOn(IDBObjectStore.prototype, 'openCursor').mockImplementation(() => {
+			throw new DOMException('The disk could not be read.', 'UnknownError');
+		});
+		const onChange = vi.fn();
+		const onError = vi.fn();
+
+		storage.watchRoutines(onChange, onError);
+
+		await expect.poll(() => onError).toHaveBeenCalledOnce();
+		expect(onChange).not.toHaveBeenCalled();
+	});
+
+	it('keeps the log after the database is opened again, with ids that carry on counting', async () => {
+		const name = newDatabaseName();
+		const first = new DexieStorage(name);
+		await first.addRoutinesIfNone([routineWith({ id: 'a' }), routineWith({ id: 'b' })]);
+		await first.deleteRoutine('a');
+
+		const reopened = new DexieStorage(name);
+		await reopened.saveRoutine(routineWith({ id: 'b', title: 'Edited' }));
+
+		const entries = await reopened.getLogEntries();
+		expect(entries.map((entry) => entry.id)).toEqual([2, 1]);
+	});
+
+	it('applies two changes from two connections one after the other, as two tabs at once', async () => {
+		const name = newDatabaseName();
+		const firstTab = new DexieStorage(name);
+		const secondTab = new DexieStorage(name);
+		await firstTab.addRoutinesIfNone([routineWith({ id: 'a', customPosition: 0 })]);
+
+		await Promise.all([
+			firstTab.createRoutine(routineWith({ id: 'first-tab', customPosition: 0 })),
+			secondTab.createRoutine(routineWith({ id: 'second-tab', customPosition: 0 }))
+		]);
+
+		const routines = await firstTab.getRoutines();
+		expect(routines.map((routine) => routine.customPosition)).toEqual([0, 1, 2]);
+		expect(routines.map((routine) => routine.id).toSorted()).toEqual([
+			'a',
+			'first-tab',
+			'second-tab'
+		]);
+		expect(await firstTab.getLogEntries()).toHaveLength(2);
+	});
+
+	it('keeps the newest 5,000 log entries by default', async () => {
+		const name = newDatabaseName();
+		const storage = new DexieStorage(name);
+		await storage.addRoutinesIfNone([routineWith({ id: 'a' }), routineWith({ id: 'b' })]);
+		const saved = await openAsSaved(name);
+		const filler = Array.from({ length: 5000 }, (_, index) => ({
+			timestamp: '2026-11-01T00:00:00.000Z',
+			type: 'change',
+			message: `Filler ${index}`
+		}));
+		await saved.table('log').bulkAdd(filler);
+		saved.close();
+
+		await storage.deleteRoutine('a');
+
+		const entries = await storage.getLogEntries();
+		expect(entries).toHaveLength(5000);
+		expect(entries[0]?.message).toBe('Deleted routine "One round"');
+		expect(entries.at(-1)?.message).toBe('Filler 1');
+	});
+
+	describe('when the log can’t be written', () => {
+		/**
+		 * Makes IndexedDB refuse every write to the log's object store, and no other, as a full disk
+		 * might refuse one, so the routines still save.
+		 *
+		 * @param method - Which write to refuse: `add` or `put`.
+		 * @throws {@link Error} When the browser has no such method on object stores.
+		 */
+		function failLogWrites(method: 'add' | 'put'): void {
+			// Read off the prototype's descriptor, since naming the method itself would be an
+			// unbound method to the linter.
+			const original: unknown = Object.getOwnPropertyDescriptor(
+				IDBObjectStore.prototype,
+				method
+			)?.value;
+			if (typeof original !== 'function') {
+				throw new Error(`Expected IDBObjectStore.prototype.${method} to be a function.`);
+			}
+			vi.spyOn(IDBObjectStore.prototype, method).mockImplementation(function (
+				this: IDBObjectStore,
+				...args: Parameters<IDBObjectStore['add']>
+			): IDBRequest<IDBValidKey> {
+				if (this.name === 'log') {
+					throw new DOMException('The disk is full.', 'QuotaExceededError');
+				}
+				return Reflect.apply(original, this, args) as IDBRequest<IDBValidKey>;
+			});
+		}
+
+		it('still saves the change, and reports the failure', async () => {
+			const storage = new DexieStorage(newDatabaseName());
+			await storage.addRoutinesIfNone([routineWith({ id: 'a' }), routineWith({ id: 'b' })]);
+			const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+			failLogWrites('add');
+			failLogWrites('put');
+
+			const deleted = await storage.deleteRoutine('a');
+
+			expect(deleted).toBe(true);
+			expect((await storage.getRoutines()).map((routine) => routine.id)).toEqual(['b']);
+			expect(await storage.getLogEntries()).toEqual([]);
+			expect(logged).toHaveBeenCalledWith('Writing to the activity log failed.', expect.anything());
+		});
+
+		it('leaves every kind of change saved', async () => {
+			const storage = new DexieStorage(newDatabaseName());
+			await storage.addRoutinesIfNone([routineWith({ id: 'a' }), routineWith({ id: 'b' })]);
+			vi.spyOn(console, 'error').mockImplementation(() => {});
+			failLogWrites('add');
+			failLogWrites('put');
+
+			await storage.createRoutine(routineWith({ id: 'new', customPosition: 0 }));
+			await storage.duplicateRoutine(routineWith({ id: 'copy' }), 'a');
+			await storage.saveRoutine(routineWith({ id: 'b', title: 'Edited' }));
+			await storage.reorderRoutines(['b', 'new', 'a', 'copy']);
+
+			const routines = await storage.getRoutines();
+			expect(routines.map((routine) => routine.id)).toEqual(['b', 'new', 'a', 'copy']);
+			expect(routines[0]?.title).toBe('Edited');
+		});
+	});
+
+	it('logs nothing when the routine can’t be saved', async () => {
+		const name = newDatabaseName();
+		const storage = new DexieStorage(name);
+		await storage.addRoutinesIfNone([routineWith({ id: 'a' }), routineWith({ id: 'b' })]);
+		vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(() => {
+			throw new DOMException('The disk is full.', 'QuotaExceededError');
+		});
+
+		await expect(storage.deleteRoutine('a')).rejects.toThrow();
+		vi.restoreAllMocks();
+
+		expect((await storage.getRoutines()).map((routine) => routine.id)).toEqual(['a', 'b']);
+		expect(await storage.getLogEntries()).toEqual([]);
 	});
 
 	it('keeps the app’s data in the database named cadoro', async () => {

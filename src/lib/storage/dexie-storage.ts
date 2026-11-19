@@ -2,7 +2,16 @@
 // promises and gives each table a typed API.
 
 import Dexie, { liveQuery, type EntityTable, type Table, type Transaction } from 'dexie';
+import { LOG_MAX_ENTRIES, type LogEntry, type NewLogEntry } from '../log';
 import { pickableRoutines, type Routine } from '../routine';
+import {
+	planCreate,
+	planDelete,
+	planDuplicate,
+	planReorder,
+	planSave,
+	type RoutineChange
+} from '../routine-changes';
 import {
 	isRevision,
 	VERSION_1_REVISION,
@@ -18,7 +27,7 @@ import {
 	type WorkPeriod
 } from '../run-records';
 import { settingsFrom, settingsWithChanges, type Settings } from '../settings';
-import type { CadoroStorage } from './storage';
+import type { CadoroStorage, StorageOptions } from './storage';
 import { writeThemeMirror } from './theme-mirror';
 
 /**
@@ -75,6 +84,20 @@ const SCHEMA_VERSION_3_ADDS = {
  */
 const SETTINGS_KEY = 'current';
 
+/**
+ * The tables schema version 4 adds to version 3's, which Dexie keeps as they are.
+ *
+ * @remarks
+ * Version 4 gives the activity log a table of its own.
+ */
+const SCHEMA_VERSION_4_ADDS = {
+	/**
+	 * The activity log's entries, keyed by an `id` that counts up by itself, so the primary key is
+	 * the order they were written in and needs no index of its own.
+	 */
+	log: '++id'
+};
+
 /** The run in progress as schema version 1 saved it, before it had a revision. */
 type Version1RunInProgress = Omit<StoredRunInProgress, 'revision'> & {
 	/** Missing from every row version 1 saved, and set by version 2's upgrade. */
@@ -123,6 +146,8 @@ type CadoroDatabase = Dexie & {
 	 * changed. `Table`, since its key isn't a field of the row.
 	 */
 	settings: Table<Partial<Settings>, string>;
+	/** The activity log's entries, keyed by their counting-up `id`. */
+	log: EntityTable<LogEntry, 'id'>;
 };
 
 /**
@@ -141,6 +166,8 @@ function connect(name: string): CadoroDatabase {
 	// Version 3 adds the `settings` table. Dexie creates a new table by itself when it upgrades,
 	// and an absent row means every setting has its default, so no data needs moving.
 	database.version(3).stores(SCHEMA_VERSION_3_ADDS);
+	// Version 4 adds the `log` table. It starts empty, so no data needs moving.
+	database.version(4).stores(SCHEMA_VERSION_4_ADDS);
 	return database;
 }
 
@@ -155,19 +182,137 @@ export class DexieStorage implements CadoroStorage {
 	/** The connection every method goes through. */
 	#database: CadoroDatabase;
 
+	/** Returns the current moment, which stamps each log entry and each deletion. */
+	readonly #now: () => Date;
+
+	/** How many log entries are kept. */
+	readonly #logLimit: number;
+
 	/**
 	 * Connects to the database, which opens on the first read or write.
 	 *
 	 * @param name - The database's name in the browser. Tests give each storage a name of its
 	 * own, so none sees another's data.
+	 * @param options - The clock and the log's size, as {@link StorageOptions} describes them.
 	 */
-	constructor(name: string = DATABASE_NAME) {
+	constructor(
+		name: string = DATABASE_NAME,
+		{ now = (): Date => new Date(), logLimit = LOG_MAX_ENTRIES }: StorageOptions = {}
+	) {
 		this.#database = connect(name);
+		this.#now = now;
+		this.#logLimit = logLimit;
 	}
 
 	async getRoutines(): Promise<Routine[]> {
 		const routines = await this.#database.routines.toArray();
 		return pickableRoutines(routines);
+	}
+
+	async getAllRoutines(): Promise<Routine[]> {
+		const routines = await this.#database.routines.toArray();
+		return routines.toSorted((a, b) => a.customPosition - b.customPosition);
+	}
+
+	watchRoutines(
+		onChange: (routines: Routine[]) => void,
+		onError: (error: unknown) => void
+	): () => void {
+		const table = this.#database.routines;
+		const subscription = liveQuery(() => table.toArray()).subscribe({
+			next: (routines) => {
+				onChange(pickableRoutines(routines));
+			},
+			error: onError
+		});
+		return (): void => {
+			subscription.unsubscribe();
+		};
+	}
+
+	async createRoutine(routine: Routine): Promise<void> {
+		await this.#changeRoutines((routines) => planCreate(routines, routine, this.#now()));
+	}
+
+	async duplicateRoutine(copy: Routine, originalId: string): Promise<void> {
+		await this.#changeRoutines((routines) =>
+			planDuplicate(routines, copy, originalId, this.#now())
+		);
+	}
+
+	async saveRoutine(routine: Routine): Promise<void> {
+		await this.#changeRoutines((routines) => planSave(routines, routine, this.#now()));
+	}
+
+	async deleteRoutine(id: string): Promise<boolean> {
+		const change = await this.#changeRoutines((routines) => planDelete(routines, id, this.#now()));
+		return change !== null;
+	}
+
+	async reorderRoutines(orderedIds: string[]): Promise<boolean> {
+		const change = await this.#changeRoutines((routines) =>
+			planReorder(routines, orderedIds, this.#now())
+		);
+		return change !== null;
+	}
+
+	async getLogEntries(): Promise<LogEntry[]> {
+		return this.#database.log.reverse().toArray();
+	}
+
+	/**
+	 * Saves a change to the routines, then writes its log entry.
+	 *
+	 * @remarks
+	 * The routines are read and saved in one read-write transaction, so two tabs changing them at
+	 * once each plan against the routines the other left. The log entry is written afterwards, in
+	 * a transaction of its own, since an entry that couldn't be written must never undo the change
+	 * or stop it, as the spec says. A failed log write is reported with `console.error`.
+	 *
+	 * @param plan - Works out the change from every routine saved, or returns `null` for none.
+	 * @returns The change that was saved, or `null` when the plan found nothing to change.
+	 * @throws Rejects with the plan's error, or IndexedDB's when the routines can't be read or
+	 * saved, and then nothing is saved and nothing is logged.
+	 */
+	async #changeRoutines(
+		plan: (routines: Routine[]) => RoutineChange | null
+	): Promise<RoutineChange | null> {
+		const table = this.#database.routines;
+		const change = await this.#database.transaction('rw', table, async () => {
+			const planned = plan(await table.toArray());
+			if (planned !== null) {
+				await table.bulkPut(planned.writes);
+			}
+			return planned;
+		});
+
+		if (change !== null) {
+			await this.#writeLogEntry(change.entry);
+		}
+		return change;
+	}
+
+	/**
+	 * Adds an entry to the log and drops the oldest entries beyond the log's limit, in one
+	 * transaction.
+	 *
+	 * @param entry - What to add, to which storage gives an id.
+	 * @returns A promise that settles once the entry is written, or has failed. It never rejects.
+	 */
+	async #writeLogEntry(entry: NewLogEntry): Promise<void> {
+		const log = this.#database.log;
+		try {
+			await this.#database.transaction('rw', log, async () => {
+				await log.add(entry);
+				const excess = (await log.count()) - this.#logLimit;
+				if (excess > 0) {
+					// The primary key counts up, so the first keys are the oldest entries.
+					await log.bulkDelete(await log.limit(excess).primaryKeys());
+				}
+			});
+		} catch (error) {
+			console.error('Writing to the activity log failed.', error);
+		}
 	}
 
 	async addRoutinesIfNone(routines: Routine[]): Promise<boolean> {
