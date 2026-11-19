@@ -594,7 +594,7 @@ function routineOfBlocks(count: number): Routine {
  */
 function pinnedControls(): Element {
 	const finish = page.getByRole('button', { name: 'Finish' }).element();
-	return requireDefined(finish.closest('.sticky'), 'the pinned controls');
+	return requireDefined(finish.closest('.sticky') ?? undefined, 'the pinned controls');
 }
 
 describe('a long routine on the Timer screen', () => {
