@@ -67,6 +67,7 @@ Runs survive reloads, every work period is recorded, and every open tab shows th
 - Schema version 1 keys `routines`, `runs` and `workPeriods` by `id`, and keeps `runInProgress`'s key outside the row (`''`), so the run is saved exactly as the engine has it, under a fixed key. Only `routines` has a TypeScript type so far. The other tables get theirs with their records, in steps 2 and 3.
 - `addRoutinesIfNone` counts and adds in one read-write transaction. IndexedDB runs read-write transactions on the same table one after another, even across connections, so two tabs can't both add the starters.
 - Dexie is a dev dependency like every other package, since the build bundles it into the static files.
+- **Changed later:** the run in progress isn't saved exactly as the engine has it, but as a stored shape with its moments as UTC strings and without its routine, in [The stored run in progress](#the-stored-run-in-progress).
 
 ### Testing storage
 
@@ -100,6 +101,7 @@ Runs survive reloads, every work period is recorded, and every open tab shows th
 - Separate `addRun`, `addWorkPeriod` and `endRun` methods were rejected, because a finite routine's last Next would need two calls with nothing holding them together.
 - `getRuns()` and `getWorkPeriods()`, oldest first, came now, although the app reads them only from milestone 7, so the shared suite checks what was saved through the interface rather than around it. Their order is the pure `runsOldestFirst` and `workPeriodsOldestFirst`, which both backends call, comparing `Date.parse` values rather than strings.
 - `hasWorkPeriods()` counts with Dexie's `count()`, for the persistence check at startup, rather than reading every period.
+- **Changed later:** `saveRunRecords` became `saveRunInProgress(runInProgress, records?)`, which saves the run in progress in the same transaction, in [Saving the run in progress](#saving-the-run-in-progress).
 - The test helpers `runWith` and `workPeriodWith` copy deeply before spreading, since a spread alone would share a period's `segments` with the constant every test uses.
 
 ### The session saving each press
@@ -117,3 +119,38 @@ Runs survive reloads, every work period is recorded, and every open tab shows th
 - Asking after every saved work period was rejected, because Firefox shows a prompt each time. Remembering across launches that it had asked was rejected, because the spec asks again at startup while storage isn't persistent.
 - Neither function rejects. A browser error or unreadable storage is logged, since the app works the same with or without persistence. TypeScript's DOM types say `navigator.storage` is always there, but it's missing outside HTTPS and `localhost`, so the parameter allows `undefined`.
 - Checked in Chromium on the dev server, with `persist()` wrapped to count calls: none on the first visit, one after a run of Play, Next and Finish, and one at startup after a reload. IndexedDB held the run and its work period, with exact times.
+
+## Step 3: keep the run in progress (`feat/restore-run`), 2026-11-19
+
+### The stored run in progress
+
+- The run in progress is saved as `StoredRunInProgress`, in `src/lib/run-in-progress.ts`: the run's `Run` record, so a restored run ends on the record Play started; the engine's run as `StoredRunState`, one shape per started state; and `heartbeatAt`, the moment of the last save. Pure functions convert both ways, `toStoredRunInProgress` and `restoreRunInProgress`, reusing `storedSegment` and its new reverse `segmentFromStored` from `run-records.ts`, and `fromUtcTimestamp` from `time.ts`.
+- Every moment in it is a UTC ISO string, at the user's choice, as this milestone's storage entry says. Saving the engine's milliseconds, as step 1's Dexie entry put it, was rejected, because storage would then mix two formats, and DevTools and milestone 8's backups would show raw numbers.
+- The routine isn't saved with the run. The session's run uses the routine object itself as its plan, so saving it would copy the whole routine into the row every second. Restoring looks the routine up by the record's `routineId`, which is safe because a routine can't be edited while it runs. A row whose routine is gone is forgotten, and the app starts as usual. That can't happen until milestone 6 adds deleting.
+- A ready run is never saved, since nothing worth keeping has happened. The type `StartedRun`, `Exclude<RunState, ReadyRun>`, makes that a type error.
+- Dexie keeps the row under the fixed key `current`, which never changes, like the database's name. Schema version 1 already declares the table, and every deployed database has it, empty, so no new version was needed. From 0.5.0 on, the row's shape is saved data, so changing it takes a version 2 with an upgrade.
+
+### Restoring paused at the heartbeat
+
+- `restoreRunInProgress` applies the engine's own `pause` at the heartbeat, since the app may have stopped at any moment after it. A running work period ends its stretch there, and a running break keeps the time it had left. A paused run, a break that was already over and an ended run come back as they were, since `pause` leaves them alone. So restoring has no rules of its own. Without the `pause`, the two tests for running timers failed.
+- `TimerSession` takes the row as its constructor's third argument, `saved`, apart from the options object. The options are what the session works with (clock, storage, ids), while the row is data about this launch. The root layout reads it with the routines in one `Promise.all`, before the first render.
+- The restored run is saved again at once, paused, so storage shows what the screen does, which step 4's other tabs will follow.
+- An ended run stays saved as the run in progress until Done, so its summary comes back after a reload, as the spec now says. Done forgets the row, and its run and work periods stay.
+
+### Saving the run in progress
+
+- `saveRunRecords(records)` became `saveRunInProgress(runInProgress, records?)`, with `getRunInProgress()` and `clearRunInProgress()` beside it. A press saves the row with its run and work periods in one read-write transaction over the three tables. Saved apart, a failure between them would leave them disagreeing: with the records saved and not the row, a restored run would end its work period again under a new id and count the work twice; with the row saved and not the records, the work would be lost. Moving the row's `put` outside the transaction made the rollback test fail on Dexie.
+- A heartbeat is the same call without records. Giving `saveRunRecords` a second argument for the row was rejected, as a heartbeat would then save "records" of nothing. Separate methods for the row and the records were rejected, as they couldn't share a transaction.
+- A press that changes nothing, such as Pause on a paused run, saves nothing, since the engine returns the same run.
+- Every write goes through one queue, `#enqueue`, which the save and Done's clear both use. Sent straight to storage, the clear finished before Finish's save, which brought the forgotten run back, and three tests failed.
+- `tick()` saves a heartbeat only while a timer is counting. A paused run has nothing new to save, and a break that's over restores as over anyway. A press reads the clock through `#moveOn()`, so it saves once, not once as a heartbeat as well.
+
+### Hidden pages and background tabs
+
+- The Timer screen saves a heartbeat when `visibilitychange` turns the page hidden and on `pagehide`, through `<svelte:document>` and `<svelte:window>`, so the moment a restored run pauses at is the moment the user left. `unload` was rejected, as it's unreliable, especially on phones, and MDN advises against it. Elsewhere in the app, the run is already paused, which saved it.
+- Chrome's [intensive throttling](https://developer.chrome.com/blog/timer-throttling-in-chrome-88) runs a chain of timers, such as a `setInterval`, at most once a minute once a page has been hidden for more than 5 minutes. So heartbeats in a long-hidden tab come about once a minute, and if the phone stops the app then, up to a minute of work may not count. The timer stays exact meanwhile, since its times come from timestamps. This is accepted, since the hidden page's own heartbeat covers the usual case of leaving and coming back.
+
+### The reload journey
+
+- `e2e/restore.spec.ts` reloads mid-work, mid-break and with the summary open, on the `desktop` and `phone` projects, and checks the times exactly. `e2e/storage.ts` reads the `workPeriods` table from inside the page with IndexedDB's own API, so the journey checks the restored work period is saved once, with both its stretches. Ignoring the saved run in the layout made it fail at its first check.
+- Playwright's clock keeps its fake time across `page.reload()`: its source adds each clock call as an init script that logs it with the real time, and each new document replays the log.
