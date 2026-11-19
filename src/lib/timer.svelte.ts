@@ -1,22 +1,39 @@
-// The timer screen's state: the routines to pick from, the chosen routine and its run. The root
+// The timer screen's state: the routines to pick from, the chosen routine and its run, whose
+// records it saves. The root
 // layout's `load` makes the app's one session and keeps it in the layout's data, rather than the
 // Timer page making it, since SvelteKit removes the page when another screen opens, and the run
 // must still be there on the way back.
 
 import type { Routine } from './routine';
 import { createRun, finish, next, pause, play, viewRun, type RunState, type RunView } from './run';
+import { recordPress, type Run, type RunRecords } from './run-records';
+import type { CadoroStorage } from './storage/storage';
 
 /** A button's effect on a run, such as `play`, from the run engine. */
 type Press = (run: RunState, now: number) => RunState;
 
+/** What a timer session needs from the rest of the app, passed in so tests can control it. */
+export type TimerSessionOptions = {
+	/**
+	 * Returns the current moment, in milliseconds since 1970 (UTC), such as `Date.now`. Tests pass
+	 * a fake clock they move by hand.
+	 */
+	clock: () => number;
+	/** Where each run and work period is saved. */
+	storage: CadoroStorage;
+	/** Returns a new unique id each time it's called, such as `crypto.randomUUID`. */
+	newId: () => string;
+};
+
 /**
  * The routine picker and the run of the chosen routine, as reactive state the timer screen
- * shows.
+ * shows, with each run and work period saved as it starts and ends.
  *
  * @remarks
- * The run logic stays in the pure engine in `run.ts`. This class only keeps its result in state
- * and reads the clock, so each button's change shows on screen at once. Its state is private and
- * only its methods change it, so the screen can't put a run into a state the engine didn't make.
+ * The run logic stays in the pure engine in `run.ts`, and what to save in `run-records.ts`. This
+ * class only keeps their results in state, reads the clock and hands the records to storage, so
+ * each button's change shows on screen at once. Its state is private and only its methods change
+ * it, so the screen can't put a run into a state the engine didn't make.
  */
 export class TimerSession {
 	/** The routines to pick from, in the picker's order. */
@@ -24,6 +41,21 @@ export class TimerSession {
 
 	/** Returns the current moment, in milliseconds since 1970 (UTC), such as `Date.now`. */
 	readonly #clock: () => number;
+
+	/** Where each run and work period is saved. */
+	readonly #storage: CadoroStorage;
+
+	/** Returns a new unique id each time it's called. */
+	readonly #newId: () => string;
+
+	/**
+	 * The record of the latest run Play started, or `null` before the first. It isn't state,
+	 * since nothing on screen shows it.
+	 */
+	#record: Run | null = null;
+
+	/** The last save handed to storage, which the next save waits for. */
+	#saving: Promise<void> = Promise.resolve();
 
 	/** The routine chosen in the picker. */
 	#routine: Routine;
@@ -43,11 +75,11 @@ export class TimerSession {
 	 * @param routines - The routines to pick from, in the picker's order. There's always at least
 	 * one, since the first launch creates the starter routines, and routines can't be deleted
 	 * yet.
-	 * @param clock - Returns the current moment, in milliseconds since 1970 (UTC). Tests pass a
-	 * fake clock they move by hand.
+	 * @param options - The clock, the storage runs are saved in and the id generator, as
+	 * {@link TimerSessionOptions} describes them.
 	 * @throws {@link Error} If there are no routines to pick from.
 	 */
-	constructor(routines: readonly Routine[], clock: () => number) {
+	constructor(routines: readonly Routine[], { clock, storage, newId }: TimerSessionOptions) {
 		const [firstRoutine] = routines;
 		if (firstRoutine === undefined) {
 			throw new Error('A timer session needs at least one routine.');
@@ -55,6 +87,8 @@ export class TimerSession {
 
 		this.routines = routines;
 		this.#clock = clock;
+		this.#storage = storage;
+		this.#newId = newId;
 		this.#routine = $state.raw(firstRoutine);
 		this.#run = $state.raw(createRun(firstRoutine));
 		this.#now = $state(clock());
@@ -133,7 +167,7 @@ export class TimerSession {
 	}
 
 	/**
-	 * Applies a button to the run at the current moment.
+	 * Applies a button to the run at the current moment, and saves what it started or ended.
 	 *
 	 * @remarks
 	 * The clock is read first, so the view is up to date as soon as the button changes the run,
@@ -143,6 +177,45 @@ export class TimerSession {
 	 */
 	#press(press: Press): void {
 		this.tick();
-		this.#run = press(this.#run, this.#now);
+		const before = this.#run;
+		this.#run = press(before, this.#now);
+
+		const records = recordPress(
+			{
+				before,
+				after: this.#run,
+				now: this.#now,
+				routineId: this.#routine.id,
+				record: this.#record
+			},
+			this.#newId
+		);
+		this.#record = records.run ?? this.#record;
+		this.#save(records);
+	}
+
+	/**
+	 * Hands records to storage once every earlier save has finished, without waiting for it.
+	 *
+	 * @remarks
+	 * Buttons change the screen at once and storage catches up, so a slow save never holds up
+	 * the timer. Each save waits for the one before, so saves reach storage in the order the
+	 * buttons were pressed whatever the backend, and a run's start is never saved after its end.
+	 * A failed save is logged and the next one still runs, until milestone 8's activity log
+	 * records errors.
+	 *
+	 * @param records - What a press left to save. Nothing is handed to storage when it's empty.
+	 */
+	#save(records: RunRecords): void {
+		const hasRecords = records.run !== null || records.workPeriods.length > 0;
+		if (!hasRecords) {
+			return;
+		}
+
+		this.#saving = this.#saving
+			.then(() => this.#storage.saveRunRecords(records))
+			.catch((error: unknown) => {
+				console.error('The run could not be saved.', error);
+			});
 	}
 }
