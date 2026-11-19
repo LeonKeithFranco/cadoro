@@ -12,6 +12,7 @@ The decision log: what was decided as Cadoro was built, why, and the options rej
 
 - `05-alerts-and-settings.md`: milestone 5, the chime files, settings in storage, the theme without a flash, the chimes' schedule and the one tab that sounds them, the wake lock, the Settings screen, testing the chimes, and the milestone review's fixes.
 - `06-routines.md`: milestone 6, the routine rules in pure logic, storage and the activity log, the Routines screen, locking the running routine, the Timer's sorted picker and pinned controls, pre-bundled libraries, and the journeys.
+- `07-stats.md`: milestone 7, the stats logic split by what each module knows, local days and the pinned test time zone, the Stats screen and its accessible chart, deleted routines' labels, and the journeys.
 
 ## Adding a decision
 
