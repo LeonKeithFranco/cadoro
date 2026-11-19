@@ -154,3 +154,32 @@ Runs survive reloads, every work period is recorded, and every open tab shows th
 
 - `e2e/restore.spec.ts` reloads mid-work, mid-break and with the summary open, on the `desktop` and `phone` projects, and checks the times exactly. `e2e/storage.ts` reads the `workPeriods` table from inside the page with IndexedDB's own API, so the journey checks the restored work period is saved once, with both its stretches. Ignoring the saved run in the layout made it fail at its first check.
 - Playwright's clock keeps its fake time across `page.reload()`: its source adds each clock call as an init script that logs it with the real time, and each new document replays the log.
+
+## Between steps 3 and 4: the autonomous replan (`build/agent-guardrails`), 2026-11-19
+
+### The decisions
+
+- Scope: the full spec to 1.0.0, nothing cut. Web Push and the container and homelab stay optional, outside the run.
+- Shared tabs are built as planned, with a Dexie live query.
+- Order: shared tabs, Alerts and Settings, Routines, Stats, Backup and activity log, then 1.0.
+- One pull request per milestone, each with one version bump and release, and one fresh Opus reviewer per milestone before the merge prompt.
+- Claude runs `task pr:merge` once CI is green and the review is settled. The existing `ask` rule stays, so the user's approval of the prompt is the sign-off.
+- Teaching stopped entirely: no explanations, no learning log entries, no stops for questions. `docs/PLAN.md` is the approved plan for every remaining milestone, so there's no plan mode per step.
+- Docs are lean: SPEC, PROGRESS and ARCHITECTURE updated once per milestone, and short decision-log bullets only for what the spec and plan don't hold.
+- Quality: good documentation and good tests, always. Doc comments stay enforced, and every rule, edge case, journey and failure gets a test.
+- Design is Claude's call, following the existing screens, and the user sends feedback after using the app.
+- Chimes: open-licensed files if their licences can be verified, otherwise synthesised with Web Audio.
+- The only remaining routine can't be deleted: Delete is disabled, with a hint. This settles the open item about deleting every routine.
+- One continuous session through all milestones. Open questions get the conventional option that fits the spec, noted. Device checks are listed in each release summary, never waited on.
+- The README is practical only: what it is, install, use, data limitations, self-hosting and development.
+- Guardrails come first, so the run is checked mechanically: test-integrity lint, return types and typed promise lint, `noUncheckedIndexedAccess`, and a permission prompt on guardrail edits.
+- The packages the remaining milestones need are installed in one command, so the install prompt comes once, while the user is present. Any other package still prompts.
+
+### Milestone 0: the guardrails
+
+- Installed `@vitest/eslint-plugin`, `eslint-plugin-playwright`, `date-fns`, `layerchart` 2.11 and `svelte-dnd-action` in one command. All fit Svelte 5.57, TypeScript 6 and Vite 8, so none was replaced. They're dev dependencies, like Dexie, so `npm audit --omit=dev` leaves them out.
+- Explicit return types, with 19 fixes.
+- typescript-eslint's typed rules, with the promise rules on. `require-await` is off, because `InMemoryStorage` and the test fakes implement promise interfaces with `async` methods that don't await, while `no-floating-promises` still catches a forgotten await. `tsconfig.json` now includes `dev-server.test.ts` and `pwa-assets.config.ts`, so the typed rules cover them.
+- The Vitest and Playwright lint plugins check the tests. Inline ESLint configuration is ignored (`noInlineConfig`, which ESLint reports as a warning while the rule it tried to disable still errors), and `@ts-expect-error` is banned.
+- `noUncheckedIndexedAccess` is on. `requireDefined` in `src/lib/defined.ts` and `blockAt` in `run.ts` cover indexes that must exist, rather than a blanket `!`.
+- `.claude/settings.json` asks before Edit on `eslint.config.js`, `tsconfig.json`, `playwright.config.ts`, `.github/workflows/**` and itself. Claude Code didn't apply it to the first edit right after the file was written, only to later edits, so a new rule should be proven with a second edit.
