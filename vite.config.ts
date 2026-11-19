@@ -135,7 +135,8 @@ export default defineConfig({
 						provider: playwright(),
 						instances: [{ browser: 'chromium', headless: true }]
 					},
-					include: ['src/**/*.svelte.test.ts'],
+					// Component tests, and storage tests, which need the browser's real IndexedDB.
+					include: ['src/**/*.svelte.test.ts', 'src/**/*.browser.test.ts'],
 					exclude: ['src/lib/server/**']
 				}
 			},
@@ -147,7 +148,7 @@ export default defineConfig({
 					environment: 'node',
 					// The root's tests cover the config's own logic, such as the dev server's port.
 					include: ['src/**/*.test.ts', '*.test.ts'],
-					exclude: ['src/**/*.svelte.test.ts']
+					exclude: ['src/**/*.svelte.test.ts', 'src/**/*.browser.test.ts']
 				}
 			}
 		]
