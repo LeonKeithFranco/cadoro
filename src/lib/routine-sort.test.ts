@@ -45,6 +45,17 @@ describe('sortRoutines', () => {
 		expect(sortedIds(routines, 'title-asc')).toEqual(['ant', 'bee', 'cat']);
 	});
 
+	it('sorts by title ignoring accents, so Éclair sits with the E titles', () => {
+		const routines = [
+			routineWith({ id: 'zebra', title: 'Zebra', customPosition: 0 }),
+			routineWith({ id: 'eclair', title: 'Éclair', customPosition: 1 }),
+			routineWith({ id: 'egg', title: 'Egg', customPosition: 2 }),
+			routineWith({ id: 'dog', title: 'Dog', customPosition: 3 })
+		];
+
+		expect(sortedIds(routines, 'title-asc')).toEqual(['dog', 'eclair', 'egg', 'zebra']);
+	});
+
 	it('sorts by title from Z to A', () => {
 		const routines = [
 			routineWith({ id: 'ant', title: 'ANT', customPosition: 0 }),

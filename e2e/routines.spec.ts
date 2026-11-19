@@ -232,6 +232,69 @@ test('opening another routine, or leaving the screen, with unsaved changes asks 
 	});
 });
 
+test('browser back with unsaved changes asks to discard them, and Cancel stays', async ({
+	page
+}) => {
+	await page.goto('/');
+	await followLink(
+		page,
+		page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Routines' })
+	);
+	await cardOf(page, 'Classic').getByRole('button', { name: 'Edit' }).click();
+	await page.getByRole('textbox', { name: 'Title', exact: true }).fill('Changed');
+
+	await page.goBack();
+
+	const dialog = page.getByRole('dialog', { name: 'Discard changes?' });
+	await expect(dialog).toBeVisible();
+	await dialog.getByRole('button', { name: 'Cancel' }).click();
+	await expect(page).toHaveURL('/routines');
+	await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue('Changed');
+
+	await page.goBack();
+	await dialog.getByRole('button', { name: 'Discard' }).click();
+	await expect(page).toHaveURL('/');
+});
+
+// Closing the tab, a reload and a typed address all run the page's `beforeunload` handlers the
+// same way, and `page.close({ runBeforeUnload: true })` is Playwright's way to run them without
+// leaving the page unless the browser lets it.
+test('leaving the page with unsaved changes gets the browser’s own prompt, and staying keeps them', async ({
+	page
+}) => {
+	await page.goto('/routines');
+	await cardOf(page, 'Classic').getByRole('button', { name: 'Edit' }).click();
+	await page.getByRole('textbox', { name: 'Title', exact: true }).fill('Changed');
+	const dialogTypes: string[] = [];
+	page.on('dialog', (dialog) => {
+		dialogTypes.push(dialog.type());
+		void dialog.dismiss();
+	});
+
+	await page.close({ runBeforeUnload: true });
+
+	// With `runBeforeUnload`, `close` returns before the browser has asked.
+	await expect.poll(() => dialogTypes).toEqual(['beforeunload']);
+	expect(page.isClosed()).toBe(false);
+	await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue('Changed');
+});
+
+test('leaving the page with no unsaved changes gets no prompt', async ({ page }) => {
+	await page.goto('/routines');
+	await cardOf(page, 'Classic').getByRole('button', { name: 'Edit' }).click();
+	const dialogTypes: string[] = [];
+	page.on('dialog', (dialog) => {
+		dialogTypes.push(dialog.type());
+		void dialog.dismiss();
+	});
+
+	await page.close({ runBeforeUnload: true });
+
+	// With `runBeforeUnload`, `close` returns before the page has gone.
+	await expect.poll(() => page.isClosed()).toBe(true);
+	expect(dialogTypes).toEqual([]);
+});
+
 test('a routine with two blocks runs exactly as built: each target, break, cycle and round', async ({
 	page
 }) => {
