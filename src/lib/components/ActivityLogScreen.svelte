@@ -7,7 +7,6 @@
 -->
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import ArrowLeft from '@lucide/svelte/icons/arrow-left';
 	import { onMount } from 'svelte';
 	import { recordError } from '../error-log';
 	import { exportFileName, serializeLog } from '../export-files';
@@ -76,7 +75,7 @@
 		href={resolve('/settings')}
 		class="inline-flex items-center gap-1 font-medium text-rose-700 underline underline-offset-2 dark:text-rose-300"
 	>
-		<ArrowLeft class="size-4" />
+		<span aria-hidden="true">←</span>
 		Back to Settings
 	</a>
 </p>
