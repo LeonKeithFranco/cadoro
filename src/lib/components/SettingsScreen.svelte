@@ -90,7 +90,8 @@
 	const inputColours =
 		'rounded-md border-zinc-300 bg-white text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100';
 	/** The colours of the radio buttons and the checkbox, whose ticks are rose. */
-	const choiceColours = 'border-zinc-300 text-rose-700 dark:border-zinc-600 dark:text-rose-400';
+	const choiceColours =
+		'border-zinc-400 bg-white text-rose-700 checked:bg-rose-700 focus:ring-rose-700 dark:border-zinc-500 dark:bg-zinc-900 dark:text-rose-400 dark:checked:bg-rose-400 dark:focus:ring-rose-400';
 </script>
 
 <ScreenHeading title="Settings" />
