@@ -1,18 +1,21 @@
 <!--
   @component
   The frame every screen is drawn in. It loads the global styles, shows the header with the app's
-  name and the navigation, renders the current screen in the page's `<main>`, and holds the update
+  name and the navigation, keeps the theme in step with the setting, renders the current screen in the page's `<main>`, and holds the update
   prompt, which registers the service worker that keeps the app for offline use.
 -->
 <script lang="ts">
 	import './layout.css';
 	import { page } from '$app/state';
 	import ScreenNav from '#lib/components/ScreenNav.svelte';
+	import ThemeSync from '#lib/components/ThemeSync.svelte';
 	import UpdatePrompt from '#lib/components/UpdatePrompt.svelte';
 	import type { LayoutProps } from './$types';
 
 	let { children, data }: LayoutProps = $props();
 </script>
+
+<ThemeSync theme={data.settingsSession.settings.theme} />
 
 <!-- The header's border spans the window, while its contents line up with the screen below. -->
 <header class="border-b border-zinc-200 dark:border-zinc-800">
