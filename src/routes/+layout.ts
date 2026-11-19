@@ -1,8 +1,9 @@
 import { joinOpenTabs } from '#lib/open-tabs.ts';
 import { loadRoutines } from '#lib/routine-loading.ts';
+import { SettingsSession } from '#lib/settings.svelte.ts';
 import { DexieStorage } from '#lib/storage/dexie-storage.ts';
 import { askToPersistIfWorkSaved, askToPersistOnce } from '#lib/storage/persistence.ts';
-import { TimerSession } from '#lib/timer.svelte.ts';
+import { TimerSession, type TimerSessionOptions } from '#lib/timer.svelte.ts';
 import type { LayoutLoad } from './$types';
 
 /**
@@ -16,11 +17,19 @@ import type { LayoutLoad } from './$types';
 export const ssr = false;
 
 /**
- * The app's one timer session, made by the first `load` and handed back by every later one, so
- * a `load` running again, such as after `invalidateAll()`, can't start a second session and lose
- * the run.
+ * The app's one timer session and settings session, made by the first `load` and handed back by
+ * every later one, so a `load` running again, such as after `invalidateAll()`, can't start a
+ * second session and lose the run.
  */
-let timerSessionOpening: Promise<TimerSession> | undefined;
+let appOpening: Promise<AppSessions> | undefined;
+
+/** The sessions the app opens with, which every screen receives as the layout's data. */
+type AppSessions = {
+	/** The app's one timer session. */
+	timerSession: TimerSession;
+	/** The user's settings, following storage. */
+	settingsSession: SettingsSession;
+};
 
 /**
  * Opens storage, creates the starter routines on the first launch, and starts the timer session
@@ -39,33 +48,34 @@ let timerSessionOpening: Promise<TimerSession> | undefined;
  * TypeScript's DOM types say `navigator.locks` is always there, but it's missing outside HTTPS
  * and `localhost`, as `navigator.storage` is.
  *
- * @returns The new timer session.
- * @throws Rejects with storage's own error when the routines or the run in progress can't be
- * read, or the routines can't be saved.
+ * The settings are read with the routines, so the first render already has them.
+ *
+ * @returns The new timer session and settings session.
+ * @throws Rejects with storage's own error when the routines, the settings or the run in
+ * progress can't be read, or the routines can't be saved.
  */
-async function openTimerSession(): Promise<TimerSession> {
+async function openApp(): Promise<AppSessions> {
 	const storage = new DexieStorage();
 	const newId = (): string => crypto.randomUUID();
 	const askToPersist = askToPersistOnce(navigator.storage);
 	const locks: LockManager | undefined = navigator.locks;
 
 	void askToPersistIfWorkSaved(storage, askToPersist);
-	const [routines, saved, isAnotherTabOpen] = await Promise.all([
+	const [routines, saved, isAnotherTabOpen, settings] = await Promise.all([
 		loadRoutines(storage, new Date(), newId),
 		storage.getRunInProgress(),
-		joinOpenTabs(locks)
+		joinOpenTabs(locks),
+		storage.getSettings()
 	]);
-	return new TimerSession(
-		routines,
-		{
-			clock: () => Date.now(),
-			storage,
-			newId,
-			newRevision: newId,
-			onWorkSaved: () => void askToPersist()
-		},
-		{ saved, isAnotherTabOpen }
-	);
+	const options: TimerSessionOptions = {
+		clock: () => Date.now(),
+		storage,
+		newId,
+		newRevision: newId,
+		onWorkSaved: () => void askToPersist()
+	};
+	const timerSession = new TimerSession(routines, options, { saved, isAnotherTabOpen });
+	return { timerSession, settingsSession: new SettingsSession(storage, settings) };
 }
 
 /**
@@ -78,6 +88,6 @@ async function openTimerSession(): Promise<TimerSession> {
  * SvelteKit shows its error page.
  */
 export const load: LayoutLoad = async () => {
-	timerSessionOpening ??= openTimerSession();
-	return { timerSession: await timerSessionOpening };
+	appOpening ??= openApp();
+	return await appOpening;
 };
