@@ -22,6 +22,42 @@ export type BackupSummary = {
 };
 
 /**
+ * Words a count with its unit, in the singular for 1.
+ *
+ * @param count - How many.
+ * @param unit - The unit in the singular, such as `run`.
+ * @returns For example `1 run` or `3 runs`.
+ */
+export function counted(count: number, unit: string): string {
+	return `${count} ${unit}${count === 1 ? '' : 's'}`;
+}
+
+/**
+ * Words what a backup holds for the import's confirmation.
+ *
+ * @param summary - What the backup holds.
+ * @returns A sentence with the counts, the days of the first and last runs in UTC when it has
+ * runs, and when the backup was made.
+ */
+export function describeBackupSummary(summary: BackupSummary): string {
+	const counts = [
+		counted(summary.routineCount, 'routine'),
+		counted(summary.runCount, 'run'),
+		counted(summary.workPeriodCount, 'work period')
+	].join(', ');
+	const exportedDay = summary.exportedAt.slice(0, DAY_LENGTH);
+	if (summary.firstRunAt === null || summary.lastRunAt === null) {
+		return `The backup holds ${counts}, and was made on ${exportedDay} (UTC).`;
+	}
+	const firstDay = summary.firstRunAt.slice(0, DAY_LENGTH);
+	const lastDay = summary.lastRunAt.slice(0, DAY_LENGTH);
+	return `The backup holds ${counts}, with runs from ${firstDay} to ${lastDay} (UTC), and was made on ${exportedDay} (UTC).`;
+}
+
+/** The length of the day at the start of a UTC timestamp, such as `2026-11-19`. */
+const DAY_LENGTH = 10;
+
+/**
  * Counts what a backup holds.
  *
  * @param backup - A valid backup.
