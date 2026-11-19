@@ -1,5 +1,7 @@
+import { asset } from '$app/paths';
 import { joinOpenTabs } from '#lib/open-tabs.ts';
 import { loadRoutines } from '#lib/routine-loading.ts';
+import { RunChimes } from '#lib/run-chimes.svelte.ts';
 import { SettingsSession } from '#lib/settings.svelte.ts';
 import { DexieStorage } from '#lib/storage/dexie-storage.ts';
 import { askToPersistIfWorkSaved, askToPersistOnce } from '#lib/storage/persistence.ts';
@@ -36,7 +38,7 @@ type AppSessions = {
  * with the routines saved and the run in progress, if one is saved, saving its runs in the same
  * storage. It marks this tab as open, and tells the session whether another tab was, so a run
  * live in another tab isn't paused. It also asks for persistent storage, once, as soon as work is
- * saved.
+ * saved, and starts the run's chimes, which every button press unlocks.
  *
  * @remarks
  * `crypto.randomUUID` is wrapped rather than passed as it is, because called on its own, away from
@@ -49,6 +51,11 @@ type AppSessions = {
  * and `localhost`, as `navigator.storage` is.
  *
  * The settings are read with the routines, so the first render already has them.
+ *
+ * The chimes need the timer session, and the session's presses unlock the chimes, so the
+ * session's `onPress` reaches the chimes made just after it. No press can come before then, since
+ * nothing has rendered yet. The chimes follow the session for as long as the app is open, so
+ * nothing else needs to keep them.
  *
  * @returns The new timer session and settings session.
  * @throws Rejects with storage's own error when the routines, the settings or the run in
@@ -67,15 +74,27 @@ async function openApp(): Promise<AppSessions> {
 		joinOpenTabs(locks),
 		storage.getSettings()
 	]);
+	const clock = (): number => Date.now();
 	const options: TimerSessionOptions = {
-		clock: () => Date.now(),
+		clock,
 		storage,
 		newId,
 		newRevision: newId,
-		onWorkSaved: () => void askToPersist()
+		onWorkSaved: () => void askToPersist(),
+		onPress: () => {
+			chimes.unlock();
+		}
 	};
 	const timerSession = new TimerSession(routines, options, { saved, isAnotherTabOpen });
-	return { timerSession, settingsSession: new SettingsSession(storage, settings) };
+	const settingsSession = new SettingsSession(storage, settings);
+	const chimes = new RunChimes({
+		timer: timerSession,
+		settings: settingsSession,
+		clock,
+		locks,
+		address: asset
+	});
+	return { timerSession, settingsSession };
 }
 
 /**
