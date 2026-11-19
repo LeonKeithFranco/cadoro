@@ -114,7 +114,8 @@ export type WakeLockLog = {
  *
  * @remarks
  * Call it before the page opens. Without it the browser's own wake lock is used, whose state a
- * journey can't read.
+ * journey can't read. Its locks are only ever let go by the app, so nothing listening for their
+ * release is ever called.
  *
  * @param page - The page to give the wake lock to.
  */
@@ -125,13 +126,17 @@ export async function fakeWakeLock(page: Page): Promise<void> {
 		Object.defineProperty(navigator, 'wakeLock', {
 			configurable: true,
 			value: {
-				request: (): Promise<{ release: () => Promise<void> }> => {
+				request: (): Promise<{
+					release: () => Promise<void>;
+					addEventListener: () => void;
+				}> => {
 					log.requests++;
 					return Promise.resolve({
 						release: (): Promise<void> => {
 							log.releases++;
 							return Promise.resolve();
-						}
+						},
+						addEventListener: (): void => {}
 					});
 				}
 			}
