@@ -1,8 +1,8 @@
 # Progress
 
-**Status:** milestone 4's step 1 is done, as version 0.3.0, which goes live on GitHub Pages once its pull request merges. The app is installed on the desktop and the phone. It runs both starter routines through work, overtime, breaks and Finish, works offline, and offers to reload when a new version is ready. The starter routines are saved in IndexedDB on the first launch and kept from then on, but runs aren't saved yet, so a reload loses the run.
+**Status:** milestone 4's step 2 is done, as version 0.4.0, which goes live on GitHub Pages once its pull request merges. Step 1 is live as 0.3.0. The app is installed on the desktop and the phone. It runs both starter routines through work, overtime, breaks and Finish, works offline, and offers to reload when a new version is ready. The starter routines are saved in IndexedDB on the first launch, every run and work period is saved as it starts and ends, and persistent storage is asked for once work is saved. The run in progress isn't saved yet, so a reload loses the current run.
 
-**Next:** milestone 4, step 2, record runs (`feat/run-records`), planned against the code once step 1 is merged and released.
+**Next:** milestone 4, step 3, keep the run in progress (`feat/restore-run`), planned against the code once step 2 is merged and released.
 
 **Open:**
 
@@ -15,7 +15,7 @@
 ## Milestone 4: Keep runs
 
 1. [x] Routines in storage (`feat/routine-storage`), 0.3.0: the storage interface, its Dexie and in-memory backends, schema version 1, the starter routines created once on first launch, and the app loading them before it renders
-2. [ ] Record runs (`feat/run-records`), 0.4.0: each run and work period saved as it starts and ends, and persistent storage asked for
+2. [x] Record runs (`feat/run-records`), 0.4.0: each run and work period saved as it starts and ends, and persistent storage asked for
 3. [ ] Keep the run in progress (`feat/restore-run`), 0.5.0: saved on every change and every second, and restored paused at the last heartbeat
 4. [ ] Share the run across tabs (`feat/shared-run`), 0.6.0: every tab following the saved run through a Dexie live query
 
