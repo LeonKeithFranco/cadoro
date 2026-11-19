@@ -6,6 +6,7 @@
 
 import type { Routine } from './routine';
 import { createRun, finish, next, pause, play, viewRun, type RunState, type RunView } from './run';
+import { toStoredRunInProgress } from './run-in-progress';
 import { recordPress, type Run, type RunRecords } from './run-records';
 import type { CadoroStorage } from './storage/storage';
 
@@ -19,7 +20,7 @@ export type TimerSessionOptions = {
 	 * a fake clock they move by hand.
 	 */
 	clock: () => number;
-	/** Where each run and work period is saved. */
+	/** Where the run in progress, and each run and work period, is saved. */
 	storage: CadoroStorage;
 	/** Returns a new unique id each time it's called, such as `crypto.randomUUID`. */
 	newId: () => string;
@@ -32,7 +33,8 @@ export type TimerSessionOptions = {
 
 /**
  * The routine picker and the run of the chosen routine, as reactive state the timer screen
- * shows, with each run and work period saved as it starts and ends.
+ * shows, with the run saved whenever a button changes it, and each run and work period saved as
+ * it starts and ends.
  *
  * @remarks
  * The run logic stays in the pure engine in `run.ts`, and what to save in `run-records.ts`. This
@@ -47,7 +49,7 @@ export class TimerSession {
 	/** Returns the current moment, in milliseconds since 1970 (UTC), such as `Date.now`. */
 	readonly #clock: () => number;
 
-	/** Where each run and work period is saved. */
+	/** Where the run in progress, and each run and work period, is saved. */
 	readonly #storage: CadoroStorage;
 
 	/** Returns a new unique id each time it's called. */
@@ -179,27 +181,27 @@ export class TimerSession {
 	}
 
 	/**
-	 * Applies a button to the run at the current moment, and saves what it started or ended.
+	 * Applies a button to the run at the current moment, and saves the run with what it started
+	 * or ended.
 	 *
 	 * @remarks
 	 * The clock is read first, so the view is up to date as soon as the button changes the run,
-	 * rather than at the next tick.
+	 * rather than at the next tick. A button that does nothing, such as Pause on a ready run,
+	 * leaves the run as it was, so nothing is saved.
 	 *
 	 * @param press - The button's effect on the run, from the engine.
 	 */
 	#press(press: Press): void {
 		this.tick();
 		const before = this.#run;
-		this.#run = press(before, this.#now);
+		const after = press(before, this.#now);
+		if (after === before) {
+			return;
+		}
+		this.#run = after;
 
 		const records = recordPress(
-			{
-				before,
-				after: this.#run,
-				now: this.#now,
-				routineId: this.#routine.id,
-				record: this.#record
-			},
+			{ before, after, now: this.#now, routineId: this.#routine.id, record: this.#record },
 			this.#newId
 		);
 		this.#record = records.run ?? this.#record;
@@ -207,7 +209,8 @@ export class TimerSession {
 	}
 
 	/**
-	 * Hands records to storage once every earlier save has finished, without waiting for it.
+	 * Hands the run in progress, with what a change left to keep, to storage once every earlier
+	 * save has finished, without waiting for it.
 	 *
 	 * @remarks
 	 * Buttons change the screen at once and storage catches up, so a slow save never holds up
@@ -216,18 +219,22 @@ export class TimerSession {
 	 * A failed save is logged and the next one still runs, until milestone 8's activity log
 	 * records errors. Once a save that held work periods has finished, `onWorkSaved` is called.
 	 *
-	 * @param records - What a press left to save. Nothing is handed to storage when it's empty.
+	 * @param records - What the change left to keep, besides the run in progress. A ready run
+	 * isn't saved, since nothing has happened yet that's worth keeping.
 	 */
 	#save(records: RunRecords): void {
-		const hasWorkPeriods = records.workPeriods.length > 0;
-		const hasRecords = records.run !== null || hasWorkPeriods;
-		if (!hasRecords) {
+		const run = this.#run;
+		const record = this.#record;
+		// A run Play has started always has its record, so this only skips a ready run.
+		if (run.status === 'ready' || record === null) {
 			return;
 		}
 
+		const runInProgress = toStoredRunInProgress(record, run, this.#now);
+		const hasWorkPeriods = records.workPeriods.length > 0;
 		this.#saving = this.#saving
 			.then(async () => {
-				await this.#storage.saveRunRecords(records);
+				await this.#storage.saveRunInProgress(runInProgress, records);
 				if (hasWorkPeriods) {
 					this.#onWorkSaved();
 				}

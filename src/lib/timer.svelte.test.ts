@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createStarterRoutines, type Routine } from './routine';
+import type { StoredRunInProgress } from './run-in-progress';
 import type { RunRecords } from './run-records';
 import { InMemoryStorage } from './storage/in-memory-storage';
 import { minutes, seconds } from './testing/durations';
@@ -443,15 +444,81 @@ describe('recording runs', () => {
 			]);
 	});
 
+	it('saves the run in progress with each press, as of the moment it was pressed', async () => {
+		const storage = new InMemoryStorage();
+		const session = createSession([foreverRoutine], { storage });
+		session.play();
+		nowMs = minutes(10);
+
+		session.pause();
+
+		await expect
+			.poll(() => storage.getRunInProgress())
+			.toEqual({
+				record: {
+					id: 'id-1',
+					routineId: 'forever',
+					startedAt: '1970-01-01T00:00:00.000Z',
+					endedAt: null,
+					outcome: null,
+					roundsReached: 0
+				},
+				run: {
+					status: 'working',
+					endedPeriods: [],
+					position: { round: 0, block: 0, cycle: 0 },
+					segments: [{ start: '1970-01-01T00:00:00.000Z', end: '1970-01-01T00:10:00.000Z' }],
+					runningSince: null
+				},
+				heartbeatAt: '1970-01-01T00:10:00.000Z'
+			});
+	});
+
+	it('saves the ended run as the run in progress, so its summary can come back', async () => {
+		const storage = new InMemoryStorage();
+		const session = createSession([foreverRoutine], { storage });
+		session.play();
+		nowMs = minutes(25);
+
+		session.finish();
+
+		await expect
+			.poll(() => storage.getRunInProgress())
+			.toMatchObject({
+				record: { id: 'id-1', outcome: 'finished' },
+				run: { status: 'ended', outcome: 'finished' }
+			});
+	});
+
+	it('saves nothing for a press that changes nothing, such as Pause on a paused run', async () => {
+		const storage = new InMemoryStorage();
+		const saveSpy = vi.spyOn(storage, 'saveRunInProgress');
+		const session = createSession([foreverRoutine], { storage });
+		session.play();
+		nowMs = minutes(10);
+		session.pause();
+		nowMs = minutes(11);
+		session.pause();
+		nowMs = minutes(12);
+
+		session.play();
+
+		// Saves reach storage in order, so once Play's is saved, the second Pause's would be too.
+		await expect
+			.poll(() => storage.getRunInProgress())
+			.toMatchObject({ run: { runningSince: '1970-01-01T00:12:00.000Z' } });
+		expect(saveSpy).toHaveBeenCalledTimes(3);
+	});
+
 	it('saves each press in order, even when an earlier save is slow', async () => {
 		const storage = new InMemoryStorage();
-		const save = storage.saveRunRecords.bind(storage);
+		const save = storage.saveRunInProgress.bind(storage);
 		const { promise: firstSaveHeld, resolve: releaseFirstSave } = Promise.withResolvers<void>();
 		const saveSpy = vi
-			.spyOn(storage, 'saveRunRecords')
-			.mockImplementationOnce(async (records: RunRecords) => {
+			.spyOn(storage, 'saveRunInProgress')
+			.mockImplementationOnce(async (runInProgress: StoredRunInProgress, records?: RunRecords) => {
 				await firstSaveHeld;
-				await save(records);
+				await save(runInProgress, records);
 			});
 		const session = createSession([oneRoundRoutine], { storage });
 		session.play();
@@ -472,7 +539,7 @@ describe('recording runs', () => {
 	it('logs a save that fails, and carries on timing and saving', async () => {
 		const storage = new InMemoryStorage();
 		const failure = new Error('The disk is full.');
-		vi.spyOn(storage, 'saveRunRecords').mockRejectedValueOnce(failure);
+		vi.spyOn(storage, 'saveRunInProgress').mockRejectedValueOnce(failure);
 		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 		const session = createSession([foreverRoutine], { storage });
 		session.play();
@@ -502,7 +569,7 @@ describe('recording runs', () => {
 
 	it('says nothing about work whose save failed', async () => {
 		const storage = new InMemoryStorage();
-		const saveSpy = vi.spyOn(storage, 'saveRunRecords');
+		const saveSpy = vi.spyOn(storage, 'saveRunInProgress');
 		vi.spyOn(console, 'error').mockImplementation(() => {});
 		const onWorkSaved = vi.fn();
 		const session = createSession([foreverRoutine], { storage, onWorkSaved });

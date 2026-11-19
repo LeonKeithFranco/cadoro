@@ -2,6 +2,7 @@
 // memory for tests, implements this interface, and one shared suite of tests checks them all.
 
 import type { Routine } from '../routine';
+import type { StoredRunInProgress } from '../run-in-progress';
 import type { Run, RunRecords, WorkPeriod } from '../run-records';
 
 /**
@@ -40,20 +41,38 @@ export interface CadoroStorage {
 	addRoutinesIfNone(routines: Routine[]): Promise<boolean>;
 
 	/**
-	 * Saves what a button press leaves to save: the run, when it starts or ends, and the work
-	 * periods it ended, all together or not at all.
+	 * Saves the run in progress, with what the change to it leaves to keep: the run's record,
+	 * when it starts or ends, and the work periods it ended, all together or not at all.
 	 *
 	 * @remarks
-	 * The run replaces any saved run with its id, since a run is saved once when it starts and
-	 * again when it ends. Work periods are only ever added, so one can't overwrite another. If
-	 * anything can't be saved, nothing from this call is, so a run can't be saved as ended
-	 * without its last work period.
+	 * The run in progress replaces the one saved, as there's only ever one. The run's record
+	 * replaces any saved run with its id, since a run is saved once when it starts and again when
+	 * it ends. Work periods are only ever added, so one can't overwrite another. If anything can't
+	 * be saved, nothing from this call is, so a run can't be saved as ended without its last work
+	 * period, and a restored run can never end a work period that's already saved.
 	 *
-	 * @param records - The run, or `null` to leave it as saved, and the work periods to add.
+	 * @param runInProgress - The run in progress as of this change.
+	 * @param records - The run's record, or `null` to leave it as saved, and the work periods to
+	 * add. None when left out, as for a heartbeat.
 	 * @throws Rejects with the backend's own error when a work period's id is already saved, or
 	 * when the data can't be saved, and then nothing from this call is saved.
 	 */
-	saveRunRecords(records: RunRecords): Promise<void>;
+	saveRunInProgress(runInProgress: StoredRunInProgress, records?: RunRecords): Promise<void>;
+
+	/**
+	 * Reads the run in progress, to restore it when the app opens.
+	 *
+	 * @returns The run in progress as last saved, or `null` when none is saved.
+	 * @throws Rejects with the backend's own error when its data can't be read.
+	 */
+	getRunInProgress(): Promise<StoredRunInProgress | null>;
+
+	/**
+	 * Forgets the run in progress, once its summary is closed. Its run and work periods stay.
+	 *
+	 * @throws Rejects with the backend's own error when the data can't be saved.
+	 */
+	clearRunInProgress(): Promise<void>;
 
 	/**
 	 * Reads every run, in progress or ended.

@@ -1,6 +1,7 @@
 import Dexie from 'dexie';
 import { describe, expect, it } from 'vitest';
 import { routineWith } from '../testing/routines';
+import { runInProgressWith, savedRunInProgress } from '../testing/run-in-progress';
 import { DexieStorage } from './dexie-storage';
 
 /**
@@ -68,6 +69,28 @@ describe('DexieStorage', () => {
 			['runs', 'id'],
 			['workPeriods', 'id']
 		]);
+	});
+
+	it('keeps the run in progress after the database is opened again, as after a reload', async () => {
+		const name = newDatabaseName();
+		await new DexieStorage(name).saveRunInProgress(savedRunInProgress);
+
+		const reopened = new DexieStorage(name);
+
+		expect(await reopened.getRunInProgress()).toEqual(savedRunInProgress);
+	});
+
+	it('keeps the run in progress as one row, under the key current, however often it’s saved', async () => {
+		const name = newDatabaseName();
+		const storage = new DexieStorage(name);
+		await storage.saveRunInProgress(savedRunInProgress);
+		const later = runInProgressWith({ heartbeatAt: '2026-11-19T09:10:01.000Z' });
+		await storage.saveRunInProgress(later);
+
+		const saved = await openAsSaved(name);
+
+		expect(await saved.table('runInProgress').toCollection().primaryKeys()).toEqual(['current']);
+		expect(await saved.table('runInProgress').get('current')).toEqual(later);
 	});
 
 	it('keeps the app’s data in the database named cadoro', async () => {
