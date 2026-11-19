@@ -46,6 +46,52 @@ export function pickableRoutines(routines: Routine[]): Routine[] {
 	return notDeleted.toSorted((a, b) => a.customPosition - b.customPosition);
 }
 
+/**
+ * Makes a block with the defaults a new block starts with: titled "Focus", a 25-minute target, a
+ * 20% break and 1 cycle.
+ *
+ * @param newId - Returns a new unique id each time it's called, such as `crypto.randomUUID`.
+ * @returns A new block, which is valid as it is.
+ */
+export function newBlock(newId: () => string): Block {
+	return { id: newId(), title: 'Focus', targetMinutes: 25, breakPercent: 20, cycles: 1 };
+}
+
+/**
+ * Makes the routine that "+ New routine" opens for editing: a blank title, which must be filled
+ * in, infinite rounds, and one default block.
+ *
+ * @remarks
+ * It goes at the top of the list, so `customPosition` is 0. Whoever adds it to the routines makes
+ * room for it with `insertRoutine`.
+ *
+ * @param now - The moment it's created.
+ * @param newId - Returns a new unique id each time it's called, such as `crypto.randomUUID`.
+ * @returns A new routine, not valid until its title is filled in.
+ */
+export function newRoutine(now: Date, newId: () => string): Routine {
+	return {
+		id: newId(),
+		title: '',
+		rounds: 'infinite',
+		blocks: [newBlock(newId)],
+		customPosition: 0,
+		createdAt: now.toISOString(),
+		deletedAt: null
+	};
+}
+
+/**
+ * Says whether a routine may be deleted, which it may unless it's the only one left, so there is
+ * always one to run.
+ *
+ * @param routines - Every routine, deleted ones included.
+ * @returns `true` when more than one routine isn't deleted.
+ */
+export function canDeleteRoutine(routines: Routine[]): boolean {
+	return pickableRoutines(routines).length > 1;
+}
+
 /** A routine's content without what's unique to each copy, such as ids. */
 type RoutineTemplate = Pick<Routine, 'title' | 'rounds'> & {
 	/** The blocks, in run order, without ids. */
