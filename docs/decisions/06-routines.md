@@ -30,6 +30,8 @@ The Routines screen, editing routines and blocks in place, the activity log of r
 ### The Routines screen
 
 - Save on an unchanged routine closes the form and writes nothing, so it adds no log entry.
+- "Unsaved" and "unchanged" compare the titles trimmed, as they're saved (`withTrimmedTitles`), so spaces alone don't prompt "Discard changes?" or write a log entry whose old and new values match.
+- When another tab deletes the routine being edited, the screen closes its form and shows a notice, since `editing` would otherwise stay set with no form to show, asking "Discard changes?" about nothing. When another tab changes its title, rounds or blocks, the form stays, with a notice that Save will overwrite that change: the user's work isn't thrown away, and storage's `saveRoutine` keeps the last write, so the notice is the only warning. A reorder alone says nothing.
 - While a routine is open, the list isn't a drag zone, because `svelte-dnd-action` shares its handle state across zones.
 - Leaving by a link with unsaved changes asks "Discard changes?" in `beforeNavigate`, cancels the navigation, and carries on with `goto(resolve(route))` once confirmed.
 - The layout's `load` now returns `storage`, so the screen edits through the same storage object as everything else.

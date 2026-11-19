@@ -217,7 +217,8 @@ Done or Escape closes the dialog and returns the routine to its starting state, 
 
 - Editing happens in place: Edit expands the routine within the Routines list into a form.
 - Only one routine is open for editing at a time. Opening another, or leaving the screen, with unsaved changes asks "Discard changes?" first.
-- Changes apply only on Save. Cancel undoes all of them. Save on a routine with no changes closes the form and saves and logs nothing.
+- If the routine being edited is deleted in another tab, its form closes with a notice. If its title, rounds or blocks are changed in another tab, the form keeps the user's changes and says the routine was changed elsewhere and that Save will overwrite it.
+- Changes apply only on Save. Cancel undoes all of them. Save on a routine with no changes closes the form and saves and logs nothing, and a change that only adds or removes spaces around a title isn't a change.
 - Titles are trimmed of spaces at both ends before they're checked, so a title of only spaces is blank, and they're saved trimmed.
 - Editing never changes a routine's place in the custom order.
 - The form edits the routine's title and rounds, and each block's title, target, break percentage and cycles.

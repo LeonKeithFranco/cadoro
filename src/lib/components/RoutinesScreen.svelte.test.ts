@@ -771,6 +771,67 @@ describe('the routine of a run in progress', () => {
 	});
 });
 
+describe('a routine changed in another tab while it is edited', () => {
+	it('closes the form with a notice when the routine is deleted, and leaves nothing to discard', async () => {
+		const { storage } = await openScreen();
+		await openForEditing('Alpha');
+		await typeTitle('Renamed');
+
+		await storage.deleteRoutine('alpha');
+
+		await expect.element(page.getByRole('form', { name: 'Edit routine' })).not.toBeInTheDocument();
+		await expect
+			.element(
+				page.getByRole('status').getByText('Alpha was deleted in another tab', { exact: false })
+			)
+			.toBeVisible();
+		await cardOf('Bravo').getByRole('button', { name: 'Edit' }).click();
+		await expect.element(page.getByRole('dialog')).not.toBeInTheDocument();
+		await expect
+			.element(page.getByRole('textbox', { name: 'Title', exact: true }))
+			.toHaveValue('Bravo');
+	});
+
+	it('brings the drag handles back once the edited routine is deleted', async () => {
+		const { storage } = await openScreen();
+		await openForEditing('Alpha');
+		await expect.element(page.getByRole('button', { name: 'Drag Bravo' })).not.toBeInTheDocument();
+
+		await storage.deleteRoutine('alpha');
+
+		await expect.element(page.getByRole('button', { name: 'Drag Bravo' })).toBeVisible();
+	});
+
+	it('says in the form that it was changed elsewhere and that Save overwrites it', async () => {
+		const { storage } = await openScreen();
+		await openForEditing('Alpha');
+		await typeTitle('Mine');
+		const alpha = requireDefined((await storage.getRoutines())[0], 'Alpha');
+
+		await storage.saveRoutine({ ...alpha, title: 'Theirs' });
+
+		await expect
+			.element(page.getByRole('status').getByText('changed in another tab', { exact: false }))
+			.toBeVisible();
+		await expect.element(page.getByText('Save will overwrite', { exact: false })).toBeVisible();
+		await expect
+			.element(page.getByRole('textbox', { name: 'Title', exact: true }))
+			.toHaveValue('Mine');
+	});
+
+	it('says nothing when only the routines’ order changed elsewhere', async () => {
+		const { storage } = await openScreen();
+		await openForEditing('Alpha');
+
+		await storage.reorderRoutines(['bravo', 'alpha', 'charlie']);
+
+		await expect.poll(listedTitles).toEqual(['Bravo', 'Charlie']);
+		await expect
+			.element(page.getByText('changed in another tab', { exact: false }))
+			.not.toBeInTheDocument();
+	});
+});
+
 describe('editing blocks', () => {
 	it('adds a default block at the end', async () => {
 		await openScreen();
