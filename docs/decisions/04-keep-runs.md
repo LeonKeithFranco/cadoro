@@ -80,3 +80,40 @@ Runs survive reloads, every work period is recorded, and every open tab shows th
 - The plan had one `src/lib` function returning the whole session. Splitting the storage part off keeps it free of Svelte, so its tests run in Node against the in-memory backend, while a function that builds a `TimerSession` would need the browser project for its runes.
 - The `load` keeps the session's promise in a module variable, assigned with `??=`, so a `load` running again, such as after `invalidateAll()`, hands back the same session rather than losing the run.
 - `TimerSession` still needs at least one routine. Nothing can delete routines until milestone 6, and the spec doesn't yet say what the Timer screen shows when every routine is deleted, so that's left open for milestone 6.
+
+## Step 2: record runs (`feat/run-records`), 2026-11-19
+
+### The records each press saves
+
+- The run engine is unchanged. `recordPress`, in `src/lib/run-records.ts`, compares the run before and after a button press and works out what to save: a new `Run` when Play starts a ready run, a `WorkPeriod` for each period newly in `endedPeriods`, and the run's end when it reaches `ended`. Pause, resuming and moving on from a break save nothing, since breaks aren't recorded.
+- The new periods are those past the old count, `endedPeriods.slice(before.length)`, because the engine only ever adds to the end of the list.
+- Adding ids, or a list of events, to the engine's runs was rejected. Ids belong to storage, and the engine stays pure timing logic whose runs step 3 saves as they are.
+- `roundsReached` is 0 while a run is in progress and set when it ends, from `summarizeRun`, since only then is it known. `endedAt: null` already marks a run in progress. Updating it every round was rejected as extra writes for a number only the end settles. The spec's data model says so.
+- Ids come in as `newId`, as `loadRoutines` takes them, so tests use `numberedIds()`. `recordPress` throws if work ends while the caller has no run record, since dropping the work silently would be worse.
+- Moments become UTC strings through `toUtcTimestamp` in `time.ts`, as planned in this milestone's storage entry.
+
+### Saving runs and work periods together
+
+- `CadoroStorage.saveRunRecords({ run, workPeriods })` takes what `recordPress` gives and saves it in one read-write transaction across `runs` and `workPeriods`, so a run is never saved as ended without its last work period. The run is `put`, since it's saved at its start and again at its end, and the periods are `bulkAdd`ed, so one is never overwritten.
+- Dexie's `bulkAdd` docs say an uncaught failure aborts the transaction and rolls back every write in it, while outside a transaction the other rows stay saved. A test saves an ended run with a repeated work period id and checks that nothing changed. With the transaction removed, it failed on `DexieStorage`.
+- The in-memory backend has no transactions, so it checks every id before writing anything.
+- Separate `addRun`, `addWorkPeriod` and `endRun` methods were rejected, because a finite routine's last Next would need two calls with nothing holding them together.
+- `getRuns()` and `getWorkPeriods()`, oldest first, came now, although the app reads them only from milestone 7, so the shared suite checks what was saved through the interface rather than around it. Their order is the pure `runsOldestFirst` and `workPeriodsOldestFirst`, which both backends call, comparing `Date.parse` values rather than strings.
+- `hasWorkPeriods()` counts with Dexie's `count()`, for the persistence check at startup, rather than reading every period.
+- The test helpers `runWith` and `workPeriodWith` copy deeply before spreading, since a spread alone would share a period's `segments` with the constant every test uses.
+
+### The session saving each press
+
+- `TimerSession`'s constructor takes an options object, `{ clock, storage, newId, onWorkSaved }`, typed as `TimerSessionOptions`, so each argument is named at the call. Positional parameters were rejected as easy to swap.
+- The buttons stay synchronous and the screen changes at once. Each press's records go on a promise chain, `#saving`, so each save starts once the one before has finished. Saves then reach storage in the order the buttons were pressed whatever the backend, and a run's start can't land after its end. A test holds the first save open with `Promise.withResolvers()`. Without the chain, the start overwrote the ended run.
+- Making the buttons `async` and awaiting each save was rejected, since a slow disk would hold up the timer. Relying on IndexedDB running overlapping transactions in order was rejected, since the interface doesn't promise it and the in-memory backend doesn't share it.
+- A failed save is logged with `console.error` and the chain carries on, until milestone 8's activity log records errors.
+- There's no Playwright journey this step, because nothing on screen changes. The session's tests run the real engine against `InMemoryStorage`, the shared suite proves Dexie behaves the same, and step 3's reload journey checks the saved periods end to end.
+
+### Asking for persistent storage
+
+- `askToPersistOnce(navigator.storage)`, in `src/lib/storage/persistence.ts`, makes a function that asks the first time it's called and does nothing after that. It checks `persisted()` first and calls `persist()` only when storage isn't persistent yet. Its flag is set before the first `await`, so two calls in a row ask once.
+- The layout makes one, calls it at startup through `askToPersistIfWorkSaved` when a work period is saved, without waiting, and hands it to the session as `onWorkSaved`, which the session calls after a save that held work periods. So the app asks at most once per launch, never on an empty first visit, as the spec says.
+- Asking after every saved work period was rejected, because Firefox shows a prompt each time. Remembering across launches that it had asked was rejected, because the spec asks again at startup while storage isn't persistent.
+- Neither function rejects. A browser error or unreadable storage is logged, since the app works the same with or without persistence. TypeScript's DOM types say `navigator.storage` is always there, but it's missing outside HTTPS and `localhost`, so the parameter allows `undefined`.
+- Checked in Chromium on the dev server, with `persist()` wrapped to count calls: none on the first visit, one after a run of Play, Next and Finish, and one at startup after a reload. IndexedDB held the run and its work period, with exact times.
