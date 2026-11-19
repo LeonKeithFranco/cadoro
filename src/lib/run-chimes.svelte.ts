@@ -26,7 +26,8 @@ export type RunChimesOptions = {
 	readonly settings: { readonly settings: Settings };
 	/**
 	 * Returns the current moment, in milliseconds since 1970 (UTC), such as `Date.now`. It's read
-	 * as each reschedule starts, the same moment the player reads the audio clock.
+	 * as each reschedule starts, the same moment the player reads the audio clock, and the player
+	 * reads it again to place a chime anew when the audio clock may have stopped.
 	 */
 	readonly clock: () => number;
 	/**
@@ -67,7 +68,10 @@ export type RunChimesOptions = {
  * is logged.
  *
  * The run is only read when it changes, and each chime is scheduled ahead on the audio clock, so
- * a background tab's slowed timers never make a chime late.
+ * a background tab's slowed timers never make a chime late. The audio clock can stand still while
+ * time goes on, as while a laptop sleeps, so the chime is also placed again from the wall clock as
+ * the page shows again, besides when the player sees the audio run again, as
+ * {@link ChimePlayer} explains.
  */
 export class RunChimes {
 	/** Plays the chimes, scheduling each on the audio clock. */
@@ -113,7 +117,8 @@ export class RunChimes {
 			files: chimeFilesFor(initial, address),
 			volume: gainFor(initial.volume),
 			createContext,
-			fetchFile
+			fetchFile,
+			clock
 		});
 
 		// The root keeps the effects running outside any component, for as long as the app is open.
@@ -136,6 +141,15 @@ export class RunChimes {
 					void this.#player.reschedule(run, clock());
 				}
 			});
+		});
+
+		// The audio clock may have stood still while the page was out of sight, such as while a
+		// laptop slept, so the chime is placed again from the wall clock once it shows. A tab that
+		// isn't sounding has nothing placed, so the player does nothing there.
+		document.addEventListener('visibilitychange', () => {
+			if (document.visibilityState === 'visible') {
+				void this.#player.catchUp();
+			}
 		});
 	}
 
@@ -161,7 +175,7 @@ export class RunChimes {
 	 * then. Every call resumes the audio, which a phone can suspend, such as for a call.
 	 */
 	unlock(): void {
-		this.#player.unlock();
+		void this.#player.unlock();
 		if (this.#hasAskedToSound) {
 			return;
 		}

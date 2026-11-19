@@ -62,6 +62,19 @@ export type ChimeAudioContext = {
 	/** The speakers. */
 	readonly destination: ChimeOutput;
 	/**
+	 * Whether the audio clock runs: `running`, or another state, such as `suspended`, while it's
+	 * stopped.
+	 */
+	readonly state: string;
+	/**
+	 * Listens for the state to change, as when the browser stops the audio clock while a laptop
+	 * sleeps or for a phone call, and runs it again after.
+	 *
+	 * @param type - The event, `statechange`.
+	 * @param listener - Called after each change of state.
+	 */
+	addEventListener(type: 'statechange', listener: () => void): void;
+	/**
 	 * Lets the context make sound, which browsers allow only after a user gesture.
 	 *
 	 * @returns A promise that settles once the context is running, or rejects if it can't run.
@@ -105,7 +118,24 @@ export type ChimePlayerOptions = {
 	readonly createContext?: () => ChimeAudioContext;
 	/** Fetches a chime file. Defaults to the browser's `fetch`. */
 	readonly fetchFile?: (url: string) => Promise<Response>;
+	/**
+	 * Returns the current moment on the wall clock, in milliseconds since 1970 (UTC), which keeps
+	 * going while the audio clock stops. Defaults to `Date.now`.
+	 */
+	readonly clock?: () => number;
 };
+
+/**
+ * How long after its moment a chime may still start, in milliseconds, such as when its file was
+ * slow to load. A chime any later is dropped, since a late chime would mark a moment that's gone.
+ */
+export const LATE_CHIME_TOLERANCE_MS = MS_PER_SECOND;
+
+/**
+ * How far a scheduled chime may be from its moment, in milliseconds, before catching up places it
+ * again. The two clocks are read a moment apart, so a chime in place never measures exactly 0.
+ */
+const ALLOWED_DRIFT_MS = 100;
 
 /** A chime the player has scheduled and not cancelled. */
 export type ScheduledChime = DueChime & {
@@ -138,6 +168,13 @@ type AudioOutput = {
  * whether a press, a restore or another tab's change, {@link ChimePlayer.reschedule} cancels what
  * was scheduled and schedules the run's next chime instead. A chime file that can't be fetched or
  * decoded is logged, and the run carries on without its chime.
+ *
+ * The audio clock stops while a laptop sleeps, or a phone takes a call, while the wall clock goes
+ * on, so a chime placed on the audio clock would play late by as long as it stood still. So the
+ * player places the last run's chime again from the wall clock whenever the audio clock may have
+ * stopped: when the context says it runs again, once an unlock has resumed it, and when
+ * {@link ChimePlayer.catchUp} is called, as the page shows again. A chime whose moment has passed
+ * by then is dropped, and none ever starts more than {@link LATE_CHIME_TOLERANCE_MS} late.
  */
 export class ChimePlayer {
 	/** The chime file each alert plays. */
@@ -148,6 +185,10 @@ export class ChimePlayer {
 	readonly #createContext: () => ChimeAudioContext;
 	/** Fetches a chime file. */
 	readonly #fetchFile: (url: string) => Promise<Response>;
+	/** Returns the current moment on the wall clock, in milliseconds since 1970 (UTC). */
+	readonly #clock: () => number;
+	/** The run the last reschedule placed the chime of, or `null` before any, or once cancelled. */
+	#lastRun: RunState | null = null;
 	/** The audio output, once unlocked, or `null` before. */
 	#output: AudioOutput | null = null;
 	/** Each file's decoded chime, loaded once, or `null` when it couldn't be loaded. */
@@ -160,14 +201,15 @@ export class ChimePlayer {
 	/**
 	 * Makes a player, which stays silent until it's unlocked.
 	 *
-	 * @param options - The chime files, the volume, and optionally the audio context's factory and
-	 * the fetch, which tests replace.
+	 * @param options - The chime files, the volume, and optionally the audio context's factory,
+	 * the fetch and the wall clock, which tests replace.
 	 */
 	constructor(options: ChimePlayerOptions) {
 		this.#files = options.files;
 		this.#volume = clampVolume(options.volume);
 		this.#createContext = options.createContext ?? ((): ChimeAudioContext => new AudioContext());
 		this.#fetchFile = options.fetchFile ?? ((url: string): Promise<Response> => fetch(url));
+		this.#clock = options.clock ?? ((): number => Date.now());
 	}
 
 	/**
@@ -185,20 +227,87 @@ export class ChimePlayer {
 	 * @remarks
 	 * Call it from a user gesture, such as the Play press, since browsers allow audio to start only
 	 * then. The first call makes the audio context, and every call asks it to resume, since a phone
-	 * can suspend it, such as for a call. A context that can't be made, or can't resume, is logged,
-	 * and the player stays silent.
+	 * can suspend it, such as for a call. Once it has resumed, the last run's chime is placed again
+	 * from the wall clock, in case the audio clock stood still. A context that can't be made, or
+	 * can't resume, is logged, and the player stays silent.
+	 *
+	 * @returns A promise of whether the audio can play: `true` once the context has resumed, or
+	 * `false` when it can't be made or resumed. It never rejects.
 	 */
-	unlock(): void {
+	async unlock(): Promise<boolean> {
 		const output = this.#output ?? this.#openOutput();
 		if (output === null) {
-			return;
+			return false;
 		}
-		output.context.resume().catch((error: unknown) => {
-			console.error('Could not start the audio for the chimes', error);
-		});
 		for (const file of Object.values(this.#files)) {
 			void this.#soundFor(output.context, file);
 		}
+		try {
+			await output.context.resume();
+		} catch (error: unknown) {
+			console.error('Could not start the audio for the chimes', error);
+			return false;
+		}
+		await this.catchUp();
+		return true;
+	}
+
+	/**
+	 * Places the last run's chime again from the wall clock, in case the audio clock stood still
+	 * while time went on, as it does while a laptop sleeps.
+	 *
+	 * @remarks
+	 * The app calls it as the page shows again. A chime whose moment has passed is dropped rather
+	 * than played late. A chime still placed within {@link ALLOWED_DRIFT_MS} of its moment is left
+	 * as it is, so an unlock, such as a preview's, doesn't restart it. Before any reschedule, or
+	 * after {@link ChimePlayer.cancel}, it does nothing.
+	 *
+	 * @returns A promise that settles once the chime is placed again, or there's none. It never
+	 * rejects.
+	 */
+	async catchUp(): Promise<void> {
+		const run = this.#lastRun;
+		const output = this.#output;
+		if (run === null || output === null) {
+			return;
+		}
+		const now = this.#clock();
+		if (this.#isInPlace(run, now, output.context)) {
+			return;
+		}
+		await this.reschedule(run, now);
+	}
+
+	/**
+	 * Says whether what's scheduled is still the run's next chime, at its moment on the audio
+	 * clock.
+	 *
+	 * @param run - The run the chime was scheduled for.
+	 * @param now - The current moment on the wall clock, in milliseconds since 1970 (UTC).
+	 * @param context - The audio context, whose clock the chime is placed on.
+	 * @returns `true` when nothing is due and nothing is scheduled, or when the scheduled chime is
+	 * the due one, starting within {@link ALLOWED_DRIFT_MS} of its moment.
+	 */
+	#isInPlace(run: RunState, now: number, context: ChimeAudioContext): boolean {
+		const chime = nextChime(run, now);
+		const placed = this.#scheduled.at(-1);
+		if (chime === null || placed === undefined) {
+			return chime === null && placed === undefined;
+		}
+		const dueStartsAt = context.currentTime + (chime.at - now) / MS_PER_SECOND;
+		const driftMs = Math.abs(placed.startsAt - dueStartsAt) * MS_PER_SECOND;
+		return placed.at === chime.at && driftMs <= ALLOWED_DRIFT_MS;
+	}
+
+	/**
+	 * Cancels the chimes still to play, and forgets the run, so nothing is placed again until the
+	 * next reschedule, as when another tab takes over sounding them. A chime already playing
+	 * finishes.
+	 */
+	cancel(): void {
+		this.#rescheduleCount++;
+		this.#lastRun = null;
+		this.#cancelScheduled();
 	}
 
 	/**
@@ -208,7 +317,8 @@ export class ChimePlayer {
 	 * @remarks
 	 * A chime already playing carries on. Before the player is unlocked, nothing is scheduled. A
 	 * chime still loading is scheduled once it's loaded, unless a later reschedule replaced this
-	 * one first. If loading took past its moment, it plays at once.
+	 * one first, and placed from the time loading took. If loading took past its moment, it plays
+	 * at once, or not at all when it's over {@link LATE_CHIME_TOLERANCE_MS} late.
 	 *
 	 * @param run - The run as it is now.
 	 * @param now - The current moment, in milliseconds since 1970 (UTC), the same moment the run's
@@ -219,6 +329,7 @@ export class ChimePlayer {
 	async reschedule(run: RunState, now: number): Promise<void> {
 		this.#rescheduleCount++;
 		const thisReschedule = this.#rescheduleCount;
+		this.#lastRun = run;
 		this.#cancelScheduled();
 
 		const output = this.#output;
@@ -227,8 +338,7 @@ export class ChimePlayer {
 			return;
 		}
 
-		const delaySeconds = (chime.at - now) / MS_PER_SECOND;
-		const startsAt = output.context.currentTime + delaySeconds;
+		const clockBeforeLoad = this.#clock();
 		const file = this.#files[chime.alert];
 		const sound = await this.#soundFor(output.context, file);
 		const isReplaced = thisReschedule !== this.#rescheduleCount;
@@ -236,6 +346,14 @@ export class ChimePlayer {
 			return;
 		}
 
+		// Measured on the wall clock, which goes on even if the audio clock stopped meanwhile.
+		const nowAfterLoad = now + (this.#clock() - clockBeforeLoad);
+		const lateMs = nowAfterLoad - chime.at;
+		if (lateMs > LATE_CHIME_TOLERANCE_MS) {
+			return;
+		}
+		const delaySeconds = (chime.at - nowAfterLoad) / MS_PER_SECOND;
+		const startsAt = output.context.currentTime + delaySeconds;
 		const source = output.context.createBufferSource();
 		source.buffer = sound;
 		source.connect(output.volume);
@@ -257,7 +375,7 @@ export class ChimePlayer {
 	 * It never rejects.
 	 */
 	async preview(file: string): Promise<void> {
-		this.unlock();
+		void this.unlock();
 		const output = this.#output;
 		if (output === null) {
 			return;
@@ -296,7 +414,8 @@ export class ChimePlayer {
 	}
 
 	/**
-	 * Makes the audio context and the volume control, connected to the speakers.
+	 * Makes the audio context and the volume control, connected to the speakers, and listens for
+	 * the audio clock to run again after stopping, to place the chime again.
 	 *
 	 * @returns The audio output, or `null` when the context can't be made, which is logged.
 	 */
@@ -306,6 +425,11 @@ export class ChimePlayer {
 			const volume = context.createGain();
 			volume.gain.value = this.#volume;
 			volume.connect(context.destination);
+			context.addEventListener('statechange', () => {
+				if (context.state === 'running') {
+					void this.catchUp();
+				}
+			});
 			this.#output = { context, volume };
 			return this.#output;
 		} catch (error) {

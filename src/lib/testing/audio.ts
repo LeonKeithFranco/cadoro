@@ -74,10 +74,42 @@ export class FakeAudioContext implements ChimeAudioContext {
 	resumeCount = 0;
 	/** The error `resume` rejects with, or `null` for it to resolve. */
 	resumeError: Error | null = null;
+	/**
+	 * Whether the audio clock runs, `suspended` until `resume`, as a context made without a
+	 * gesture is.
+	 */
+	state: 'suspended' | 'running' = 'suspended';
+	/** Everything listening for the state to change, in the order it started listening. */
+	readonly #stateListeners: (() => void)[] = [];
 
 	resume(): Promise<void> {
 		this.resumeCount++;
-		return this.resumeError === null ? Promise.resolve() : Promise.reject(this.resumeError);
+		if (this.resumeError !== null) {
+			return Promise.reject(this.resumeError);
+		}
+		this.changeState('running');
+		return Promise.resolve();
+	}
+
+	addEventListener(_type: 'statechange', listener: () => void): void {
+		this.#stateListeners.push(listener);
+	}
+
+	/**
+	 * Changes the state, as the browser does when it stops the audio clock by itself, such as while
+	 * a laptop sleeps or for a phone call, and runs it again after, telling every listener, as
+	 * `statechange` does. A change to the state it already has tells no one.
+	 *
+	 * @param state - The new state.
+	 */
+	changeState(state: 'suspended' | 'running'): void {
+		if (state === this.state) {
+			return;
+		}
+		this.state = state;
+		for (const listener of this.#stateListeners) {
+			listener();
+		}
 	}
 
 	decodeAudioData(data: ArrayBuffer): Promise<FakeSound> {

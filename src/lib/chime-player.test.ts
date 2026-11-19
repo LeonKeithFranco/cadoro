@@ -36,26 +36,37 @@ type Setup = {
  * Makes a player with a fake audio context and fake files, at half volume, not yet unlocked.
  *
  * @param options - Anything that differs from the defaults: {@link files}, served as
- * {@link served}, at a volume of 0.5.
+ * {@link served}, at a volume of 0.5, with a wall clock that stays at {@link start}.
  * @returns The player and its fakes.
  */
 function setUp(options: Partial<ChimePlayerOptions> = {}): Setup {
 	const context = new FakeAudioContext();
 	const createContext = vi.fn(() => context);
 	const fetchFile = vi.fn(fakeFiles(served));
-	const player = new ChimePlayer({ files, volume: 0.5, createContext, fetchFile, ...options });
+	const player = new ChimePlayer({
+		files,
+		volume: 0.5,
+		createContext,
+		fetchFile,
+		clock: (): number => start,
+		...options
+	});
 	return { player, context, createContext, fetchFile };
 }
 
 /**
  * Makes a player as {@link setUp} does, and unlocks it, as the Play press will.
  *
+ * @remarks
+ * It waits for the unlock to finish, as a press does before the run's chime is scheduled, so the
+ * unlock's own catching up can't replace a chime the test schedules after.
+ *
  * @param options - Anything that differs from {@link setUp}'s defaults.
- * @returns The player and its fakes.
+ * @returns A promise of the player and its fakes, once the unlock has finished.
  */
-function setUpUnlocked(options: Partial<ChimePlayerOptions> = {}): Setup {
+async function setUpUnlocked(options: Partial<ChimePlayerOptions> = {}): Promise<Setup> {
 	const setup = setUp(options);
-	setup.player.unlock();
+	await setup.player.unlock();
 	return setup;
 }
 
@@ -97,9 +108,9 @@ describe('ChimePlayer', () => {
 	});
 
 	describe('unlocking', () => {
-		it('makes one audio context, with its volume connected to the speakers', () => {
-			const { player, context, createContext } = setUpUnlocked();
-			player.unlock();
+		it('makes one audio context, with its volume connected to the speakers', async () => {
+			const { player, context, createContext } = await setUpUnlocked();
+			await player.unlock();
 
 			expect(createContext).toHaveBeenCalledTimes(1);
 			expect(context.gains).toHaveLength(1);
@@ -107,30 +118,32 @@ describe('ChimePlayer', () => {
 			expect(context.gains[0]?.connections).toEqual([context.destination]);
 		});
 
-		it('asks the audio context to resume on every unlock', () => {
-			const { player, context } = setUpUnlocked();
-			player.unlock();
+		it('asks the audio context to resume on every unlock', async () => {
+			const { player, context } = await setUpUnlocked();
+			await player.unlock();
 
 			expect(context.resumeCount).toBe(2);
 		});
 
-		it('fetches each chime file once', () => {
-			const { player, fetchFile } = setUpUnlocked();
-			player.unlock();
+		it('fetches each chime file once', async () => {
+			const { player, fetchFile } = await setUpUnlocked();
+			await player.unlock();
 
 			expect(fetchFile).toHaveBeenCalledTimes(2);
 			expect(fetchFile).toHaveBeenCalledWith(files.target);
 			expect(fetchFile).toHaveBeenCalledWith(files.break);
 		});
 
-		it('fetches a file both alerts share only once', () => {
-			const { fetchFile } = setUpUnlocked({ files: { target: files.target, break: files.target } });
+		it('fetches a file both alerts share only once', async () => {
+			const { fetchFile } = await setUpUnlocked({
+				files: { target: files.target, break: files.target }
+			});
 
 			expect(fetchFile).toHaveBeenCalledTimes(1);
 		});
 
 		it('logs an audio context that cannot be made, and stays silent', async () => {
-			const { player } = setUpUnlocked({
+			const { player } = await setUpUnlocked({
 				createContext: () => {
 					throw new Error('AudioContext is not defined');
 				}
@@ -149,17 +162,42 @@ describe('ChimePlayer', () => {
 			const context = new FakeAudioContext();
 			context.resumeError = new Error('Not allowed to start');
 
-			setUpUnlocked({ createContext: () => context });
+			await setUpUnlocked({ createContext: () => context });
 
-			await expect
-				.poll(() => logged.mock.calls)
-				.toContainEqual(['Could not start the audio for the chimes', context.resumeError]);
+			expect(logged).toHaveBeenCalledWith(
+				'Could not start the audio for the chimes',
+				context.resumeError
+			);
+		});
+
+		it('says the audio can play once the context has resumed', async () => {
+			const { player } = setUp();
+
+			expect(await player.unlock()).toBe(true);
+		});
+
+		it('says the audio can’t play when the context can’t be made', async () => {
+			const { player } = setUp({
+				createContext: () => {
+					throw new Error('AudioContext is not defined');
+				}
+			});
+
+			expect(await player.unlock()).toBe(false);
+		});
+
+		it('says the audio can’t play when the context can’t resume', async () => {
+			const context = new FakeAudioContext();
+			context.resumeError = new Error('Not allowed to start');
+			const { player } = setUp({ createContext: () => context });
+
+			expect(await player.unlock()).toBe(false);
 		});
 	});
 
 	describe('scheduling', () => {
 		it('schedules the target chime on the audio clock, through the volume', async () => {
-			const { player, context } = setUpUnlocked();
+			const { player, context } = await setUpUnlocked();
 			context.currentTime = 100;
 
 			await player.reschedule(working, start);
@@ -174,7 +212,7 @@ describe('ChimePlayer', () => {
 		});
 
 		it('counts the wait from the moment of the change', async () => {
-			const { player, context } = setUpUnlocked();
+			const { player, context } = await setUpUnlocked();
 			context.currentTime = 100;
 
 			await player.reschedule(working, start + minutes(10) + seconds(30));
@@ -183,7 +221,7 @@ describe('ChimePlayer', () => {
 		});
 
 		it('schedules the break chime with the break’s file', async () => {
-			const { player, context } = setUpUnlocked();
+			const { player, context } = await setUpUnlocked();
 			const onBreak = next(working, start + minutes(25));
 
 			await player.reschedule(onBreak, start + minutes(25));
@@ -195,7 +233,7 @@ describe('ChimePlayer', () => {
 		});
 
 		it('schedules nothing when no chime is due', async () => {
-			const { player, context } = setUpUnlocked();
+			const { player, context } = await setUpUnlocked();
 			const paused = pause(working, start + minutes(5));
 
 			await player.reschedule(paused, start + minutes(5));
@@ -205,7 +243,7 @@ describe('ChimePlayer', () => {
 		});
 
 		it('fetches a chime file only once however often it schedules', async () => {
-			const { player, fetchFile } = setUpUnlocked();
+			const { player, fetchFile } = await setUpUnlocked();
 
 			await player.reschedule(working, start);
 			await player.reschedule(working, start + seconds(1));
@@ -217,7 +255,7 @@ describe('ChimePlayer', () => {
 
 	describe('rescheduling', () => {
 		it('stops a chime that has not started when the run pauses', async () => {
-			const { player, context } = setUpUnlocked();
+			const { player, context } = await setUpUnlocked();
 			await player.reschedule(working, start);
 			context.currentTime = 60;
 
@@ -228,7 +266,7 @@ describe('ChimePlayer', () => {
 		});
 
 		it('replaces a chime with one at the run’s new moment', async () => {
-			const { player, context } = setUpUnlocked();
+			const { player, context } = await setUpUnlocked();
 			await player.reschedule(working, start);
 			const resumed = play(pause(working, start + minutes(1)), start + minutes(3));
 			context.currentTime = 3 * 60;
@@ -244,7 +282,7 @@ describe('ChimePlayer', () => {
 		});
 
 		it('lets a chime that has started play on', async () => {
-			const { player, context } = setUpUnlocked();
+			const { player, context } = await setUpUnlocked();
 			await player.reschedule(working, start);
 			context.currentTime = 25 * 60;
 
@@ -259,7 +297,7 @@ describe('ChimePlayer', () => {
 				new Promise((resolve) => {
 					serveFile = resolve;
 				});
-			const { player, context } = setUpUnlocked({
+			const { player, context } = await setUpUnlocked({
 				files: { target: files.target, break: files.target },
 				fetchFile: slowFetch
 			});
@@ -274,9 +312,146 @@ describe('ChimePlayer', () => {
 		});
 	});
 
+	describe('when the audio clock stops while time goes on', () => {
+		/** The wall clock's moment, in milliseconds since 1970, which each test moves by hand. */
+		let wallMs = start;
+
+		// Starts each test's wall clock at the run's start.
+		beforeEach(() => {
+			wallMs = start;
+		});
+
+		/**
+		 * Makes an unlocked player whose wall clock is {@link wallMs}, with the target chime
+		 * scheduled at the run's start, 25 minutes ahead on the audio clock.
+		 *
+		 * @returns The player and its fakes.
+		 */
+		async function setUpScheduled(): Promise<Setup> {
+			const setup = await setUpUnlocked({ clock: () => wallMs });
+			await setup.player.reschedule(working, start);
+			return setup;
+		}
+
+		it('moves the chime to its moment on the wall clock once the audio runs again', async () => {
+			const { player, context } = await setUpScheduled();
+
+			// The laptop sleeps from 10 minutes before the target to 5 minutes before it.
+			context.currentTime = 15 * 60;
+			context.changeState('suspended');
+			wallMs = start + minutes(20);
+			context.changeState('running');
+
+			await expect
+				.poll(() => player.scheduled)
+				.toEqual([
+					{ alert: 'target', at: start + minutes(25), startsAt: 20 * 60, file: files.target }
+				]);
+			expect(context.sources[0]?.isStopped).toBe(true);
+		});
+
+		it('drops a chime whose moment passed while the audio clock was stopped', async () => {
+			const { player, context } = await setUpScheduled();
+
+			// The laptop sleeps from 3 minutes before the target to 20 minutes after it.
+			context.currentTime = 22 * 60;
+			context.changeState('suspended');
+			wallMs = start + minutes(45);
+			context.changeState('running');
+
+			await expect.poll(() => context.sources[0]?.isStopped).toBe(true);
+			expect(player.scheduled).toEqual([]);
+			expect(context.sources).toHaveLength(1);
+		});
+
+		it('moves the chime when an unlock resumes audio whose clock had stopped', async () => {
+			const { player, context } = await setUpScheduled();
+
+			// The audio clock stood still for 5 minutes, though the browser still says it runs.
+			context.currentTime = 15 * 60;
+			wallMs = start + minutes(20);
+			await player.unlock();
+
+			await expect
+				.poll(() => player.scheduled)
+				.toEqual([expect.objectContaining({ at: start + minutes(25), startsAt: 20 * 60 })]);
+		});
+
+		it('moves the chime when asked to catch up, as the page shows again', async () => {
+			const { player, context } = await setUpScheduled();
+
+			context.currentTime = 15 * 60;
+			wallMs = start + minutes(20);
+			await player.catchUp();
+
+			expect(player.scheduled).toEqual([
+				expect.objectContaining({ at: start + minutes(25), startsAt: 20 * 60 })
+			]);
+		});
+
+		it('catches up with nothing before anything was scheduled', async () => {
+			const { player, context } = await setUpUnlocked({ clock: () => wallMs });
+
+			await player.catchUp();
+
+			expect(context.sources).toEqual([]);
+		});
+
+		/**
+		 * Makes an unlocked player whose wall clock is {@link wallMs}, and whose one chime file
+		 * loads only when the test serves it.
+		 *
+		 * @returns A promise of the player, its fakes, and `serveFile`, which serves the file.
+		 */
+		async function setUpSlowFile(): Promise<Setup & { serveFile: () => void }> {
+			let serve: (response: Response) => void = () => undefined;
+			const slowFetch = (): Promise<Response> =>
+				new Promise((resolve) => {
+					serve = resolve;
+				});
+			const setup = await setUpUnlocked({
+				clock: () => wallMs,
+				files: { target: files.target, break: files.target },
+				fetchFile: slowFetch
+			});
+			return {
+				...setup,
+				serveFile: (): void => {
+					serve(new Response('target chime'));
+				}
+			};
+		}
+
+		it('drops a chime whose file loaded over a second after its moment', async () => {
+			const { player, context, serveFile } = await setUpSlowFile();
+			wallMs = start + minutes(25) - seconds(1);
+
+			const scheduling = player.reschedule(working, wallMs);
+			wallMs = start + minutes(25) + 1001;
+			serveFile();
+			await scheduling;
+
+			expect(context.sources).toEqual([]);
+			expect(player.scheduled).toEqual([]);
+		});
+
+		it('plays at once a chime whose file loaded within a second of its moment', async () => {
+			const { player, context, serveFile } = await setUpSlowFile();
+			wallMs = start + minutes(25) - seconds(1);
+
+			const scheduling = player.reschedule(working, wallMs);
+			wallMs = start + minutes(25) + seconds(1);
+			serveFile();
+			await scheduling;
+
+			expect(context.sources).toHaveLength(1);
+			expect(context.sources[0]?.startedAt).toBe(-1);
+		});
+	});
+
 	describe('a chime file that cannot be played', () => {
 		it('logs a missing file, and schedules nothing', async () => {
-			const { player, context } = setUpUnlocked({ fetchFile: fakeFiles({}) });
+			const { player, context } = await setUpUnlocked({ fetchFile: fakeFiles({}) });
 
 			await player.reschedule(working, start);
 
@@ -289,7 +464,7 @@ describe('ChimePlayer', () => {
 		});
 
 		it('logs a file that cannot be decoded, and schedules nothing', async () => {
-			const { player, context } = setUpUnlocked({
+			const { player, context } = await setUpUnlocked({
 				fetchFile: fakeFiles({ ...served, [files.target]: `${undecodable}, but a web page` })
 			});
 
@@ -304,7 +479,7 @@ describe('ChimePlayer', () => {
 
 		it('logs a fetch that fails, and schedules nothing', async () => {
 			const offline = new TypeError('Failed to fetch');
-			const { player, context } = setUpUnlocked({ fetchFile: () => Promise.reject(offline) });
+			const { player, context } = await setUpUnlocked({ fetchFile: () => Promise.reject(offline) });
 
 			await player.reschedule(working, start);
 
@@ -314,7 +489,7 @@ describe('ChimePlayer', () => {
 
 		it('tries a file that failed only once', async () => {
 			const fetchFile = vi.fn(fakeFiles({}));
-			const { player } = setUpUnlocked({ fetchFile });
+			const { player } = await setUpUnlocked({ fetchFile });
 
 			await player.reschedule(working, start);
 			await player.reschedule(working, start + seconds(1));
@@ -328,7 +503,7 @@ describe('ChimePlayer', () => {
 		});
 
 		it('still plays the other alert’s chime', async () => {
-			const { player, context } = setUpUnlocked({
+			const { player, context } = await setUpUnlocked({
 				fetchFile: fakeFiles({ [files.break]: 'break chime' })
 			});
 			const onBreak = next(working, start + minutes(25));
@@ -362,7 +537,7 @@ describe('ChimePlayer', () => {
 		});
 
 		it('leaves the scheduled chime alone', async () => {
-			const { player, context } = setUpUnlocked();
+			const { player, context } = await setUpUnlocked();
 			await player.reschedule(working, start);
 			const [scheduled] = player.scheduled;
 
@@ -401,41 +576,41 @@ describe('ChimePlayer', () => {
 	});
 
 	describe('volume', () => {
-		it('changes the gain every chime plays through', () => {
-			const { player, context } = setUpUnlocked();
+		it('changes the gain every chime plays through', async () => {
+			const { player, context } = await setUpUnlocked();
 
 			player.setVolume(0.25);
 
 			expect(context.gains[0]?.gain.value).toBe(0.25);
 		});
 
-		it('keeps a volume set before unlocking for when it unlocks', () => {
+		it('keeps a volume set before unlocking for when it unlocks', async () => {
 			const { player, context } = setUp();
 
 			player.setVolume(0.8);
-			player.unlock();
+			await player.unlock();
 
 			expect(context.gains[0]?.gain.value).toBe(0.8);
 		});
 
-		it('holds a volume above 1 to 1', () => {
-			const { player, context } = setUpUnlocked();
+		it('holds a volume above 1 to 1', async () => {
+			const { player, context } = await setUpUnlocked();
 
 			player.setVolume(1.5);
 
 			expect(context.gains[0]?.gain.value).toBe(1);
 		});
 
-		it('holds a volume below 0 to 0', () => {
-			const { player, context } = setUpUnlocked();
+		it('holds a volume below 0 to 0', async () => {
+			const { player, context } = await setUpUnlocked();
 
 			player.setVolume(-0.5);
 
 			expect(context.gains[0]?.gain.value).toBe(0);
 		});
 
-		it('holds the starting volume to 0 to 1', () => {
-			const { context } = setUpUnlocked({ volume: 2 });
+		it('holds the starting volume to 0 to 1', async () => {
+			const { context } = await setUpUnlocked({ volume: 2 });
 
 			expect(context.gains[0]?.gain.value).toBe(1);
 		});
@@ -444,7 +619,7 @@ describe('ChimePlayer', () => {
 	describe('changing the chime files', () => {
 		it('plays the new file from the next reschedule', async () => {
 			const otherFile = '/chimes/other.mp3';
-			const { player, context } = setUpUnlocked({
+			const { player, context } = await setUpUnlocked({
 				fetchFile: fakeFiles({ ...served, [otherFile]: 'other chime' })
 			});
 
