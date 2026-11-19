@@ -1,10 +1,30 @@
 <!doctype html>
-<!-- The theme stays dark, the spec's default, until Settings can change it. -->
+<!-- `data-theme` starts as dark, the spec's default, for a first visit or a browser that blocks
+     localStorage. The script in the head replaces it before the page is first painted. -->
 <html lang="en" data-theme="dark" class="scheme-light dark:scheme-dark">
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="text-scale" content="scale" />
+		<!-- Shows the saved theme before the first paint, so a light or system theme doesn't flash
+		     dark while IndexedDB is still being opened. It reads the mirror of the theme setting
+		     that `DexieStorage` keeps in localStorage under `cadoro-theme`, and makes the same
+		     choice as `resolveTheme` in `src/lib/theme.ts`. Once the app loads, `ThemeSync` takes
+		     over. -->
+		<script>
+			try {
+				var savedTheme = localStorage.getItem('cadoro-theme');
+				if (savedTheme === 'light' || savedTheme === 'dark' || savedTheme === 'system') {
+					var isDark =
+						savedTheme === 'system'
+							? matchMedia('(prefers-color-scheme: dark)').matches
+							: savedTheme === 'dark';
+					document.documentElement.dataset.theme = isDark ? 'dark' : 'light';
+				}
+			} catch (error) {
+				// localStorage is blocked: the page keeps the default theme.
+			}
+		</script>
 		<!-- `%sveltekit.assets%` is the path to the files in `static/` and those the PWA plugin
 		     writes beside them, such as the manifest. It follows the base path. -->
 		<link rel="manifest" href="%sveltekit.assets%/manifest.webmanifest" />

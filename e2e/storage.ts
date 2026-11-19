@@ -37,3 +37,42 @@ export async function savedWorkPeriods(page: Page): Promise<WorkPeriod[]> {
 			})
 	);
 }
+
+/**
+ * Saves the settings row in the app's IndexedDB database, as the Settings screen will once it
+ * exists, so a journey can start from a chosen theme.
+ *
+ * @remarks
+ * It writes with IndexedDB's own API, so the page's open Dexie connection isn't told, and a
+ * journey reloads the page to make the app read the row. The page must have loaded the app once
+ * already, so the database and its `settings` table exist.
+ *
+ * @param page - A page of the app, whose database is written.
+ * @param row - The settings row, holding only the settings to change from their defaults.
+ * @throws Rejects with IndexedDB's error when the database or its `settings` table can't be
+ * written.
+ */
+export async function saveSettingsRow(page: Page, row: { theme: string }): Promise<void> {
+	await page.evaluate(
+		(settingsRow) =>
+			new Promise<void>((resolve, reject) => {
+				const opening = indexedDB.open('cadoro');
+				opening.onerror = (): void =>
+					reject(opening.error ?? new Error('Opening the database failed.'));
+				opening.onsuccess = (): void => {
+					const database = opening.result;
+					const writing = database
+						.transaction('settings', 'readwrite')
+						.objectStore('settings')
+						.put(settingsRow, 'current');
+					writing.onerror = (): void =>
+						reject(writing.error ?? new Error('Saving the settings failed.'));
+					writing.onsuccess = (): void => {
+						database.close();
+						resolve();
+					};
+				};
+			}),
+		row
+	);
+}
