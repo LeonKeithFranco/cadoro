@@ -40,7 +40,7 @@ The user decided on 2026-11-19 to finish Cadoro to 1.0.0 with as little of their
 - Use Conventional Commits for commit messages and PR titles, such as `feat(timer): add earned break`. `style` means code formatting only; visible styling changes are `feat` or `fix`.
 - Write tests after writing the code. The code may need tweaks to get the behaviour exactly right, and the tests then lock that behaviour in to guard against regressions. For a bug fix, write the regression test first and see it fail. Don't use test-driven development, and don't chase coverage numbers.
 - Find elements in tests by role and label first, and use test ids only where nothing a user sees identifies the element.
-- Give the user the commands to run on the homelab, and explain each one.
+- Give the user the commands to run on the homelab.
 
 ## Stop rules
 
