@@ -324,12 +324,10 @@ export class TimerSession {
 
 		const heartbeatAt = toUtcTimestamp(this.#now);
 		this.#enqueue(async () => {
-			// Once the writes before it have finished, the revision storage holds can differ from the
-			// run's, if a save of the run failed.
-			const savedRevision = this.#savedRevision(revision);
-			if (savedRevision !== null) {
-				await this.#storage.saveHeartbeat(savedRevision, heartbeatAt);
-			}
+			// The run's own revision, not the one storage holds: after a failed save the two differ,
+			// and the stored run is behind this tab's, so the heartbeat is refused. Accepting it would
+			// make a restore count this tab's later time, such as a break, as work.
+			await this.#storage.saveHeartbeat(revision, heartbeatAt);
 		});
 	}
 

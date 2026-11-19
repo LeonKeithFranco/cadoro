@@ -1227,14 +1227,17 @@ describe('sharing the run across tabs', () => {
 		expect(clearSpy).not.toHaveBeenCalled();
 	});
 
-	it('keeps saving heartbeats against the saved run after a press’s save fails', async () => {
+	it('drops heartbeats after a press’s save fails, so a restore never counts the break as work', async () => {
 		const storage = new InMemoryStorage();
 		const session = createSession([foreverRoutine], { storage });
 		session.play();
-		await expect.poll(() => storage.getRunInProgress()).not.toBeNull();
+		nowMs = minutes(10);
+		session.tick();
+		const saved = await reopen(storage, '1970-01-01T00:10:00.000Z');
 		const failure = new Error('The disk is full.');
 		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 		vi.spyOn(storage, 'saveRunInProgress').mockRejectedValueOnce(failure);
+		const heartbeatSpy = vi.spyOn(storage, 'saveHeartbeat');
 		nowMs = minutes(25);
 		session.next();
 		await expect
@@ -1244,9 +1247,12 @@ describe('sharing the run across tabs', () => {
 		nowMs = minutes(25) + seconds(1);
 		session.tick();
 
-		await expect
-			.poll(() => storage.getRunInProgress())
-			.toMatchObject({ heartbeatAt: '1970-01-01T00:25:01.000Z' });
+		// The tab is on a break, but storage still holds the running work period, so a heartbeat
+		// on it would make a restore count the break as work. Storage refuses it.
+		expect(await settledCalls(heartbeatSpy, 1)).toEqual([false]);
+		expect(await storage.getRunInProgress()).toEqual(saved);
+		const restored = createSession([foreverRoutine], { storage }, { saved });
+		expect(restored.view).toMatchObject({ status: 'working', workedMs: minutes(10) });
 	});
 
 	it('ends two tabs restoring at once on the same run, with work saved once', async () => {
