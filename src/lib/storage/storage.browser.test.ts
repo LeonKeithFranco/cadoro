@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { routineWith } from '../testing/routines';
+import { DexieStorage } from './dexie-storage';
 import { InMemoryStorage } from './in-memory-storage';
 import type { CadoroStorage } from './storage';
 
@@ -12,7 +13,11 @@ type Backend = {
 };
 
 /** Every backend, each checked against the same tests, so they all keep the same contract. */
-const backends: Backend[] = [{ name: 'InMemoryStorage', create: () => new InMemoryStorage() }];
+const backends: Backend[] = [
+	{ name: 'InMemoryStorage', create: () => new InMemoryStorage() },
+	// A new database for each test. The test browser starts with no data on every run.
+	{ name: 'DexieStorage', create: () => new DexieStorage(`test-${crypto.randomUUID()}`) }
+];
 
 describe.each(backends)('$name', ({ create }) => {
 	describe('getRoutines', () => {
