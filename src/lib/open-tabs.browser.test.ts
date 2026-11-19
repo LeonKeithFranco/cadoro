@@ -86,6 +86,23 @@ describe('joinOpenTabs', () => {
 		);
 	});
 
+	it('still says another tab is open when it finds one but its own lock is refused', async () => {
+		const failure = new Error('Locks are blocked.');
+		const name = newLockName();
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		const locks: LockManager = {
+			query: async (): Promise<LockManagerSnapshot> => ({
+				held: [{ name, mode: 'shared', clientId: 'another-tab' }],
+				pending: []
+			}),
+			request: async (): Promise<never> => {
+				throw failure;
+			}
+		};
+
+		expect(await joinOpenTabs(locks, name)).toBe(true);
+	});
+
 	it('logs a refused lock and says none is open, rather than waiting for it', async () => {
 		const failure = new Error('Locks are blocked.');
 		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
