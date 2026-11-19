@@ -505,4 +505,39 @@ describe('following the run from another tab', () => {
 			.element(page.getByRole('group', { name: 'Work' }))
 			.toHaveTextContent('1:00 / 25:00');
 	});
+
+	it('drops the Finish question when another tab ends the run, showing its summary', async () => {
+		const storage = new InMemoryStorage();
+		const session = createSession(undefined, storage);
+		const otherTab = createSession(undefined, storage, numberedIds('other'));
+		render(TimerScreen, { session });
+		await page.getByRole('button', { name: 'Play' }).click();
+		await expect.poll(() => otherTab.view).toMatchObject({ status: 'working' });
+		await page.getByRole('button', { name: 'Finish' }).click();
+		await expect.element(page.getByRole('dialog', { name: 'Finish this run?' })).toBeVisible();
+
+		otherTab.finish();
+
+		await expect.element(page.getByRole('dialog', { name: 'Run summary' })).toBeVisible();
+		await expect
+			.element(page.getByRole('dialog', { name: 'Finish this run?' }))
+			.not.toBeInTheDocument();
+	});
+
+	it('doesn’t ask about Finish again in the next run after another tab ended the last one', async () => {
+		const storage = new InMemoryStorage();
+		const session = createSession(undefined, storage);
+		const otherTab = createSession(undefined, storage, numberedIds('other'));
+		render(TimerScreen, { session });
+		await page.getByRole('button', { name: 'Play' }).click();
+		await expect.poll(() => otherTab.view).toMatchObject({ status: 'working' });
+		await page.getByRole('button', { name: 'Finish' }).click();
+		otherTab.finish();
+		await page.getByRole('button', { name: 'Done' }).click();
+
+		await page.getByRole('button', { name: 'Play' }).click();
+
+		await expect.element(page.getByRole('button', { name: 'Pause' })).toBeVisible();
+		await expect.element(page.getByRole('dialog')).not.toBeInTheDocument();
+	});
 });
