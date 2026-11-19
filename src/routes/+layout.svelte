@@ -7,6 +7,7 @@
 <script lang="ts">
 	import './layout.css';
 	import { page } from '$app/state';
+	import ErrorBoundary from '#lib/components/ErrorBoundary.svelte';
 	import ScreenNav from '#lib/components/ScreenNav.svelte';
 	import ThemeSync from '#lib/components/ThemeSync.svelte';
 	import UpdatePrompt from '#lib/components/UpdatePrompt.svelte';
@@ -27,7 +28,9 @@
 
 <!-- On phones, the bottom padding keeps the end of the screen clear of the tab bar. -->
 <main class="mx-auto max-w-3xl p-4 pb-24 md:pb-4">
-	{@render children()}
+	<ErrorBoundary>
+		{@render children()}
+	</ErrorBoundary>
 </main>
 
 <!-- The layout mounts once, when the app opens, and stays while screens change, so the service
