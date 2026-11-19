@@ -1226,4 +1226,63 @@ describe('sharing the run across tabs', () => {
 		expect(saveSpy).toHaveBeenCalledTimes(2);
 		expect(clearSpy).not.toHaveBeenCalled();
 	});
+
+	it('keeps saving heartbeats against the saved run after a press’s save fails', async () => {
+		const storage = new InMemoryStorage();
+		const session = createSession([foreverRoutine], { storage });
+		session.play();
+		await expect.poll(() => storage.getRunInProgress()).not.toBeNull();
+		const failure = new Error('The disk is full.');
+		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+		vi.spyOn(storage, 'saveRunInProgress').mockRejectedValueOnce(failure);
+		nowMs = minutes(25);
+		session.next();
+		await expect
+			.poll(() => consoleError)
+			.toHaveBeenCalledWith('The run could not be saved.', failure);
+
+		nowMs = minutes(25) + seconds(1);
+		session.tick();
+
+		await expect
+			.poll(() => storage.getRunInProgress())
+			.toMatchObject({ heartbeatAt: '1970-01-01T00:25:01.000Z' });
+	});
+
+	it('ends two tabs restoring at once on the same run, with work saved once', async () => {
+		const storage = new InMemoryStorage();
+		const first = createSession([foreverRoutine], { storage });
+		first.play();
+		nowMs = minutes(10);
+		first.tick();
+		const saved = await reopen(storage, '1970-01-01T00:10:00.000Z');
+		nowMs = minutes(30);
+		const onWorkSaved = vi.fn();
+		const saveSpy = vi.spyOn(storage, 'saveRunInProgress');
+
+		const tabA = createSession(
+			[foreverRoutine],
+			{ storage, newId: numberedIds('a'), onWorkSaved },
+			{ saved, isAnotherTabOpen: false }
+		);
+		const tabB = createSession(
+			[foreverRoutine],
+			{ storage, newId: numberedIds('b'), onWorkSaved },
+			{ saved, isAnotherTabOpen: false }
+		);
+
+		const results = await settledCalls(saveSpy, 2);
+		expect([...results].sort()).toEqual([false, true]);
+		await waitForMicrotasks();
+		expect(tabA.view).toEqual(tabB.view);
+		expect(tabA.view).toMatchObject({ status: 'working', workedMs: minutes(10), isRunning: false });
+		tabA.play();
+		nowMs = minutes(45);
+		tabA.next();
+		await expect.poll(() => storage.getWorkPeriods()).toHaveLength(1);
+		await waitForMicrotasks();
+		expect(await storage.getWorkPeriods()).toHaveLength(1);
+		expect(onWorkSaved).toHaveBeenCalledOnce();
+		await expect.poll(() => tabB.view).toMatchObject({ status: 'break' });
+	});
 });

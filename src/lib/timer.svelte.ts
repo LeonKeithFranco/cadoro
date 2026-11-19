@@ -324,7 +324,12 @@ export class TimerSession {
 
 		const heartbeatAt = toUtcTimestamp(this.#now);
 		this.#enqueue(async () => {
-			await this.#storage.saveHeartbeat(revision, heartbeatAt);
+			// Once the writes before it have finished, the revision storage holds can differ from the
+			// run's, if a save of the run failed.
+			const savedRevision = this.#savedRevision(revision);
+			if (savedRevision !== null) {
+				await this.#storage.saveHeartbeat(savedRevision, heartbeatAt);
+			}
 		});
 	}
 
