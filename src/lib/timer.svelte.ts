@@ -13,6 +13,7 @@ import {
 	type RestoredRun,
 	type StoredRunInProgress
 } from './run-in-progress';
+import { recordError } from './error-log';
 import { noRecords, recordPress, type Run, type RunRecords } from './run-records';
 import type { CadoroStorage } from './storage/storage';
 import { toUtcTimestamp } from './time';
@@ -271,7 +272,7 @@ export class TimerSession {
 				this.#noticeChange(runInProgress);
 			},
 			(error: unknown) => {
-				console.error('Changes to the run from other tabs can no longer be followed.', error);
+				void recordError('Changes to the run from other tabs can no longer be followed.', error);
 			}
 		);
 		storage.watchRoutines(
@@ -279,7 +280,7 @@ export class TimerSession {
 				this.#noticeRoutines(changed);
 			},
 			(error: unknown) => {
-				console.error('Changes to the routines can no longer be followed.', error);
+				void recordError('Changes to the routines can no longer be followed.', error);
 			}
 		);
 	}
@@ -651,7 +652,7 @@ export class TimerSession {
 		try {
 			saved = await this.#storage.getRunInProgress();
 		} catch (error: unknown) {
-			console.error('The run could not be read.', error);
+			void recordError('The run could not be read.', error);
 			return;
 		}
 
@@ -719,7 +720,7 @@ export class TimerSession {
 		this.#saving = this.#saving
 			.then(write)
 			.catch((error: unknown) => {
-				console.error('The run could not be saved.', error);
+				void recordError('The run could not be saved.', error);
 			})
 			.then(() => {
 				this.#pendingWrites -= 1;

@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import { ChimePlayer, type ChimeFiles, type ChimePlayerOptions } from './chime-player';
+import { useErrorLog } from './error-log';
 import { createRun, next, pause, play, type RunState } from './run';
+import { InMemoryStorage } from './storage/in-memory-storage';
 import { FakeAudioContext, fakeFiles, undecodable, type FakeSound } from './testing/audio';
 import { minutes, seconds } from './testing/durations';
 import { routineWith } from './testing/routines';
@@ -628,6 +630,59 @@ describe('ChimePlayer', () => {
 
 			expect(player.scheduled[0]?.file).toBe(otherFile);
 			expect(playedFile(context, 0)).toBe('other chime');
+		});
+	});
+
+	describe('recording its failures in the activity log', () => {
+		/** Where the errors go, which each test chooses as the app's log. */
+		let log: InMemoryStorage;
+
+		// Chooses a new log, and takes it away after, so no test records into another's.
+		beforeEach(() => {
+			log = new InMemoryStorage();
+			useErrorLog(log);
+		});
+		afterEach(() => {
+			useErrorLog(null);
+		});
+
+		/**
+		 * Reads the messages of the error entries recorded so far.
+		 *
+		 * @returns The messages, newest first.
+		 */
+		async function recordedMessages(): Promise<string[]> {
+			const entries = await log.getLogEntries();
+			return entries.filter((entry) => entry.type === 'error').map((entry) => entry.message);
+		}
+
+		it('records an audio context that cannot be made', async () => {
+			const { player } = await setUpUnlocked({
+				createContext: () => {
+					throw new Error('AudioContext is not defined');
+				}
+			});
+
+			await player.reschedule(working, start);
+
+			await expect.poll(recordedMessages).toEqual(['Could not set up the audio for the chimes']);
+		});
+
+		it('records an audio context that cannot resume', async () => {
+			const context = new FakeAudioContext();
+			context.resumeError = new Error('Not allowed to start');
+
+			await setUpUnlocked({ createContext: () => context });
+
+			await expect.poll(recordedMessages).toEqual(['Could not start the audio for the chimes']);
+		});
+
+		it('records a chime file that cannot be loaded', async () => {
+			const { player } = await setUpUnlocked({ fetchFile: fakeFiles({}) });
+
+			await player.reschedule(working, start);
+
+			await expect.poll(recordedMessages).toContain(`Could not load the chime ${files.target}`);
 		});
 	});
 });
