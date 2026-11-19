@@ -21,6 +21,15 @@ test('after one visit, the app opens and runs with no connection', async ({ page
 		await expect(workBox).toContainText(/0:0[1-9] \/ 25:00/);
 	});
 
+	await test.step('offline, every chime still loads', async () => {
+		const statuses = await page.evaluate(async () => {
+			const names = ['bell-ding-1', 'bell-ding-2', 'bell-ding-3', 'bell-ding-4'];
+			const responses = await Promise.all(names.map((name) => fetch(`chimes/${name}.mp3`)));
+			return responses.map((response) => response.status);
+		});
+		expect(statuses).toEqual([200, 200, 200, 200]);
+	});
+
 	await test.step('offline, other screens open from their link and their address', async () => {
 		await navigation.getByRole('link', { name: 'Stats' }).click();
 		await expect(page.getByRole('heading', { level: 1, name: 'Stats' })).toBeVisible();
