@@ -42,6 +42,13 @@ export type TimerSessionOptions = {
 	 * for persistent storage. It isn't waited for.
 	 */
 	onWorkSaved: () => void;
+	/**
+	 * Called as any button is pressed, before the press changes the run, and from within the
+	 * press itself, which the app uses to unlock the chimes' audio, since browsers allow audio to
+	 * start only during a user gesture. Called even when the press changes nothing. Nothing is
+	 * called when left out.
+	 */
+	onPress?: () => void;
 };
 
 /** What the app found as it opened, which a session carries on from. */
@@ -90,6 +97,9 @@ export class TimerSession {
 
 	/** Called each time a save that held work periods has finished. */
 	readonly #onWorkSaved: () => void;
+
+	/** Called as any button is pressed, before the press changes the run. */
+	readonly #onPress: () => void;
 
 	/**
 	 * The record of the run in progress, as Play started it, as restored or as taken on from
@@ -156,15 +166,23 @@ export class TimerSession {
 	 * @param routines - The routines to pick from, in the picker's order. There's always at least
 	 * one, since the first launch creates the starter routines, and routines can't be deleted
 	 * yet.
-	 * @param options - The clock, the storage runs are saved in, the id generators and what to do
-	 * once work is saved, as {@link TimerSessionOptions} describes them.
+	 * @param options - The clock, the storage runs are saved in, the id generators, what to do
+	 * once work is saved and what to do as a button is pressed, as {@link TimerSessionOptions}
+	 * describes them.
 	 * @param opening - The run in progress storage held as the app opened, and whether another tab
 	 * was open. No run and no other tab when left out.
 	 * @throws {@link Error} If there are no routines to pick from.
 	 */
 	constructor(
 		routines: readonly Routine[],
-		{ clock, storage, newId, newRevision, onWorkSaved }: TimerSessionOptions,
+		{
+			clock,
+			storage,
+			newId,
+			newRevision,
+			onWorkSaved,
+			onPress = (): void => {}
+		}: TimerSessionOptions,
 		{ saved, isAnotherTabOpen }: AppOpening = { saved: null, isAnotherTabOpen: false }
 	) {
 		const [firstRoutine] = routines;
@@ -178,6 +196,7 @@ export class TimerSession {
 		this.#newId = newId;
 		this.#newRevision = newRevision;
 		this.#onWorkSaved = onWorkSaved;
+		this.#onPress = onPress;
 
 		const carriedOn = TimerSession.#carryOn(saved, routines, isAnotherTabOpen);
 		const routine = carriedOn?.routine ?? firstRoutine;
@@ -235,6 +254,15 @@ export class TimerSession {
 	/** The routine chosen in the picker. */
 	get routine(): Routine {
 		return this.#routine;
+	}
+
+	/**
+	 * The chosen routine's run as it is now, which the chimes are scheduled from. It's reactive
+	 * state, which changes only when a button, a restore or another tab's change replaces the
+	 * run, never on a tick. Runs are immutable, so reading it can't change the session.
+	 */
+	get run(): RunState {
+		return this.#run;
 	}
 
 	/**
@@ -341,13 +369,15 @@ export class TimerSession {
 	 * or ended.
 	 *
 	 * @remarks
-	 * The clock is read first, so the view is up to date as soon as the button changes the run,
-	 * rather than at the next tick. A button that does nothing, such as Pause on a ready run,
-	 * leaves the run as it was, so nothing is saved.
+	 * `onPress` is called first, while the button's gesture is still going. The clock is read
+	 * next, so the view is up to date as soon as the button changes the run, rather than at the
+	 * next tick. A button that does nothing, such as Pause on a ready run, leaves the run as it
+	 * was, so nothing is saved.
 	 *
 	 * @param press - The button's effect on the run, from the engine.
 	 */
 	#press(press: Press): void {
+		this.#onPress();
 		this.#moveOn();
 		const before = this.#run;
 		const after = press(before, this.#now);

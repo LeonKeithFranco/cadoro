@@ -36,9 +36,9 @@ let newRevision = numberedIds('revision');
  * `revision-1`.
  *
  * @param choices - The routines to pick from. The starter routines unless a test needs others.
- * @param options - The options a test sets, `storage`, `newId` and `onWorkSaved`. Unless given,
- * the session saves to new, empty storage, and `onWorkSaved` is a spy nothing checks. Two tabs
- * share a storage, each with ids of its own.
+ * @param options - The options a test sets, `storage`, `newId`, `onWorkSaved` and `onPress`.
+ * Unless given, the session saves to new, empty storage, `onWorkSaved` is a spy nothing checks,
+ * and there's no `onPress`. Two tabs share a storage, each with ids of its own.
  * @param opening - What the app found as it opened. No saved run and no other tab open, unless
  * given.
  * @returns A new session, carrying on the saved run, or with the first routine chosen and its run
@@ -46,7 +46,7 @@ let newRevision = numberedIds('revision');
  */
 function createSession(
 	choices: readonly Routine[] = routines,
-	options: Partial<Pick<TimerSessionOptions, 'storage' | 'newId' | 'onWorkSaved'>> = {},
+	options: Partial<Pick<TimerSessionOptions, 'storage' | 'newId' | 'onWorkSaved' | 'onPress'>> = {},
 	opening: Partial<AppOpening> = {}
 ): TimerSession {
 	return new TimerSession(
@@ -311,6 +311,66 @@ describe('the controls', () => {
 		session.finish();
 
 		expect(session.view).toMatchObject({ status: 'ready', isInProgress: false });
+	});
+});
+
+describe('the run as the chimes see it', () => {
+	it('gives the run as each press leaves it, and keeps the same run through ticks', () => {
+		const session = createSession();
+		expect(session.run).toMatchObject({ status: 'ready' });
+
+		nowMs = seconds(5);
+		session.play();
+		const started = session.run;
+		nowMs = seconds(30);
+		session.tick();
+
+		expect(started).toMatchObject({ status: 'working', runningSince: seconds(5) });
+		expect(session.run).toBe(started);
+	});
+
+	it('gives the run another tab changed, once the session takes it on', async () => {
+		const storage = new InMemoryStorage();
+		const firstTab = createSession([foreverRoutine], { storage, newId: numberedIds('first') });
+		const secondTab = createSession([foreverRoutine], { storage, newId: numberedIds('second') });
+
+		firstTab.play();
+
+		await expect.poll(() => secondTab.run).toMatchObject({ status: 'working', runningSince: 0 });
+	});
+
+	it('calls onPress as each button is pressed, before the press changes the run', () => {
+		const statusesWhenCalled: string[] = [];
+		const session = createSession([foreverRoutine], {
+			onPress: () => statusesWhenCalled.push(session.run.status)
+		});
+
+		session.play();
+		session.next();
+		session.pause();
+		session.finish();
+
+		expect(statusesWhenCalled).toEqual(['ready', 'working', 'break', 'break']);
+	});
+
+	it('calls onPress even for a press that changes nothing, such as Pause on a ready run', () => {
+		const onPress = vi.fn();
+		const session = createSession(routines, { onPress });
+
+		session.pause();
+
+		expect(onPress).toHaveBeenCalledOnce();
+	});
+
+	it('calls onPress for no tick, choice or new run', () => {
+		const onPress = vi.fn();
+		const session = createSession(routines, { onPress });
+
+		session.select(classicWithLongBreak.id);
+		session.tick();
+		session.readyNewRun();
+
+		expect(onPress).not.toHaveBeenCalled();
 	});
 });
 
