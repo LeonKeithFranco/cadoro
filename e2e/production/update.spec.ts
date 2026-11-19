@@ -140,31 +140,42 @@ test.describe('a new version of the app', () => {
 		await expect(offer).toBeVisible();
 	});
 
-	test('in another tab mid-run, it waits for that run to end too', async ({ page }) => {
-		const runningTab = page;
-		const otherTab = await page.context().newPage();
-		await openControlledApp(runningTab);
-		await otherTab.goto('');
-		await runningTab.getByRole('button', { name: 'Play' }).click();
-		await findNewVersion(otherTab);
+	test('with the app in two tabs, both wait for the shared run to end, then reload together', async ({
+		page
+	}) => {
+		const firstTab = page;
+		const secondTab = await page.context().newPage();
+		await openControlledApp(firstTab);
+		await secondTab.goto('');
+		await firstTab.getByRole('button', { name: 'Play' }).click();
+		await expect(secondTab.getByRole('button', { name: 'Pause' })).toBeVisible();
+		await findNewVersion(secondTab);
 
-		await test.step('Reload in the other tab reloads only that tab', async () => {
-			const runningTabNavigations: string[] = [];
-			runningTab.on('framenavigated', (frame) => runningTabNavigations.push(frame.url()));
+		const navigations: string[] = [];
+		firstTab.on('framenavigated', (frame) => navigations.push(frame.url()));
+		secondTab.on('framenavigated', (frame) => navigations.push(frame.url()));
 
-			await pressReload(otherTab);
-
-			await expect(runningTab.getByRole('button', { name: 'Pause' })).toBeVisible();
-			expect(runningTabNavigations).toEqual([]);
+		await test.step('while the shared run is in progress, neither tab offers to reload', async () => {
+			await expect(updateOffer(firstTab)).toBeHidden();
+			await expect(updateOffer(secondTab)).toBeHidden();
+			expect(navigations).toEqual([]);
 		});
 
-		await test.step('once its run ends, the running tab offers to reload, and does', async () => {
-			await finishRun(runningTab);
-			await expect(updateOffer(runningTab)).toBeVisible();
+		await test.step('once the run ends, both tabs offer to reload', async () => {
+			await finishRun(firstTab);
 
-			await pressReload(runningTab);
+			await expect(updateOffer(firstTab)).toBeVisible();
+			await expect(updateOffer(secondTab)).toBeVisible();
+		});
 
-			await expect(runningTab.getByRole('heading', { level: 1, name: 'Timer' })).toBeVisible();
+		await test.step('Reload in one tab reloads both', async () => {
+			const firstTabReloaded = firstTab.waitForEvent('load', { timeout: RELOAD_TIMEOUT_MS });
+
+			await pressReload(secondTab);
+			await firstTabReloaded;
+
+			await expect(firstTab.getByRole('heading', { level: 1, name: 'Timer' })).toBeVisible();
+			await expect(secondTab.getByRole('heading', { level: 1, name: 'Timer' })).toBeVisible();
 		});
 	});
 });
