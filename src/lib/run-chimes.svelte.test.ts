@@ -48,8 +48,9 @@ type Tab = {
  * @param storage - The storage the tab saves to, which two tabs share.
  * @param options - What differs from the app's own: `hasNoLocks`, true for a browser without the
  * Web Locks API, where the tab gets no lock manager, rather than the browser's real one; `name`,
- * the lock's name, which is this test's unless given; and `settings`, the settings the tab opens
- * with, as storage holds them, which are the defaults unless given.
+ * the lock's name, which is this test's unless given; `settings`, the settings the tab opens
+ * with, as storage holds them, which are the defaults unless given; and `hasNoAudio`, true for a
+ * browser where the audio context can't be made.
  * @returns The tab.
  */
 function openTab(
@@ -57,8 +58,9 @@ function openTab(
 	{
 		hasNoLocks = false,
 		name = lockName,
-		settings = DEFAULT_SETTINGS
-	}: { hasNoLocks?: boolean; name?: string; settings?: Settings } = {}
+		settings = DEFAULT_SETTINGS,
+		hasNoAudio = false
+	}: { hasNoLocks?: boolean; name?: string; settings?: Settings; hasNoAudio?: boolean } = {}
 ): Tab {
 	const audio = new FakeAudioContext();
 	let contexts = 0;
@@ -86,6 +88,9 @@ function openTab(
 		lockName: name,
 		createContext: (): FakeAudioContext => {
 			contexts++;
+			if (hasNoAudio) {
+				throw new Error('AudioContext is not defined');
+			}
 			return audio;
 		},
 		fetchFile: fakeFiles({
@@ -419,6 +424,85 @@ describe('one tab sounding', () => {
 			.poll(() => tab.chimes.scheduled)
 			.toEqual([expect.objectContaining({ alert: 'target', at: minutes(25), startsAt: 1500 })]);
 		expect(tab.chimes.isSounding).toBe(true);
+	});
+
+	it('never takes the turn when its audio can’t be made, leaving it to a tab that can play', async () => {
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		const storage = new InMemoryStorage();
+		const silentTab = openTab(storage, { hasNoAudio: true });
+		const playingTab = openTab(storage);
+
+		silentTab.timer.play();
+		await expect.poll(() => playingTab.timer.run.status).toBe('working');
+		playingTab.timer.pause();
+		await expect.poll(() => silentTab.timer.run).toMatchObject({ runningSince: null });
+		playingTab.timer.play();
+
+		await expect.poll(() => playingTab.chimes.scheduled).toHaveLength(1);
+		expect(silentTab.chimes.isSounding).toBe(false);
+	});
+
+	it('never takes the turn when its audio can’t resume, and asks once it can', async () => {
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		const tab = openTab(new InMemoryStorage());
+		tab.audio.resumeError = new Error('Not allowed to start');
+
+		tab.timer.play();
+		await afterPendingWork();
+		expect(tab.chimes.isSounding).toBe(false);
+
+		tab.audio.resumeError = null;
+		tab.timer.pause();
+		tab.timer.play();
+
+		await expect.poll(() => tab.chimes.scheduled).toHaveLength(1);
+		expect(tab.chimes.isSounding).toBe(true);
+	});
+
+	it('lets the turn go when its audio later fails, so the next tab sounds', async () => {
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		const storage = new InMemoryStorage();
+		const firstTab = openTab(storage);
+		const secondTab = openTab(storage);
+		firstTab.timer.play();
+		await expect.poll(() => firstTab.chimes.isSounding).toBe(true);
+		await expect.poll(() => secondTab.timer.run.status).toBe('working');
+		secondTab.timer.pause();
+		await expect.poll(() => firstTab.timer.run).toMatchObject({ runningSince: null });
+		secondTab.timer.play();
+		await expect.poll(() => firstTab.timer.run).toMatchObject({ runningSince: 0 });
+
+		nowMs = minutes(25);
+		firstTab.audio.currentTime = 1500;
+		secondTab.audio.currentTime = 1500;
+		firstTab.audio.resumeError = new Error('Interrupted');
+		firstTab.timer.next();
+
+		await expect
+			.poll(() => secondTab.chimes.scheduled)
+			.toEqual([expect.objectContaining({ alert: 'break', at: minutes(30) })]);
+		expect(firstTab.chimes.isSounding).toBe(false);
+		expect(firstTab.chimes.scheduled).toEqual([]);
+	});
+
+	it('leaves the queue when its audio fails while it waits, so it never takes the turn', async () => {
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		const releaseLock = await holdLockElsewhere();
+		const tab = openTab(new InMemoryStorage());
+		tab.timer.play();
+		await expect
+			.poll(async () => (await navigator.locks.query()).pending)
+			.toContainEqual(expect.objectContaining({ name: lockName }));
+
+		tab.audio.resumeError = new Error('Interrupted');
+		tab.timer.pause();
+		await expect
+			.poll(async () => (await navigator.locks.query()).pending)
+			.not.toContainEqual(expect.objectContaining({ name: lockName }));
+		releaseLock();
+		await afterPendingWork();
+
+		expect(tab.chimes.isSounding).toBe(false);
 	});
 
 	it('asks for its turn once, however many buttons are pressed', async () => {

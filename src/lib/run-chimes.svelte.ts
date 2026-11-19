@@ -56,11 +56,12 @@ export type RunChimesOptions = {
  *
  * @remarks
  * Browsers start audio only during a user gesture, so nothing sounds until {@link RunChimes.unlock}
- * is called from one, which the app does on every button press. Only then does the tab ask for
- * its turn to sound, with an exclusive Web Lock. So the tab that sounds is always one whose audio
- * was unlocked, and a tab no button was pressed in, such as one that joined a live run, never
- * takes the turn from one that can play. The first tab unlocked holds the turn until it closes,
- * and the browser then hands it to the next unlocked tab in the lock's queue, which schedules the
+ * is called from one, which the app does on every button press. Only once its audio plays does
+ * the tab ask for its turn to sound, with an exclusive Web Lock. So the tab that sounds is always
+ * one whose audio was unlocked, and a tab no button was pressed in, such as one that joined a live
+ * run, or whose audio can't be made, never takes the turn from one that can play. The first tab
+ * unlocked holds the turn until it closes, or until an unlock finds its audio can't resume, and
+ * the browser then hands it to the next unlocked tab in the lock's queue, which schedules the
  * run's next chime as the run is then.
  *
  * Without the Web Locks API, or if the browser refuses the lock, the tabs can't take turns, so
@@ -89,8 +90,11 @@ export class RunChimes {
 	/** Whether this tab has its turn to sound the chimes. State, so gaining it schedules the next chime. */
 	#isSounding = $state(false);
 
-	/** Whether this tab has asked for its turn yet, which it does once, on its first unlock. */
-	#hasAskedToSound = false;
+	/**
+	 * Gives up this tab's turn, whether it's waiting in the lock's queue or holding the lock, or
+	 * `null` when the tab hasn't asked for one, or gave it up.
+	 */
+	#giveUpTurn: (() => void) | null = null;
 
 	/**
 	 * Starts following the run and the settings, silent until {@link RunChimes.unlock} is called.
@@ -168,19 +172,57 @@ export class RunChimes {
 	}
 
 	/**
-	 * Lets this tab play the chimes, and asks for its turn to sound them the first time.
+	 * Lets this tab play the chimes, and once its audio plays, asks for its turn to sound them,
+	 * unless it already has.
 	 *
 	 * @remarks
 	 * Call it from a user gesture, such as a button press, since browsers allow audio to start only
-	 * then. Every call resumes the audio, which a phone can suspend, such as for a call.
+	 * then. Every call resumes the audio, which a phone can suspend, such as for a call. A tab
+	 * whose audio can't be made or resumed doesn't ask, and gives up a turn it has, cancelling its
+	 * chime, so it never keeps the turn from a tab that can play. It asks again once a later unlock
+	 * succeeds.
 	 */
 	unlock(): void {
-		void this.#player.unlock();
-		if (this.#hasAskedToSound) {
+		void this.#unlockAndTakeTurn();
+	}
+
+	/**
+	 * Unlocks the audio, then asks for this tab's turn if it plays, or gives the turn up if not.
+	 *
+	 * @returns A promise that settles once the turn is asked for or given up. It never rejects.
+	 */
+	async #unlockAndTakeTurn(): Promise<void> {
+		const canPlay = await this.#player.unlock();
+		if (canPlay) {
+			this.#askForTurn();
+		} else {
+			this.#letTurnGo();
+		}
+	}
+
+	/** Asks for this tab's turn to sound the chimes, unless it's waiting for one or has it. */
+	#askForTurn(): void {
+		if (this.#giveUpTurn !== null) {
 			return;
 		}
-		this.#hasAskedToSound = true;
-		void this.#waitForTurnToSound();
+		const abandon = new AbortController();
+		const { promise: givenUp, resolve: giveUp } = Promise.withResolvers<void>();
+		this.#giveUpTurn = (): void => {
+			abandon.abort();
+			giveUp();
+		};
+		void this.#waitForTurnToSound(abandon.signal, givenUp);
+	}
+
+	/** Gives up this tab's turn, waiting or held, and cancels its chime, so the next tab sounds. */
+	#letTurnGo(): void {
+		if (this.#giveUpTurn === null) {
+			return;
+		}
+		this.#giveUpTurn();
+		this.#giveUpTurn = null;
+		this.#isSounding = false;
+		this.#player.cancel();
 	}
 
 	/**
@@ -200,13 +242,17 @@ export class RunChimes {
 	}
 
 	/**
-	 * Waits for the lock that gives a tab its turn to sound, then holds it until the tab closes.
+	 * Waits for the lock that gives a tab its turn to sound, then holds it until the tab closes or
+	 * gives the turn up.
 	 *
-	 * @returns A promise that never settles once the lock is held, and settles without the lock
-	 * only when there's no Web Locks API or the browser refuses it, in which case this tab sounds
-	 * anyway. It never rejects.
+	 * @param abandon - Aborted when the turn is given up, which takes the tab out of the queue if
+	 * it's still waiting.
+	 * @param givenUp - Settles when the turn is given up, which lets the lock go if it's held.
+	 * @returns A promise that settles once the lock is let go, or at once without the Web Locks
+	 * API, or once the browser refuses the lock, in which case this tab sounds anyway. It never
+	 * rejects.
 	 */
-	async #waitForTurnToSound(): Promise<void> {
+	async #waitForTurnToSound(abandon: AbortSignal, givenUp: Promise<void>): Promise<void> {
 		if (this.#locks === undefined) {
 			this.#isSounding = true;
 			return;
@@ -214,11 +260,15 @@ export class RunChimes {
 		try {
 			// Exclusive by default, so one tab holds it and the rest wait in turn. The browser lets
 			// it go when the tab closes, reloads or crashes.
-			await this.#locks.request(this.#lockName, async () => {
+			await this.#locks.request(this.#lockName, { signal: abandon }, async () => {
 				this.#isSounding = true;
-				await new Promise<never>(() => {});
+				await givenUp;
 			});
 		} catch (error: unknown) {
+			// Leaving the queue rejects the request, which is no failure.
+			if (abandon.aborted) {
+				return;
+			}
 			console.error('Could not take turns with other tabs, so this tab sounds the chimes.', error);
 			this.#isSounding = true;
 		}
