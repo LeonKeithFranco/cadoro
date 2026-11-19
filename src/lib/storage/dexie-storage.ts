@@ -1,9 +1,11 @@
 // The app's storage: the browser's IndexedDB, through Dexie, which wraps IndexedDB's events in
 // promises and gives each table a typed API.
 
-import Dexie, { type EntityTable } from 'dexie';
+import Dexie, { type EntityTable, type Table } from 'dexie';
 import { pickableRoutines, type Routine } from '../routine';
+import type { StoredRunInProgress } from '../run-in-progress';
 import {
+	noRecords,
 	runsOldestFirst,
 	workPeriodsOldestFirst,
 	type Run,
@@ -43,12 +45,16 @@ const SCHEMA_VERSION_1 = {
 };
 
 /**
- * The database, with a type for each table the code reads and saves so far.
+ * The key the one run in progress is saved under. Saved data uses it, so it never changes.
+ */
+const RUN_IN_PROGRESS_KEY = 'current';
+
+/**
+ * The database, with a type for each table.
  *
  * @remarks
  * Dexie adds a property for each table when the schema is declared, which TypeScript can't see,
- * so this type names them, as Dexie's docs do. `runInProgress` gets its type in step 3 of
- * milestone 4, when the run in progress is saved.
+ * so this type names them, as Dexie's docs do.
  */
 type CadoroDatabase = Dexie & {
 	/** Every routine, deleted ones included, keyed by its `id`. */
@@ -57,6 +63,11 @@ type CadoroDatabase = Dexie & {
 	runs: EntityTable<Run, 'id'>;
 	/** Every work period, keyed by its `id`. */
 	workPeriods: EntityTable<WorkPeriod, 'id'>;
+	/**
+	 * The one run in progress, under {@link RUN_IN_PROGRESS_KEY}. `Table` rather than
+	 * `EntityTable`, since its key isn't a field of the row.
+	 */
+	runInProgress: Table<StoredRunInProgress, string>;
 };
 
 /**
@@ -114,14 +125,19 @@ export class DexieStorage implements CadoroStorage {
 		});
 	}
 
-	async saveRunRecords(records: RunRecords): Promise<void> {
-		const { runs, workPeriods } = this.#database;
+	async saveRunInProgress(
+		runInProgress: StoredRunInProgress,
+		records: RunRecords = noRecords()
+	): Promise<void> {
+		const { runInProgress: runInProgressTable, runs, workPeriods } = this.#database;
 
-		// One read-write transaction across both tables, so the run and its work periods are saved
-		// together or not at all. A failed `bulkAdd` that isn't caught aborts the transaction, as
-		// Dexie's docs say, which undoes the run's `put` too. Outside a transaction, the run and
-		// the other periods would stay saved.
-		await this.#database.transaction('rw', [runs, workPeriods], async () => {
+		// One read-write transaction across the three tables, so the run in progress, the run and
+		// its work periods are saved together or not at all. A failed `bulkAdd` that isn't caught
+		// aborts the transaction, as Dexie's docs say, which undoes both `put`s too. Outside a
+		// transaction, the others would stay saved.
+		await this.#database.transaction('rw', [runInProgressTable, runs, workPeriods], async () => {
+			// The key is given, since it isn't a field of the row.
+			await runInProgressTable.put(runInProgress, RUN_IN_PROGRESS_KEY);
 			if (records.run !== null) {
 				// `put` adds the run or replaces it, as it's saved again when it ends.
 				await runs.put(records.run);
@@ -129,6 +145,15 @@ export class DexieStorage implements CadoroStorage {
 			// `bulkAdd` refuses an id that's already saved, so a work period is never overwritten.
 			await workPeriods.bulkAdd(records.workPeriods);
 		});
+	}
+
+	async getRunInProgress(): Promise<StoredRunInProgress | null> {
+		const runInProgress = await this.#database.runInProgress.get(RUN_IN_PROGRESS_KEY);
+		return runInProgress ?? null;
+	}
+
+	async clearRunInProgress(): Promise<void> {
+		await this.#database.runInProgress.delete(RUN_IN_PROGRESS_KEY);
 	}
 
 	async getRuns(): Promise<Run[]> {

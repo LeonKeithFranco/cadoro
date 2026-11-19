@@ -2,7 +2,9 @@
 // as long as the object.
 
 import { pickableRoutines, type Routine } from '../routine';
+import type { StoredRunInProgress } from '../run-in-progress';
 import {
+	noRecords,
 	runsOldestFirst,
 	workPeriodsOldestFirst,
 	type Run,
@@ -28,6 +30,9 @@ export class InMemoryStorage implements CadoroStorage {
 	/** Every work period saved, by id. */
 	#workPeriods = new Map<string, WorkPeriod>();
 
+	/** The run in progress, or `null` when none is saved. */
+	#runInProgress: StoredRunInProgress | null = null;
+
 	async getRoutines(): Promise<Routine[]> {
 		return structuredClone(pickableRoutines(this.#routines));
 	}
@@ -41,7 +46,10 @@ export class InMemoryStorage implements CadoroStorage {
 		return true;
 	}
 
-	async saveRunRecords(records: RunRecords): Promise<void> {
+	async saveRunInProgress(
+		runInProgress: StoredRunInProgress,
+		records: RunRecords = noRecords()
+	): Promise<void> {
 		// Every check comes before any change, so a rejected call saves nothing, as a rolled-back
 		// transaction does in IndexedDB.
 		const newIds = new Set<string>();
@@ -52,12 +60,21 @@ export class InMemoryStorage implements CadoroStorage {
 			newIds.add(period.id);
 		}
 
+		this.#runInProgress = structuredClone(runInProgress);
 		if (records.run !== null) {
 			this.#runs.set(records.run.id, structuredClone(records.run));
 		}
 		for (const period of records.workPeriods) {
 			this.#workPeriods.set(period.id, structuredClone(period));
 		}
+	}
+
+	async getRunInProgress(): Promise<StoredRunInProgress | null> {
+		return structuredClone(this.#runInProgress);
+	}
+
+	async clearRunInProgress(): Promise<void> {
+		this.#runInProgress = null;
 	}
 
 	async getRuns(): Promise<Run[]> {

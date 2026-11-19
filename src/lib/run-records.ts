@@ -64,6 +64,16 @@ export type RunRecords = {
 	workPeriods: WorkPeriod[];
 };
 
+/**
+ * Makes the records of a change that keeps nothing new, such as a pause or a heartbeat.
+ *
+ * @returns No run and no work periods, in a new object each time, so no caller can change
+ * another's.
+ */
+export function noRecords(): RunRecords {
+	return { run: null, workPeriods: [] };
+}
+
 /** A button press: the run before and after it, and what's known about the run so far. */
 export type ButtonPress = {
 	/** The run before the press. */
@@ -107,7 +117,7 @@ export function recordPress(press: ButtonPress, newId: () => string): RunRecords
 		if (hasWorkToSave) {
 			throw new Error('A run must have a record before its work can be saved.');
 		}
-		return { run: null, workPeriods: [] };
+		return noRecords();
 	}
 
 	const workPeriods = endedPeriods.map((period) =>
