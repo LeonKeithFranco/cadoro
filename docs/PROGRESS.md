@@ -2,7 +2,7 @@
 
 **Status:** milestone 8 is done, as version 0.10.0, which goes live once its pull request merges. Settings has a Data card that exports every work period as a CSV, backs everything up as a JSON file and imports a backup after showing what it holds, and an activity log page that lists the changes, imports and errors and exports them as JSON. Every failed save or read and every uncaught error is recorded in the log. Milestone 7, Stats (0.9.0), is in review as pull request 29, and 0.8.0 (Routines) is live. The app is installed on the desktop and the phone, runs both starter routines, works offline, keeps its data in IndexedDB, restores a run after a reload, and shows the same run in every tab.
 
-**Next:** the test coverage audit, then milestone 9, Release 1.0 (`docs/release-1-0`, 1.0.0). `docs/PLAN.md` has the plan for every remaining milestone. Device checks pending: a backup made on one device importing into another; dragging routines and blocks by touch on the phone, and the pinned controls above the tab bar on a long routine; killing the installed app mid-run and reopening it finds the run paused at about the moment it was left; a chime plays on time in a background desktop tab; the phone's screen stays on during a run; and the four chimes sound right by ear.
+**Next:** the test coverage audit (`test/coverage-audit`), then milestone 9, Release 1.0 (`docs/release-1-0`, 1.0.0). `docs/PLAN.md` has the plan for every remaining milestone. Device checks pending: a backup made on one device importing into another; dragging routines and blocks by touch on the phone, and the pinned controls above the tab bar on a long routine; killing the installed app mid-run and reopening it finds the run paused at about the moment it was left; a chime plays on time in a background desktop tab; the phone's screen stays on during a run; and the four chimes sound right by ear.
 
 **Open:**
 
@@ -38,6 +38,7 @@ Each finished milestone lists its steps' branches. Its decisions are in its file
 
 ### Phase 3: Release
 
+- [ ] Before 9. Test coverage audit: `test/coverage-audit` (0.10.1, or no bump)
 - [ ] 9. Release 1.0: `docs/release-1-0` (1.0.0)
 
 ### Phase 4: Optional

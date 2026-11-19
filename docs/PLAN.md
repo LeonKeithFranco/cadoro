@@ -242,6 +242,16 @@ Branch `feat/backup-and-log`, 0.10.0. SPEC: Export and import, Activity log, Set
 
 ## Phase 3: Release
 
+### Before 9. Test coverage audit
+
+Branch `test/coverage-audit`, from `main` once milestone 8 is merged. It's 0.10.1 if a bug fix changes the app, and otherwise merged without a bump. The user added this step on 2026-11-19.
+
+1. **Install.** `@vitest/coverage-v8` at the installed Vitest's version, one install prompt.
+2. **Coverage report (Sonnet).** A one-off local `--coverage` run across both Vitest projects, with no threshold and nothing in CI or the Taskfile, listing the uncovered lines and branches. It finds gaps; it isn't a goal.
+3. **Behaviour audit (two fresh Opus reviewers, read-only, in parallel).** One walks the SPEC section by section, the other ARCHITECTURE's invariants and the decision log. For each rule, edge case, journey and failure, they name the test that would catch it breaking or report it missing, and they report tests that can't fail.
+4. **Fill the gaps (Sonnet, one package per area).** A test for each missing behaviour. A test that exposes a bug becomes a fix, with the regression test seen failing first. No test is loosened.
+5. Docs, then the milestone loop's review, pull request and merge.
+
 ### 9. Release 1.0
 
 Branch `docs/release-1-0`, 1.0.0 (`LEVEL=major`).
