@@ -36,8 +36,8 @@ export function counted(count: number, unit: string): string {
  * Words what a backup holds for the import's confirmation.
  *
  * @param summary - What the backup holds.
- * @returns A sentence with the counts, the days of the first and last runs in UTC when it has
- * runs, and when the backup was made.
+ * @returns A sentence with the counts, the days of the first and last runs when it has runs, and
+ * the day the backup was made, each in the user's time zone.
  */
 export function describeBackupSummary(summary: BackupSummary): string {
 	const counts = [
@@ -45,17 +45,25 @@ export function describeBackupSummary(summary: BackupSummary): string {
 		counted(summary.runCount, 'run'),
 		counted(summary.workPeriodCount, 'work period')
 	].join(', ');
-	const exportedDay = summary.exportedAt.slice(0, DAY_LENGTH);
+	const exportedDay = localDay(summary.exportedAt);
 	if (summary.firstRunAt === null || summary.lastRunAt === null) {
-		return `The backup holds ${counts}, and was made on ${exportedDay} (UTC).`;
+		return `The backup holds ${counts}, and was made on ${exportedDay}.`;
 	}
-	const firstDay = summary.firstRunAt.slice(0, DAY_LENGTH);
-	const lastDay = summary.lastRunAt.slice(0, DAY_LENGTH);
-	return `The backup holds ${counts}, with runs from ${firstDay} to ${lastDay} (UTC), and was made on ${exportedDay} (UTC).`;
+	const firstDay = localDay(summary.firstRunAt);
+	const lastDay = localDay(summary.lastRunAt);
+	return `The backup holds ${counts}, with runs from ${firstDay} to ${lastDay}, and was made on ${exportedDay}.`;
 }
 
-/** The length of the day at the start of a UTC timestamp, such as `2026-11-19`. */
-const DAY_LENGTH = 10;
+/**
+ * Works out the user's own day of a moment, since days are worked out locally only when shown.
+ *
+ * @param timestamp - A UTC timestamp.
+ * @returns The day in the user's time zone, such as `2026-11-19`.
+ */
+function localDay(timestamp: string): string {
+	// The `en-CA` locale writes a date as year, month and day, joined with dashes.
+	return new Date(fromUtcTimestamp(timestamp)).toLocaleDateString('en-CA');
+}
 
 /**
  * Counts what a backup holds.

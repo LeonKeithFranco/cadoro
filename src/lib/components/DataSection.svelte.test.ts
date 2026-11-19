@@ -183,7 +183,7 @@ describe('the Data card', () => {
 			await expect
 				.element(dialog)
 				.toHaveTextContent(
-					'The backup holds 2 routines, 1 run, 1 work period, with runs from 2026-11-19 to 2026-11-19 (UTC), and was made on 2026-11-20 (UTC).'
+					'The backup holds 2 routines, 1 run, 1 work period, with runs from 2026-11-19 to 2026-11-19, and was made on 2026-11-20.'
 				);
 			await expect.element(dialog).toHaveTextContent('including a run in progress');
 			expect(await storage.readBackupData()).toEqual(before);
