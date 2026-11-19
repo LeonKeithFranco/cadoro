@@ -9,11 +9,12 @@ Cadoro is a static SvelteKit single-page app. GitHub Pages, or any web server, s
 The code is in layers, each knowing only the one below it:
 
 1. **The run engine** in `src/lib` is plain TypeScript: a run is an immutable value, and every button is a pure function from one run and the current moment to the next run. It never reads the clock or touches the page.
-2. **`TimerSession`** keeps the current run in Svelte state, reads the clock, and applies the engine's functions when a button is pressed or the screen ticks.
-3. **Components** show views that pure functions work out from the run, such as `viewRun` for the screen and `viewBlock` for each block card, and call the session's methods.
-4. **Routes** frame the screens with the header, the navigation and the update prompt.
+2. **Storage**, in `src/lib/storage`, is the `CadoroStorage` interface, kept in the browser's IndexedDB through Dexie. It holds the routines so far.
+3. **`TimerSession`** keeps the current run in Svelte state, reads the clock, and applies the engine's functions when a button is pressed or the screen ticks.
+4. **Components** show views that pure functions work out from the run, such as `viewRun` for the screen and `viewBlock` for each block card, and call the session's methods.
+5. **Routes** frame the screens with the header, the navigation and the update prompt. The root layout's `load` reads the routines from storage, creating the starter routines on the first launch, and starts the app's one `TimerSession` before anything renders.
 
-Nothing is saved yet. Milestone 4 adds storage beneath the session.
+The run itself isn't saved yet, so a reload loses it. Steps 2 and 3 of milestone 4 save it.
 
 ## Codemap
 
@@ -21,12 +22,19 @@ Nothing is saved yet. Milestone 4 adds storage beneath the session.
 
 - `run.ts`: the run engine. The `RunState` union (ready, working, break, ended), the buttons (`play`, `pause`, `next`, `finish`), moving through rounds, blocks and cycles (`nextPosition`), the position label, work time from segments (`workedMs`), the earned break (`earnedBreakMs`), the view the timer screen shows (`viewRun`) and the run summary (`summarizeRun`).
 - `block-view.ts`: `viewBlock`, what each block card shows, worked out from the run's view.
-- `routine.ts`: the `Routine` and `Block` types from the spec's data model, and `createStarterRoutines`.
+- `routine.ts`: the `Routine` and `Block` types from the spec's data model, `pickableRoutines` (those not deleted, in custom order) and `createStarterRoutines`.
+- `routine-loading.ts`: `loadRoutines`, which creates the starter routines when storage holds none, then reads the routines.
 - `time.ts`: unit conversions (`MS_PER_SECOND`, `minutesToMs`) and time formatting (`formatElapsed` rounds down, `formatRemaining` rounds up).
 - `percent.ts`: `percentOf` and `asPercentOf`, multiplying before dividing.
 - `screens.ts`: `isCurrentScreen`, which link in the navigation is the current one.
-- `timer.svelte.ts`: `TimerSession`, and the app's one session, `timerSession`.
+- `timer.svelte.ts`: `TimerSession`. The root layout makes the app's one session.
 - `page-reload.ts`: `reloadPage`, alone in its module so tests can replace it.
+
+### `src/lib/storage`: where data is kept
+
+- `storage.ts`: the `CadoroStorage` interface, the only way the app reads and saves data. So far it reads the routines and adds them on the first launch.
+- `dexie-storage.ts`: `DexieStorage`, the app's backend, in the IndexedDB database `cadoro`, with schema version 1 declaring `routines`, `runs`, `workPeriods` and `runInProgress`.
+- `in-memory-storage.ts`: `InMemoryStorage`, for tests of code that uses storage.
 
 ### `src/lib/components`: the Svelte components
 
@@ -37,14 +45,15 @@ Nothing is saved yet. Milestone 4 adds storage beneath the session.
 
 ### `src/routes`: the screens
 
-- `+layout.ts` turns off server-side rendering, so the app renders only in the browser.
+- `+layout.ts` turns off server-side rendering, so the app renders only in the browser, and its `load` opens storage and returns `{ timerSession }` as the layout's `data`, which every page receives.
 - `+layout.svelte` is the frame: the global styles from `layout.css`, the header, the navigation and `UpdatePrompt`.
-- `+page.svelte` is the Timer screen. `routines/`, `stats/` and `settings/` hold the other screens. Settings shows the app's version.
+- `+page.svelte` is the Timer screen, showing the session from `data`. `routines/`, `stats/` and `settings/` hold the other screens. Settings shows the app's version.
 
 ### Tests and their helpers
 
-- Unit tests sit beside their module as `*.test.ts`, and component tests beside their component as `*.svelte.test.ts`.
-- `src/lib/testing/` holds test helpers: `durations.ts` (`seconds`, `minutes`, `hours`), `ids.ts` (`numberedIds`), `routines.ts` (`oneRoundRoutine`) and `run-summary.ts` (`shownTotals`).
+- Unit tests sit beside their module as `*.test.ts`, component tests beside their component as `*.svelte.test.ts`, and storage tests beside their backend as `*.browser.test.ts`.
+- `storage.browser.test.ts` is the suite every backend shares, and `dexie-storage.browser.test.ts` covers what only IndexedDB has: data kept after reopening, two connections at once, the saved schema and the database's name.
+- `src/lib/testing/` holds test helpers: `durations.ts` (`seconds`, `minutes`, `hours`), `ids.ts` (`numberedIds`), `routines.ts` (`oneRoundRoutine`, `routineWith`) and `run-summary.ts` (`shownTotals`).
 - `e2e/` holds the Playwright journeys (`*.spec.ts`), with `clock.ts` (`openOnPausedClock`, `followLink`), `service-worker.ts` (`waitForActiveWorker`), and `update-server.ts`, which serves the production build with a new service worker to browsers that ask. `e2e/production/` holds the journeys against the production build.
 
 ### Config and tooling
@@ -64,7 +73,8 @@ Nothing is saved yet. Milestone 4 adds storage beneath the session.
 - Nothing in the engine or the view functions reads the clock, the page or Svelte. Svelte appears only in `.svelte` and `.svelte.ts` files.
 - Work time is kept to the millisecond. Only the earned break is rounded, once, to whole seconds, when the break starts.
 - Every link and asset address goes through SvelteKit's `resolve()` or `%sveltekit.assets%`, so the app works under a base path such as `/cadoro`.
-- Data will go only through the storage interface, from milestone 4.
+- Data goes only through `CadoroStorage`. Nothing else opens IndexedDB.
+- What's stored survives upgrades: schema version 1 never changes now that it's deployed, so a change to what's stored takes a new Dexie version with an upgrade, and a test for it.
 
 ## Cross-cutting concerns
 
@@ -84,7 +94,7 @@ Nothing is saved yet. Milestone 4 adds storage beneath the session.
 
 ### Testing
 
-- Vitest's `server` project runs `*.test.ts` in Node, and its `client` project runs `*.svelte.test.ts` in Chromium through browser mode.
+- Vitest's `server` project runs `*.test.ts` in Node, and its `client` project runs `*.svelte.test.ts` and `*.browser.test.ts` in Chromium through browser mode, where storage tests use the real IndexedDB, with a new database per test.
 - Component tests find elements by role and label. The timer's tests drive the session with a fake clock and fake only `setInterval` and `clearInterval`, and the update prompt's replace the PWA plugin's module with `vi.mock`.
 - Tests write times as `minutes(25)`, not `25 * 60_000`, and keep their data visible rather than importing it from the code they check.
 - Playwright's projects are `desktop` and `phone` against the dev server (`PORT`, 5173 by default), `production` against a build at `/cadoro` on port 4175, and `updates` against the update server on port 4176.
