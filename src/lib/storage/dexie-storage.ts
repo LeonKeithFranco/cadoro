@@ -3,6 +3,13 @@
 
 import Dexie, { type EntityTable } from 'dexie';
 import { pickableRoutines, type Routine } from '../routine';
+import {
+	runsOldestFirst,
+	workPeriodsOldestFirst,
+	type Run,
+	type RunRecords,
+	type WorkPeriod
+} from '../run-records';
 import type { CadoroStorage } from './storage';
 
 /**
@@ -40,12 +47,16 @@ const SCHEMA_VERSION_1 = {
  *
  * @remarks
  * Dexie adds a property for each table when the schema is declared, which TypeScript can't see,
- * so this type names them, as Dexie's docs do. The other tables get their types when their
- * records do.
+ * so this type names them, as Dexie's docs do. `runInProgress` gets its type in step 3 of
+ * milestone 4, when the run in progress is saved.
  */
 type CadoroDatabase = Dexie & {
 	/** Every routine, deleted ones included, keyed by its `id`. */
 	routines: EntityTable<Routine, 'id'>;
+	/** Every run, keyed by its `id`. */
+	runs: EntityTable<Run, 'id'>;
+	/** Every work period, keyed by its `id`. */
+	workPeriods: EntityTable<WorkPeriod, 'id'>;
 };
 
 /**
@@ -101,5 +112,37 @@ export class DexieStorage implements CadoroStorage {
 			await table.bulkAdd(routines);
 			return true;
 		});
+	}
+
+	async saveRunRecords(records: RunRecords): Promise<void> {
+		const { runs, workPeriods } = this.#database;
+
+		// One read-write transaction across both tables, so the run and its work periods are saved
+		// together or not at all. A failed `bulkAdd` that isn't caught aborts the transaction, as
+		// Dexie's docs say, which undoes the run's `put` too. Outside a transaction, the run and
+		// the other periods would stay saved.
+		await this.#database.transaction('rw', [runs, workPeriods], async () => {
+			if (records.run !== null) {
+				// `put` adds the run or replaces it, as it's saved again when it ends.
+				await runs.put(records.run);
+			}
+			// `bulkAdd` refuses an id that's already saved, so a work period is never overwritten.
+			await workPeriods.bulkAdd(records.workPeriods);
+		});
+	}
+
+	async getRuns(): Promise<Run[]> {
+		const runs = await this.#database.runs.toArray();
+		return runsOldestFirst(runs);
+	}
+
+	async getWorkPeriods(): Promise<WorkPeriod[]> {
+		const periods = await this.#database.workPeriods.toArray();
+		return workPeriodsOldestFirst(periods);
+	}
+
+	async hasWorkPeriods(): Promise<boolean> {
+		// IndexedDB counts the rows itself, so none is copied out to be counted.
+		return (await this.#database.workPeriods.count()) > 0;
 	}
 }

@@ -128,6 +128,36 @@ export function recordPress(press: ButtonPress, newId: () => string): RunRecords
 }
 
 /**
+ * Puts runs in the order they started.
+ *
+ * @param runs - Runs in any order.
+ * @returns A new list of the runs, earliest `startedAt` first.
+ */
+export function runsOldestFirst(runs: Run[]): Run[] {
+	return runs.toSorted((a, b) => Date.parse(a.startedAt) - Date.parse(b.startedAt));
+}
+
+/**
+ * Puts work periods in the order they started.
+ *
+ * @param periods - Work periods in any order.
+ * @returns A new list of the work periods, earliest first segment first.
+ */
+export function workPeriodsOldestFirst(periods: WorkPeriod[]): WorkPeriod[] {
+	return periods.toSorted((a, b) => startOf(a) - startOf(b));
+}
+
+/**
+ * Finds when a work period started.
+ *
+ * @param period - The work period. It always has a segment, since a work period starts running.
+ * @returns When its first segment started, in milliseconds since 1970 (UTC).
+ */
+function startOf(period: WorkPeriod): number {
+	return Date.parse(period.segments[0].start);
+}
+
+/**
  * Makes the record of a run that Play has just started.
  *
  * @param id - The new run's id.
