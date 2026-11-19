@@ -8,6 +8,7 @@
 	import { resolve } from '$app/paths';
 	import type { Routine } from '../routine';
 	import type { WorkPeriod } from '../run-records';
+	import { routineLabel } from '../routine-stats';
 	import type { RangePreset } from '../stats-range';
 	import { viewStats } from '../stats-view';
 	import DailyChart from './DailyChart.svelte';
@@ -83,7 +84,9 @@
 			>
 				<option value={ALL_ROUTINES}>All routines</option>
 				{#each routines as routine (routine.id)}
-					<option value={routine.id}>{routine.title}</option>
+					<option value={routine.id}
+						>{routineLabel(routine.title, routine.deletedAt !== null)}</option
+					>
 				{/each}
 			</select>
 		</label>

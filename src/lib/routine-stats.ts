@@ -24,6 +24,17 @@ export type AllTimeTotals = {
 };
 
 /**
+ * Writes a routine's name as the stats show it.
+ *
+ * @param title - The routine's title.
+ * @param deleted - Whether the routine has been deleted.
+ * @returns The title, followed by `(deleted)` for a deleted routine.
+ */
+export function routineLabel(title: string, deleted: boolean): string {
+	return deleted ? `${title} (deleted)` : title;
+}
+
+/**
  * Picks the work periods the stats show: every routine's, or one routine's.
  *
  * @param workPeriods - The work periods to choose from.

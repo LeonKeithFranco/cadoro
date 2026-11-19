@@ -3,7 +3,7 @@
 
 import { format } from 'date-fns';
 import { daySlicesOf } from './day-slices';
-import { allTimeTotals, filterByRoutine } from './routine-stats';
+import { allTimeTotals, filterByRoutine, routineLabel } from './routine-stats';
 import type { Routine } from './routine';
 import type { WorkPeriod } from './run-records';
 import { rangeForPreset, type RangePreset } from './stats-range';
@@ -122,7 +122,7 @@ export function viewStats(input: StatsInput): StatsView {
 		allTime: formatElapsed(allTime.workedMs),
 		routineTotals: allTime.perRoutine.map((total) => ({
 			key: total.routineId,
-			label: total.deleted ? `${total.title} (deleted)` : total.title,
+			label: routineLabel(total.title, total.deleted),
 			duration: formatElapsed(total.workedMs)
 		}))
 	};
