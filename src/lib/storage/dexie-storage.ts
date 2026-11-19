@@ -17,7 +17,9 @@ import {
 	type RunRecords,
 	type WorkPeriod
 } from '../run-records';
+import { settingsFrom, settingsWithChanges, type Settings } from '../settings';
 import type { CadoroStorage } from './storage';
+import { writeThemeMirror } from './theme-mirror';
 
 /**
  * The database's name in the browser. Renaming it would leave every user's data behind in the
@@ -53,6 +55,25 @@ const SCHEMA_VERSION_1 = {
  * The key the one run in progress is saved under. Saved data uses it, so it never changes.
  */
 const RUN_IN_PROGRESS_KEY = 'current';
+
+/**
+ * The tables schema version 3 adds to version 2's, which Dexie keeps as they are.
+ *
+ * @remarks
+ * Version 3 gives the user's settings a table of their own.
+ */
+const SCHEMA_VERSION_3_ADDS = {
+	/**
+	 * The one row of settings the user has changed, saved under {@link SETTINGS_KEY}, with the
+	 * key kept outside the row like `runInProgress`'s.
+	 */
+	settings: ''
+};
+
+/**
+ * The key the one settings row is saved under. Saved data uses it, so it never changes.
+ */
+const SETTINGS_KEY = 'current';
 
 /** The run in progress as schema version 1 saved it, before it had a revision. */
 type Version1RunInProgress = Omit<StoredRunInProgress, 'revision'> & {
@@ -97,6 +118,11 @@ type CadoroDatabase = Dexie & {
 	 * `EntityTable`, since its key isn't a field of the row.
 	 */
 	runInProgress: Table<StoredRunInProgress, string>;
+	/**
+	 * The one settings row, under {@link SETTINGS_KEY}, holding only the settings the user has
+	 * changed. `Table`, since its key isn't a field of the row.
+	 */
+	settings: Table<Partial<Settings>, string>;
 };
 
 /**
@@ -112,6 +138,9 @@ function connect(name: string): CadoroDatabase {
 	// Version 2 keeps every table and key as version 1 has them, which the empty `stores` says:
 	// without it, Dexie would take version 2 to have no tables and delete them all.
 	database.version(2).stores({}).upgrade(upgradeToVersion2);
+	// Version 3 adds the `settings` table. Dexie creates a new table by itself when it upgrades,
+	// and an absent row means every setting has its default, so no data needs moving.
+	database.version(3).stores(SCHEMA_VERSION_3_ADDS);
 	return database;
 }
 
@@ -241,6 +270,45 @@ export class DexieStorage implements CadoroStorage {
 			await table.delete(RUN_IN_PROGRESS_KEY);
 			return true;
 		});
+	}
+
+	async getSettings(): Promise<Settings> {
+		const settings = settingsFrom((await this.#database.settings.get(SETTINGS_KEY)) ?? null);
+		// Every read refreshes the mirror, so it's made even for a user whose settings were saved
+		// before the mirror existed.
+		writeThemeMirror(settings.theme);
+		return settings;
+	}
+
+	async saveSettings(changes: Partial<Settings>): Promise<void> {
+		const table = this.#database.settings;
+
+		// One read-write transaction, so two tabs saving different settings at once keep both.
+		const row = await this.#database.transaction('rw', table, async () => {
+			const changed = settingsWithChanges((await table.get(SETTINGS_KEY)) ?? null, changes);
+			await table.put(changed, SETTINGS_KEY);
+			return changed;
+		});
+		// After the save, so a failed one leaves the mirror as it was.
+		writeThemeMirror(settingsFrom(row).theme);
+	}
+
+	watchSettings(
+		onChange: (settings: Settings) => void,
+		onError: (error: unknown) => void
+	): () => void {
+		const table = this.#database.settings;
+		const subscription = liveQuery(() => table.get(SETTINGS_KEY)).subscribe({
+			next: (row) => {
+				const settings = settingsFrom(row ?? null);
+				writeThemeMirror(settings.theme);
+				onChange(settings);
+			},
+			error: onError
+		});
+		return (): void => {
+			subscription.unsubscribe();
+		};
 	}
 
 	async getRuns(): Promise<Run[]> {

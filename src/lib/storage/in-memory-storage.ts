@@ -11,6 +11,7 @@ import {
 	type RunRecords,
 	type WorkPeriod
 } from '../run-records';
+import { settingsFrom, settingsWithChanges, type Settings } from '../settings';
 import type { CadoroStorage } from './storage';
 
 /**
@@ -36,6 +37,12 @@ export class InMemoryStorage implements CadoroStorage {
 
 	/** The `onChange` of everything following the run in progress. */
 	#watchers = new Set<(runInProgress: StoredRunInProgress | null) => void>();
+
+	/** The settings the user has changed, or `null` when none has been. */
+	#settings: Partial<Settings> | null = null;
+
+	/** The `onChange` of everything following the settings. */
+	#settingsWatchers = new Set<(settings: Settings) => void>();
 
 	async getRoutines(): Promise<Routine[]> {
 		return structuredClone(pickableRoutines(this.#routines));
@@ -111,6 +118,26 @@ export class InMemoryStorage implements CadoroStorage {
 		return true;
 	}
 
+	async getSettings(): Promise<Settings> {
+		return settingsFrom(structuredClone(this.#settings));
+	}
+
+	async saveSettings(changes: Partial<Settings>): Promise<void> {
+		this.#settings = structuredClone(settingsWithChanges(this.#settings, changes));
+		for (const watcher of this.#settingsWatchers) {
+			this.#reportSettings(watcher);
+		}
+	}
+
+	// It takes no `onError`, since memory can always be read.
+	watchSettings(onChange: (settings: Settings) => void): () => void {
+		this.#settingsWatchers.add(onChange);
+		this.#reportSettings(onChange);
+		return (): void => {
+			this.#settingsWatchers.delete(onChange);
+		};
+	}
+
 	async getRuns(): Promise<Run[]> {
 		return structuredClone(runsOldestFirst([...this.#runs.values()]));
 	}
@@ -121,6 +148,21 @@ export class InMemoryStorage implements CadoroStorage {
 
 	async hasWorkPeriods(): Promise<boolean> {
 		return this.#workPeriods.size > 0;
+	}
+
+	/**
+	 * Tells one follower of the settings what they are, once the current call has finished, as
+	 * `#report` does for the run in progress. A follower that has stopped
+	 * following by then isn't told.
+	 *
+	 * @param watcher - The follower's `onChange`.
+	 */
+	#reportSettings(watcher: (settings: Settings) => void): void {
+		queueMicrotask(() => {
+			if (this.#settingsWatchers.has(watcher)) {
+				watcher(settingsFrom(structuredClone(this.#settings)));
+			}
+		});
 	}
 
 	/**
