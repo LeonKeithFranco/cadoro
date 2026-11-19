@@ -17,7 +17,7 @@ It's built primarily for one person. Anyone else can use it from GitHub Pages, w
 - Make starting and running a routine quick, on a phone or a desktop.
 - Record every work period and show useful stats about it, without clutter.
 - Keep deployment simple: a static app hosted free on GitHub Pages, which anyone can open and install. Its built files can also be self-hosted on any web server.
-- Act as a learning project for Svelte 5, SvelteKit and Tailwind CSS, and for browser APIs the weight tracker didn't use, such as Web Audio and Screen Wake Lock.
+- Use Svelte 5, SvelteKit and Tailwind CSS, and browser APIs the weight tracker didn't use, such as Web Audio and Screen Wake Lock.
 
 ## Non-goals
 
@@ -199,7 +199,7 @@ Done or Escape closes the dialog and returns the routine to its starting state, 
 - **Custom order:** routines can be reordered with a drag handle, or with Move up and Move down buttons for keyboard and screen reader users. These controls only show while the sort is set to custom order.
 - **New routine:** a "+ New routine" button adds a new routine at the top of the list, already open for editing, with a blank title that must be filled in, infinite rounds, and one block of 25 minutes at 20% for 1 cycle. Cancel removes it.
 - **Duplicate:** makes a copy named "<title> (copy)" with the same blocks. Its stats start empty.
-- **Delete:** asks for confirmation. A deleted routine's work stays in the stats, labelled as deleted.
+- **Delete:** asks for confirmation. A deleted routine's work stays in the stats, labelled as deleted. Delete is disabled on the only remaining routine, with a hint saying why, so there is always one to run.
 
 ### Editing a routine
 
