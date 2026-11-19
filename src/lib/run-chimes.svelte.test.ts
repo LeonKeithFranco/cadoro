@@ -75,6 +75,9 @@ function openTab(
 			onWorkSaved: vi.fn(),
 			onPress: (): void => {
 				chimes.unlock();
+			},
+			onTick: (): void => {
+				void chimes.catchUp();
 			}
 		},
 		{ saved: null, isAnotherTabOpen: false }
@@ -212,13 +215,15 @@ describe('scheduling the run’s chimes', () => {
 		await expect.poll(() => tab.chimes.scheduled).toEqual([]);
 	});
 
-	it('never reschedules on a tick, since the run only changes on a press', async () => {
+	it('never reschedules on a tick while the audio clock keeps time', async () => {
 		const tab = openTab(new InMemoryStorage());
 		tab.timer.play();
 		await expect.poll(() => tab.chimes.scheduled).toHaveLength(1);
 
+		// The audio clock moves with the wall clock, as it does while nothing stops it.
 		for (const second of [1, 2, 3]) {
 			nowMs = seconds(second);
+			tab.audio.currentTime = second;
 			tab.timer.tick();
 		}
 		await afterPendingWork();
@@ -339,6 +344,35 @@ describe('when the audio clock stood still', () => {
 		await expect
 			.poll(() => tab.chimes.scheduled)
 			.toEqual([expect.objectContaining({ alert: 'target', at: minutes(25), startsAt: 20 * 60 })]);
+	});
+
+	it('drops a chime on the next tick when the wall clock jumped past it with no event', async () => {
+		const tab = openTab(new InMemoryStorage());
+		tab.timer.play();
+		await expect.poll(() => tab.chimes.scheduled).toHaveLength(1);
+
+		// Asleep from 3 minutes before the target to 20 after, in a background tab that hears
+		// neither the audio running again nor the page showing.
+		tab.audio.currentTime = 22 * 60;
+		nowMs = minutes(45);
+		tab.timer.tick();
+
+		await expect.poll(() => tab.audio.sources[0]?.isStopped).toBe(true);
+		expect(tab.chimes.scheduled).toEqual([]);
+	});
+
+	it('places the chime again on the next tick when the audio clock fell behind with no event', async () => {
+		const tab = openTab(new InMemoryStorage());
+		tab.timer.play();
+		await expect.poll(() => tab.chimes.scheduled).toHaveLength(1);
+
+		nowMs = minutes(20);
+		tab.audio.currentTime = 15 * 60;
+		tab.timer.tick();
+
+		await expect
+			.poll(() => tab.chimes.scheduled)
+			.toEqual([expect.objectContaining({ at: minutes(25), startsAt: 20 * 60 })]);
 	});
 
 	it('leaves the chime as it is when the page is hidden', async () => {

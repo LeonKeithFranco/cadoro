@@ -55,6 +55,12 @@ export type TimerSessionOptions = {
 	 * that tab's own session does. Nothing is called when left out.
 	 */
 	onRunStarted?: (routineId: string) => void;
+	/**
+	 * Called on every tick, after the view moves on, which the app uses to check that the
+	 * scheduled chime is still in place, since a background tab may hear of nothing else after a
+	 * laptop sleeps. Nothing is called when left out.
+	 */
+	onTick?: () => void;
 };
 
 /** What the app found as it opened, which a session carries on from. */
@@ -115,6 +121,9 @@ export class TimerSession {
 
 	/** Called with the routine's id when a press starts a run. */
 	readonly #onRunStarted: (routineId: string) => void;
+
+	/** Called on every tick, after the view moves on. */
+	readonly #onTick: () => void;
 
 	/**
 	 * The record of the run in progress, as Play started it, as restored or as taken on from
@@ -198,7 +207,8 @@ export class TimerSession {
 			newRevision,
 			onWorkSaved,
 			onPress = (): void => {},
-			onRunStarted = (): void => {}
+			onRunStarted = (): void => {},
+			onTick = (): void => {}
 		}: TimerSessionOptions,
 		{ saved, isAnotherTabOpen, lastRoutineId = null }: AppOpening = {
 			saved: null,
@@ -218,6 +228,7 @@ export class TimerSession {
 		this.#onWorkSaved = onWorkSaved;
 		this.#onPress = onPress;
 		this.#onRunStarted = onRunStarted;
+		this.#onTick = onTick;
 
 		const carriedOn = TimerSession.#carryOn(saved, routines, isAnotherTabOpen);
 		const lastRoutine = routines.find((candidate) => candidate.id === lastRoutineId);
@@ -374,10 +385,11 @@ export class TimerSession {
 	 * The heartbeat is the moment a restored run is paused at, so the screen also calls this as
 	 * the page is hidden, in case the app is stopped before the next tick. A paused run has
 	 * nothing new to save. Only the heartbeat is saved, never the run, so a tab that hasn't yet
-	 * seen another tab's press can't undo it.
+	 * seen another tab's press can't undo it. `onTick` is called on every tick, paused or not.
 	 */
 	tick(): void {
 		this.#moveOn();
+		this.#onTick();
 		const revision = this.#revision;
 		if (!this.view.isRunning || revision === null) {
 			return;

@@ -47,7 +47,10 @@ let newRevision = numberedIds('revision');
 function createSession(
 	choices: readonly Routine[] = routines,
 	options: Partial<
-		Pick<TimerSessionOptions, 'storage' | 'newId' | 'onWorkSaved' | 'onPress' | 'onRunStarted'>
+		Pick<
+			TimerSessionOptions,
+			'storage' | 'newId' | 'onWorkSaved' | 'onPress' | 'onRunStarted' | 'onTick'
+		>
 	> = {},
 	opening: Partial<AppOpening> = {}
 ): TimerSession {
@@ -450,6 +453,24 @@ describe('the run as the chimes see it', () => {
 		session.readyNewRun();
 
 		expect(onPress).not.toHaveBeenCalled();
+	});
+
+	it('calls onTick on every tick, paused or not, after the view moves on, and on no press', () => {
+		const workedWhenCalled: number[] = [];
+		const session = createSession(routines, {
+			onTick: () => {
+				workedWhenCalled.push(session.view.status === 'working' ? session.view.workedMs : -1);
+			}
+		});
+		session.play();
+
+		nowMs = seconds(1);
+		session.tick();
+		session.pause();
+		nowMs = seconds(2);
+		session.tick();
+
+		expect(workedWhenCalled).toEqual([seconds(1), seconds(1)]);
 	});
 });
 

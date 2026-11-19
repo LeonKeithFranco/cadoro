@@ -59,8 +59,9 @@ type AppSessions = {
  * The settings are read with the routines, so the first render already has them.
  *
  * The chimes need the timer session, and the session's presses unlock the chimes, so the
- * session's `onPress` reaches the chimes made just after it. No press can come before then, since
- * nothing has rendered yet. The chimes follow the session for as long as the app is open, so
+ * session's `onPress` reaches the chimes made just after it, as does its `onTick`, which checks
+ * the chime is still in place. No press or tick can come before then, since nothing has rendered
+ * yet. The chimes follow the session for as long as the app is open, so
  * nothing else needs to keep them.
  *
  * The timer session saves the routine each run starts with as the settings' `lastRoutineId`, and
@@ -96,6 +97,9 @@ async function openApp(): Promise<AppSessions> {
 		},
 		onRunStarted: (routineId) => {
 			void settingsSession.save({ lastRoutineId: routineId });
+		},
+		onTick: () => {
+			void chimes.catchUp();
 		}
 	};
 	const timerSession = new TimerSession(routines, options, {

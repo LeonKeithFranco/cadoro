@@ -226,6 +226,23 @@ export class RunChimes {
 	}
 
 	/**
+	 * Checks that the scheduled chime is still in place, and places it again from the wall clock
+	 * if the audio clock fell behind, or drops it if its moment has passed.
+	 *
+	 * @remarks
+	 * The app calls it on every tick, as an extra check beside the audio clock's own scheduling:
+	 * after a laptop sleeps, a background tab may hear neither the audio running again nor the
+	 * page showing, and its first tick after waking comes before the late chime would play. A
+	 * chime in place is left alone, so a tick never reschedules it. A tab that isn't sounding has
+	 * nothing placed, so it does nothing.
+	 *
+	 * @returns A promise that settles once the chime is in place, or dropped. It never rejects.
+	 */
+	catchUp(): Promise<void> {
+		return this.#player.catchUp();
+	}
+
+	/**
 	 * Plays a chime at once, as Settings' Preview buttons do.
 	 *
 	 * @remarks
