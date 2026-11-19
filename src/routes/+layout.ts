@@ -2,6 +2,7 @@ import { asset } from '$app/paths';
 import { joinOpenTabs } from '#lib/open-tabs.ts';
 import { loadRoutines } from '#lib/routine-loading.ts';
 import { RunChimes } from '#lib/run-chimes.svelte.ts';
+import { sortRoutines, type RoutineUsage } from '#lib/routine-sort.ts';
 import { SettingsSession } from '#lib/settings.svelte.ts';
 import { DexieStorage } from '#lib/storage/dexie-storage.ts';
 import type { CadoroStorage } from '#lib/storage/storage.ts';
@@ -81,15 +82,21 @@ async function openApp(): Promise<AppSessions> {
 	const locks: LockManager | undefined = navigator.locks;
 
 	void askToPersistIfWorkSaved(storage, askToPersist);
-	const [routines, saved, isAnotherTabOpen, settings] = await Promise.all([
+	const [routines, saved, isAnotherTabOpen, settings, runs, workPeriods] = await Promise.all([
 		loadRoutines(storage, new Date(), newId),
 		storage.getRunInProgress(),
 		joinOpenTabs(locks),
-		storage.getSettings()
+		storage.getSettings(),
+		storage.getRuns(),
+		storage.getWorkPeriods()
 	]);
 	const clock = (): number => Date.now();
 	const settingsSession = new SettingsSession(storage, settings);
+	// The runs as the app opened, which the "last used" and "most work" sorts read, so the session's
+	// first routine is the picker's first, whatever sort is chosen. Runs made since then aren't in it.
+	const usage: RoutineUsage = { runs, workPeriods };
 	const options: TimerSessionOptions = {
+		pickerOrder: (list) => sortRoutines([...list], settingsSession.settings.routineSort, usage),
 		clock,
 		storage,
 		newId,
