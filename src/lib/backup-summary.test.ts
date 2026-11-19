@@ -1,3 +1,4 @@
+import './testing/time-zone';
 import { describe, expect, it } from 'vitest';
 import { createBackup } from './backup-format';
 import { describeBackupSummary, summarizeBackup, type BackupSummary } from './backup-summary';
@@ -81,7 +82,20 @@ describe('describeBackupSummary', () => {
 
 	it('gives the counts, the days of the first and last runs and the day it was made', () => {
 		expect(describeBackupSummary(summary)).toBe(
-			'The backup holds 3 routines, 5 runs, 12 work periods, with runs from 2026-11-10 to 2026-11-19 (UTC), and was made on 2026-11-20 (UTC).'
+			'The backup holds 3 routines, 5 runs, 12 work periods, with runs from 2026-11-10 to 2026-11-19, and was made on 2026-11-20.'
+		);
+	});
+
+	it("gives each day in the user's time zone, not in UTC", () => {
+		const lateEvening = {
+			...summary,
+			exportedAt: '2026-11-20T02:00:00.000Z',
+			firstRunAt: '2026-11-10T03:00:00.000Z',
+			lastRunAt: '2026-11-20T01:30:00.000Z'
+		};
+
+		expect(describeBackupSummary(lateEvening)).toContain(
+			'with runs from 2026-11-09 to 2026-11-19, and was made on 2026-11-19.'
 		);
 	});
 
@@ -95,7 +109,7 @@ describe('describeBackupSummary', () => {
 		const none = { ...summary, runCount: 0, workPeriodCount: 0, firstRunAt: null, lastRunAt: null };
 
 		expect(describeBackupSummary(none)).toBe(
-			'The backup holds 3 routines, 0 runs, 0 work periods, and was made on 2026-11-20 (UTC).'
+			'The backup holds 3 routines, 0 runs, 0 work periods, and was made on 2026-11-20.'
 		);
 	});
 });
