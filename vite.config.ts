@@ -52,6 +52,11 @@ export default defineConfig({
 	// a quoted string, so Settings can show it. SvelteKit's own `version` is left alone, because
 	// the service worker uses it to tell when the fallback page has changed.
 	define: { __APP_VERSION__: JSON.stringify(packageJson.version) },
+	// The dev server pre-bundles the libraries it finds by crawling the app's entry points, and
+	// finds the ones that only lazily loaded screens import after the first page has loaded. It
+	// then re-bundles and reloads the page, which fails a test running at that moment, as every
+	// cold start of CI's dev server did. Listing them has it bundle them before the first load.
+	optimizeDeps: { include: ['svelte-dnd-action', 'layerchart', 'date-fns'] },
 	plugins: [
 		tailwindcss(),
 		// Runs SvelteKit's own plugin with the first argument, its config, and adds a service worker
