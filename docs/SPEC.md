@@ -247,6 +247,13 @@ All stats come from saved work periods and runs.
 - The current streak stays alive through today until midnight, so it doesn't drop to 0 just because you haven't worked yet today.
 - The stats can show every routine together or one routine at a time.
 - The daily chart's range presets are 7 days, 30 days, 90 days, 1 year and All, counting back from today.
+- Every range includes today, so 7 days is today and the 6 days before. A year is 365 days. "All" starts on the first day with work, or is just today when there is none. The chart has a bar for every day of its range, with an empty one for a day without work.
+- Weeks start on Monday, and a week is labelled by its Monday, such as "Week of Nov 16, 2026". Months are labelled such as "November 2026". Days, weeks and months are local, so a day with a daylight saving change is 23 or 25 hours long.
+- The weekly and monthly lists show only the weeks and months with work, newest first. All time per routine lists only routines with work, most worked first, with equal totals ordered by title. Work by a routine that can't be found counts in the overall total but has no row of its own.
+- Time against target and targets reached are shown as whole percentages, rounded to the nearest, and as "-" when there are no work periods. A period reached its target when it worked at least the target, so working exactly the target counts.
+- A deleted routine is labelled "(deleted)", such as "Old routine (deleted)", in the routine filter and in all time per routine. Choosing it shows its work.
+- With the routine filter on one routine, every figure and list narrows to it. The screen's empty state, a line pointing to the Timer, replaces everything only when no work at all is saved, so a routine with no work shows zeros and lists that say "No work yet." instead.
+- The chart's text alternative is a visually hidden table named "Work time per day", with a row for each day of the range, while the bars themselves are hidden from assistive technology.
 
 ### Export and import
 
