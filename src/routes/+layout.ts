@@ -34,6 +34,8 @@ type AppSessions = {
 	settingsSession: SettingsSession;
 	/** Keeps the screen on during a run, and says whether the browser can. */
 	wakeLockKeeper: WakeLockKeeper;
+	/** The run's chimes, which Settings plays as previews. */
+	chimes: RunChimes;
 };
 
 /**
@@ -61,7 +63,10 @@ type AppSessions = {
  * nothing has rendered yet. The chimes follow the session for as long as the app is open, so
  * nothing else needs to keep them.
  *
- * @returns The new timer session, settings session and wake lock keeper.
+ * The timer session saves the routine each run starts with as the settings' `lastRoutineId`, and
+ * opens on it next time.
+ *
+ * @returns The new timer session, settings session, wake lock keeper and chimes.
  * @throws Rejects with storage's own error when the routines, the settings or the run in
  * progress can't be read, or the routines can't be saved.
  */
@@ -79,6 +84,7 @@ async function openApp(): Promise<AppSessions> {
 		storage.getSettings()
 	]);
 	const clock = (): number => Date.now();
+	const settingsSession = new SettingsSession(storage, settings);
 	const options: TimerSessionOptions = {
 		clock,
 		storage,
@@ -87,10 +93,16 @@ async function openApp(): Promise<AppSessions> {
 		onWorkSaved: () => void askToPersist(),
 		onPress: () => {
 			chimes.unlock();
+		},
+		onRunStarted: (routineId) => {
+			void settingsSession.save({ lastRoutineId: routineId });
 		}
 	};
-	const timerSession = new TimerSession(routines, options, { saved, isAnotherTabOpen });
-	const settingsSession = new SettingsSession(storage, settings);
+	const timerSession = new TimerSession(routines, options, {
+		saved,
+		isAnotherTabOpen,
+		lastRoutineId: settings.lastRoutineId
+	});
 	const chimes = new RunChimes({
 		timer: timerSession,
 		settings: settingsSession,
@@ -105,7 +117,7 @@ async function openApp(): Promise<AppSessions> {
 		wakeLock,
 		page: document
 	});
-	return { timerSession, settingsSession, wakeLockKeeper };
+	return { timerSession, settingsSession, wakeLockKeeper, chimes };
 }
 
 /**
