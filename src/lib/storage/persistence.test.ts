@@ -2,7 +2,12 @@ import { afterEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { savedRunInProgress } from '../testing/run-in-progress';
 import { firstWorkPeriod, runInProgress } from '../testing/run-records';
 import { InMemoryStorage } from './in-memory-storage';
-import { askToPersistIfWorkSaved, askToPersistOnce } from './persistence';
+import {
+	askToPersistIfWorkSaved,
+	askToPersistOnce,
+	isStoragePersistent,
+	requestPersistentStorage
+} from './persistence';
 
 /**
  * A stand-in for `navigator.storage`. The real one's answer depends on the browser's own
@@ -119,5 +124,54 @@ describe('askToPersistIfWorkSaved', () => {
 
 		expect(askToPersist).not.toHaveBeenCalled();
 		expect(consoleError).toHaveBeenCalledWith('Saved work could not be checked for.', failure);
+	});
+});
+
+describe('isStoragePersistent', () => {
+	it('says whether the browser keeps storage persistent', async () => {
+		expect(await isStoragePersistent(fakeManager(true))).toBe(true);
+		expect(await isStoragePersistent(fakeManager(false))).toBe(false);
+	});
+
+	it('says it can’t tell where the browser has no storage manager', async () => {
+		expect(await isStoragePersistent(undefined)).toBeNull();
+	});
+
+	it('logs a failed check and says it can’t tell, rather than rejecting', async () => {
+		const failure = new Error('Blocked.');
+		const manager = { persisted: vi.fn().mockRejectedValue(failure), persist: vi.fn() };
+		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+		expect(await isStoragePersistent(manager)).toBeNull();
+
+		expect(consoleError).toHaveBeenCalledWith('Persistent storage could not be checked.', failure);
+	});
+});
+
+describe('requestPersistentStorage', () => {
+	it('asks every time it is called, since the user asked', async () => {
+		const manager = fakeManager(false);
+
+		await requestPersistentStorage(manager);
+		await requestPersistentStorage(manager);
+
+		expect(manager.persist).toHaveBeenCalledTimes(2);
+	});
+
+	it('does nothing where the browser has no storage manager', async () => {
+		await expect(requestPersistentStorage(undefined)).resolves.toBeUndefined();
+	});
+
+	it('logs a failed request rather than rejecting', async () => {
+		const failure = new Error('Blocked.');
+		const manager = { persisted: vi.fn(), persist: vi.fn().mockRejectedValue(failure) };
+		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+		await expect(requestPersistentStorage(manager)).resolves.toBeUndefined();
+
+		expect(consoleError).toHaveBeenCalledWith(
+			'Persistent storage could not be requested.',
+			failure
+		);
 	});
 });
