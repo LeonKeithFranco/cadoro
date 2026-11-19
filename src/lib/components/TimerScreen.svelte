@@ -52,7 +52,7 @@
 	});
 
 	// SvelteKit removes the screen when another one opens, and the session outlives it.
-	onDestroy(() => session.pause());
+	onDestroy(() => session.pauseOnLeave());
 
 	// Whether Finish is waiting for the user to confirm. It belongs to this screen rather than the
 	// session, so leaving the screen drops the question, while the run itself is kept.

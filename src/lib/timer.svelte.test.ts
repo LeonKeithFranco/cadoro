@@ -424,6 +424,23 @@ describe('the run as the chimes see it', () => {
 		expect(onPress).toHaveBeenCalledOnce();
 	});
 
+	it('pauses on leaving the screen, saving the pause, without calling onPress', async () => {
+		const onPress = vi.fn();
+		const storage = new InMemoryStorage();
+		const session = createSession(routines, { onPress, storage });
+		session.play();
+		onPress.mockClear();
+
+		nowMs = minutes(4);
+		session.pauseOnLeave();
+
+		expect(session.view).toMatchObject({ isRunning: false, workedMs: minutes(4) });
+		expect(onPress).not.toHaveBeenCalled();
+		await expect
+			.poll(async () => (await storage.getRunInProgress())?.run)
+			.toMatchObject({ runningSince: null });
+	});
+
 	it('calls onPress for no tick, choice or new run', () => {
 		const onPress = vi.fn();
 		const session = createSession(routines, { onPress });
