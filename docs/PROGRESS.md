@@ -1,8 +1,8 @@
 # Progress
 
-**Status:** milestone 4's step 4 is done, as version 0.6.0, which goes live once its pull request merges. Milestone 0 (guardrails and the new workflow, `build/agent-guardrails`, 0.5.1) comes before it. The app is installed on the desktop and the phone. It runs both starter routines through work, overtime, breaks and Finish, works offline, and offers to reload when a new version is ready. The starter routines are saved in IndexedDB on the first launch, every run and work period is saved as it starts and ends, and persistent storage is asked for once work is saved. The run in progress is saved on every change, every second while counting and as the page is hidden, and a reload restores it paused at that moment. Every tab shows the same run: a press in one shows in the others, and a tab opened mid-run joins it without pausing it.
+**Status:** milestone 5 is done, as version 0.7.0, which goes live once its pull request merges. Chimes sound when a work period reaches its target and when a break ends, in one tab, and Settings sets the theme, each alert's chime, the volume, keeping the screen awake and shows whether storage is persistent; the Timer opens on the last routine used. Version 0.6.0 (milestone 4's step 4) is live. Milestone 0 (guardrails and the new workflow, `build/agent-guardrails`, 0.5.1) comes before it. The app is installed on the desktop and the phone. It runs both starter routines through work, overtime, breaks and Finish, works offline, and offers to reload when a new version is ready. The starter routines are saved in IndexedDB on the first launch, every run and work period is saved as it starts and ends, and persistent storage is asked for once work is saved. The run in progress is saved on every change, every second while counting and as the page is hidden, and a reload restores it paused at that moment. Every tab shows the same run: a press in one shows in the others, and a tab opened mid-run joins it without pausing it.
 
-**Next:** merge and release milestone 4 as 0.6.0, then milestone 5, Alerts and Settings. `docs/PLAN.md` has the plan for every remaining milestone. Device check pending: killing the installed app mid-run and reopening it finds the run paused at about the moment it was left.
+**Next:** milestone 6, Routines (`feat/routines`, 0.8.0). `docs/PLAN.md` has the plan for every remaining milestone. Device checks pending: killing the installed app mid-run and reopening it finds the run paused at about the moment it was left; a chime plays on time in a background desktop tab; the phone's screen stays on during a run; and the four chimes sound right by ear.
 
 **Open:**
 
@@ -29,9 +29,9 @@ Each finished milestone lists its steps' branches. Its decisions are in its file
 
 - [x] 2. Run a routine: `build/lint-doc-comments`, `feat/run-engine`, `feat/app-shell`, `build/dev-server-port`, `feat/timer-screen`, `feat/run-summary`
 - [x] 3. PWA and GitHub Pages: `build/base-path`, `feat/offline`, `feat/update-prompt`, `build/taskfile`, `ci/pages-deploy` (0.1.0), `feat/app-version` (0.2.0)
-- [ ] 0. Guardrails and the new workflow: `build/agent-guardrails` (0.5.1)
-- [ ] 4. Keep runs: its last step is `feat/shared-run` (0.6.0)
-- [ ] 5. Alerts and Settings: `feat/alerts-and-settings` (0.7.0)
+- [x] 0. Guardrails and the new workflow: `build/agent-guardrails` (0.5.1)
+- [x] 4. Keep runs: `feat/routine-storage` (0.3.0), `feat/run-records` (0.4.0), `feat/restore-run` (0.5.0), `feat/shared-run` (0.6.0)
+- [x] 5. Alerts and Settings: `feat/alerts-and-settings` (0.7.0)
 - [ ] 6. Routines: `feat/routines` (0.8.0)
 - [ ] 7. Stats: `feat/stats` (0.9.0)
 - [ ] 8. Backup and activity log: `feat/backup-and-log` (0.10.0)
