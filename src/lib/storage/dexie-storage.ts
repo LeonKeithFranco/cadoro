@@ -5,6 +5,7 @@ import Dexie, { liveQuery, type EntityTable, type Table, type Transaction } from
 import type { BackupData } from '../backup-format';
 import { importLogEntry } from '../backup-log';
 import type { BackupSummary } from '../backup-summary';
+import { recordErrorIn } from '../error-log';
 import { LOG_MAX_ENTRIES, type LogEntry, type NewLogEntry } from '../log';
 import { pickableRoutines, type Routine } from '../routine';
 import {
@@ -303,19 +304,24 @@ export class DexieStorage implements CadoroStorage {
 	 * @returns A promise that settles once the entry is written, or has failed. It never rejects.
 	 */
 	async #writeLogEntry(entry: NewLogEntry): Promise<void> {
-		const log = this.#database.log;
 		try {
-			await this.#database.transaction('rw', log, async () => {
-				await log.add(entry);
-				const excess = (await log.count()) - this.#logLimit;
-				if (excess > 0) {
-					// The primary key counts up, so the first keys are the oldest entries.
-					await log.bulkDelete(await log.limit(excess).primaryKeys());
-				}
-			});
+			await this.addLogEntry(entry);
 		} catch (error) {
-			console.error('Writing to the activity log failed.', error);
+			// Recorded as an error entry if the log can still take one, else on the console.
+			await recordErrorIn(this, 'Writing to the activity log failed.', error, this.#now());
 		}
+	}
+
+	async addLogEntry(entry: NewLogEntry): Promise<void> {
+		const log = this.#database.log;
+		await this.#database.transaction('rw', log, async () => {
+			await log.add(entry);
+			const excess = (await log.count()) - this.#logLimit;
+			if (excess > 0) {
+				// The primary key counts up, so the first keys are the oldest entries.
+				await log.bulkDelete(await log.limit(excess).primaryKeys());
+			}
+		});
 	}
 
 	async addRoutinesIfNone(routines: Routine[]): Promise<boolean> {

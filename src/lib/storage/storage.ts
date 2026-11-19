@@ -3,7 +3,7 @@
 
 import type { BackupData } from '../backup-format';
 import type { BackupSummary } from '../backup-summary';
-import type { LogEntry } from '../log';
+import type { LogEntry, NewLogEntry } from '../log';
 import type { Routine } from '../routine';
 import type { StoredRunInProgress } from '../run-in-progress';
 import type { Run, RunRecords, WorkPeriod } from '../run-records';
@@ -144,6 +144,19 @@ export interface CadoroStorage {
 	 * @throws Rejects with the backend's own error when its data can't be read.
 	 */
 	getLogEntries(): Promise<LogEntry[]>;
+
+	/**
+	 * Adds an entry to the activity log, which keeps only the newest entries: once it holds more
+	 * than its limit, the oldest are dropped.
+	 *
+	 * @remarks
+	 * This is how errors are recorded. Routine changes and imports write their own entries, as
+	 * part of the change.
+	 *
+	 * @param entry - The entry to add, to which storage gives an id.
+	 * @throws Rejects with the backend's own error when the entry can't be written.
+	 */
+	addLogEntry(entry: NewLogEntry): Promise<void>;
 
 	/**
 	 * Saves the given routines, but only if storage holds no routine at all, deleted ones

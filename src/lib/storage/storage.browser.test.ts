@@ -623,6 +623,45 @@ describe.each(backends)('$name', ({ create }) => {
 			expect((await storage.getLogEntries())[0]?.message).toBe('Deleted routine "C"');
 		});
 
+		it('adds an entry given to addLogEntry, newest first, with its details', async () => {
+			const storage = await storageWithAbc(create);
+			await storage.deleteRoutine('c');
+
+			await storage.addLogEntry({
+				timestamp: NOW,
+				type: 'error',
+				message: 'Something failed.',
+				details: { name: 'Error', message: 'x' }
+			});
+
+			const entries = await storage.getLogEntries();
+			expect(entries.map((entry) => entry.message)).toEqual([
+				'Something failed.',
+				'Deleted routine "C"'
+			]);
+			expect(entries[0]).toMatchObject({
+				type: 'error',
+				timestamp: NOW,
+				details: { name: 'Error', message: 'x' }
+			});
+			expect(requireDefined(entries[0], 'the error entry').id).toBeGreaterThan(
+				requireDefined(entries[1], 'the earlier entry').id
+			);
+		});
+
+		it('drops the oldest entries when addLogEntry takes the log over its limit', async () => {
+			const storage = create({ ...atNow, logLimit: 2 });
+
+			for (const message of ['one', 'two', 'three']) {
+				await storage.addLogEntry({ timestamp: NOW, type: 'error', message });
+			}
+
+			expect((await storage.getLogEntries()).map((entry) => entry.message)).toEqual([
+				'three',
+				'two'
+			]);
+		});
+
 		it('keeps only the newest entries once the log is over its limit', async () => {
 			const storage = await storageWithAbc(create, { ...atNow, logLimit: 3 });
 

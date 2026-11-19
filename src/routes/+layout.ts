@@ -1,4 +1,5 @@
 import { asset } from '$app/paths';
+import { useErrorLog } from '#lib/error-log.ts';
 import { joinOpenTabs } from '#lib/open-tabs.ts';
 import { loadRoutines } from '#lib/routine-loading.ts';
 import { RunChimes } from '#lib/run-chimes.svelte.ts';
@@ -77,6 +78,7 @@ type AppSessions = {
  */
 async function openApp(): Promise<AppSessions> {
 	const storage = new DexieStorage();
+	useErrorLog(storage);
 	const newId = (): string => crypto.randomUUID();
 	const askToPersist = askToPersistOnce(navigator.storage);
 	const locks: LockManager | undefined = navigator.locks;
