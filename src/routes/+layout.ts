@@ -1,5 +1,6 @@
 import { loadRoutines } from '#lib/routine-loading.ts';
 import { DexieStorage } from '#lib/storage/dexie-storage.ts';
+import { askToPersistIfWorkSaved, askToPersistOnce } from '#lib/storage/persistence.ts';
 import { TimerSession } from '#lib/timer.svelte.ts';
 import type { LayoutLoad } from './$types';
 
@@ -22,11 +23,15 @@ let timerSessionOpening: Promise<TimerSession> | undefined;
 
 /**
  * Opens storage, creates the starter routines on the first launch, and starts the timer session
- * with the routines saved, saving its runs in the same storage.
+ * with the routines saved, saving its runs in the same storage. It also asks for persistent
+ * storage, once, as soon as work is saved.
  *
  * @remarks
  * `crypto.randomUUID` is wrapped rather than passed as it is, because called on its own, away from
  * `crypto`, it throws "Illegal invocation" in browsers.
+ *
+ * The check for saved work isn't waited for, so a slow answer from the browser, or Firefox's
+ * prompt, never holds up the first render.
  *
  * @returns The new timer session.
  * @throws Rejects with storage's own error when the routines can't be read or saved.
@@ -34,8 +39,16 @@ let timerSessionOpening: Promise<TimerSession> | undefined;
 async function openTimerSession(): Promise<TimerSession> {
 	const storage = new DexieStorage();
 	const newId = (): string => crypto.randomUUID();
+	const askToPersist = askToPersistOnce(navigator.storage);
+
+	void askToPersistIfWorkSaved(storage, askToPersist);
 	const routines = await loadRoutines(storage, new Date(), newId);
-	return new TimerSession(routines, { clock: () => Date.now(), storage, newId });
+	return new TimerSession(routines, {
+		clock: () => Date.now(),
+		storage,
+		newId,
+		onWorkSaved: () => void askToPersist()
+	});
 }
 
 /**
