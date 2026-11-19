@@ -4,6 +4,10 @@ A self-hostable timer for focused work, built as a SvelteKit PWA. Routines are m
 
 **Status:** in development. The app runs routines, installs as an app and works offline, at **[leonkeithfranco.github.io/cadoro](https://leonkeithfranco.github.io/cadoro/)**. [`docs/PROGRESS.md`](docs/PROGRESS.md) has what it does so far and what's next.
 
+## Backing up your data
+
+Everything stays in your browser, so back it up from Settings, in its Data card. **Export work periods (CSV)** downloads every work period as a spreadsheet, and **Back up (JSON)** downloads your routines, runs, work periods and settings as one file. **Import a backup** reads such a file, shows what it holds and, once you confirm, replaces all your data with it, including a run in progress. A file that isn't a valid backup is turned away, and nothing changes. The activity log, a page linked from the card, lists changes and errors and can be downloaded too.
+
 ## Docs
 
 - [`docs/SPEC.md`](docs/SPEC.md): what the app does
