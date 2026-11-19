@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { requireDefined } from './defined';
-import { createStarterRoutines, pickableRoutines } from './routine';
+import {
+	canDeleteRoutine,
+	createStarterRoutines,
+	newBlock,
+	newRoutine,
+	pickableRoutines
+} from './routine';
+import { validateRoutine } from './routine-validation';
+import { numberedIds } from './testing/ids';
 import { routineWith } from './testing/routines';
 
 /** The moment every test creates the routines at. */
@@ -110,5 +118,65 @@ describe('createStarterRoutines', () => {
 		const second = createStarterRoutines(now, countingIds());
 
 		expect(second[0]?.blocks[0]?.targetMinutes).toBe(25);
+	});
+});
+
+describe('newBlock', () => {
+	it('makes a 25-minute Focus block at 20% for 1 cycle, with an id from the generator', () => {
+		expect(newBlock(numberedIds())).toEqual({
+			id: 'id-1',
+			title: 'Focus',
+			targetMinutes: 25,
+			breakPercent: 20,
+			cycles: 1
+		});
+	});
+});
+
+describe('newRoutine', () => {
+	it('makes a routine with a blank title, infinite rounds and one default block', () => {
+		const routine = newRoutine(now, numberedIds());
+
+		expect(routine).toEqual({
+			id: 'id-1',
+			title: '',
+			rounds: 'infinite',
+			blocks: [{ id: 'id-2', title: 'Focus', targetMinutes: 25, breakPercent: 20, cycles: 1 }],
+			customPosition: 0,
+			createdAt: '2026-01-05T09:00:00.000Z',
+			deletedAt: null
+		});
+	});
+
+	it('is invalid only for its blank title, until one is filled in', () => {
+		const routine = newRoutine(now, numberedIds());
+
+		const blank = validateRoutine(routine);
+		const titled = validateRoutine({ ...routine, title: 'Writing' });
+
+		expect(blank.title).toBeDefined();
+		expect(blank.blockProblems).toEqual({});
+		expect(titled).toEqual({ blockProblems: {} });
+	});
+});
+
+describe('canDeleteRoutine', () => {
+	it('allows deleting when another routine is left', () => {
+		const routines = [routineWith({ id: 'a' }), routineWith({ id: 'b' })];
+
+		expect(canDeleteRoutine(routines)).toBe(true);
+	});
+
+	it('refuses to delete the only routine', () => {
+		expect(canDeleteRoutine([routineWith({ id: 'a' })])).toBe(false);
+	});
+
+	it('does not count deleted routines as left', () => {
+		const routines = [
+			routineWith({ id: 'a' }),
+			routineWith({ id: 'b', deletedAt: '2026-01-04T09:00:00.000Z' })
+		];
+
+		expect(canDeleteRoutine(routines)).toBe(false);
 	});
 });
