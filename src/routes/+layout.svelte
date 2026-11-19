@@ -9,10 +9,9 @@
 	import { page } from '$app/state';
 	import ScreenNav from '#lib/components/ScreenNav.svelte';
 	import UpdatePrompt from '#lib/components/UpdatePrompt.svelte';
-	import { timerSession } from '#lib/timer.svelte.ts';
 	import type { LayoutProps } from './$types';
 
-	let { children }: LayoutProps = $props();
+	let { children, data }: LayoutProps = $props();
 </script>
 
 <!-- The header's border spans the window, while its contents line up with the screen below. -->
@@ -31,4 +30,4 @@
 <!-- The layout mounts once, when the app opens, and stays while screens change, so the service
      worker is registered once. On the dev server the plugin makes registering do nothing, so
      development never runs an old cached copy. -->
-<UpdatePrompt runInProgress={timerSession.view.isInProgress} />
+<UpdatePrompt runInProgress={data.timerSession.view.isInProgress} />

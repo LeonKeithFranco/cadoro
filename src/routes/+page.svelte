@@ -1,10 +1,13 @@
 <!--
   @component
-  The Timer screen, the app's home, showing the app's one timer session.
+  The Timer screen, the app's home, showing the app's one timer session, which the root layout's
+  `load` made.
 -->
 <script lang="ts">
 	import TimerScreen from '#lib/components/TimerScreen.svelte';
-	import { timerSession } from '#lib/timer.svelte.ts';
+	import type { PageProps } from './$types';
+
+	let { data }: PageProps = $props();
 </script>
 
-<TimerScreen session={timerSession} />
+<TimerScreen session={data.timerSession} />
