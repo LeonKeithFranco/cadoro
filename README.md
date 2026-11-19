@@ -95,6 +95,7 @@ Versions follow [semantic versioning](https://semver.org/). Until 1.0.0, a new f
 ## Credits
 
 - **Icons:** the navigation icons and the app's icon come from [Lucide](https://lucide.dev), under the [ISC licence](https://github.com/lucide-icons/lucide/blob/main/LICENSE). The app's icon is Lucide's [`timer`](https://lucide.dev/icons/timer) on a rose square.
+- **Chimes:** the four bell dings in `static/chimes/` come from PWL's [Bell dings/chimes](https://opengameart.org/content/bell-dingschimes) on OpenGameArt, under [CC0 1.0](http://creativecommons.org/publicdomain/zero/1.0/). They are trimmed, converted to MP3 and set to the same loudness. [`static/chimes/SOURCES.md`](static/chimes/SOURCES.md) has the details.
 
 ## Licence
 
