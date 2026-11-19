@@ -153,9 +153,13 @@
 
 	<!-- Pinned to the bottom of the window with `sticky`, so a long routine never pushes them out
 	     of reach, and in their place after the blocks when everything fits. On phones they sit
-	     above the fixed tab bar, which is about 4rem tall. The page's background and a little
-	     padding keep the blocks scrolling under them from showing through. -->
-	<div class="sticky bottom-16 z-10 -mx-4 bg-white px-4 py-3 md:bottom-0 dark:bg-zinc-950">
+	     above the fixed tab bar, which is a little over 3.5rem tall. The box reaches down under the
+	     tab bar, which sits above it, so no sliver of a block shows between them. The page's
+	     background and a little padding keep the blocks scrolling under them from showing
+	     through. -->
+	<div
+		class="sticky bottom-14 z-[5] -mx-4 bg-white px-4 pt-3 pb-6 md:bottom-0 md:pb-3 dark:bg-zinc-950"
+	>
 		<TimerControls
 			{isRunning}
 			isInProgress={session.view.isInProgress}
