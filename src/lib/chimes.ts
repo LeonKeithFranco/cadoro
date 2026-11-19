@@ -30,6 +30,17 @@ function isChimeId(id: string): id is ChimeId {
 }
 
 /**
+ * Works out the name Settings shows for a chime.
+ *
+ * @param id - The chime's id, such as `bell-ding-2`.
+ * @returns The id as words with a capital, such as `Bell ding 2`.
+ */
+export function chimeName(id: ChimeId): string {
+	const words = id.replaceAll('-', ' ');
+	return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/**
  * Finds the file a chime id plays.
  *
  * @remarks
@@ -40,8 +51,18 @@ function isChimeId(id: string): id is ChimeId {
  * @returns The chime's file, relative to the app's folder.
  */
 export function chimeFile(id: string): ChimeFile {
-	const chime = isChimeId(id) ? id : DEFAULT_CHIME;
-	return `chimes/${chime}.mp3`;
+	return `chimes/${chimeIdFor(id)}.mp3`;
+}
+
+/**
+ * Finds the chime an id stands for, which Settings shows as chosen.
+ *
+ * @param id - A chime id, such as one Settings kept.
+ * @returns The id itself when the app has that chime, or else {@link DEFAULT_CHIME}, the one it
+ * plays instead.
+ */
+export function chimeIdFor(id: string): ChimeId {
+	return isChimeId(id) ? id : DEFAULT_CHIME;
 }
 
 /**

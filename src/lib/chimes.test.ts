@@ -1,6 +1,13 @@
 import { readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { CHIME_IDS, DEFAULT_CHIME, chimeFile, chimeFilesFor } from './chimes';
+import {
+	CHIME_IDS,
+	DEFAULT_CHIME,
+	chimeFile,
+	chimeIdFor,
+	chimeName,
+	chimeFilesFor
+} from './chimes';
 
 describe('CHIME_IDS', () => {
 	it('lists every recording in static/chimes, and nothing else', () => {
@@ -13,6 +20,22 @@ describe('CHIME_IDS', () => {
 
 	it('includes the default chime', () => {
 		expect(CHIME_IDS).toContain(DEFAULT_CHIME);
+	});
+});
+
+describe('chimeName', () => {
+	it('shows an id as words with a capital', () => {
+		expect(chimeName('bell-ding-2')).toBe('Bell ding 2');
+	});
+});
+
+describe('chimeIdFor', () => {
+	it('keeps the id of a chime the app has', () => {
+		expect(chimeIdFor('bell-ding-4')).toBe('bell-ding-4');
+	});
+
+	it('gives the default chime for an id the app doesn’t have', () => {
+		expect(chimeIdFor('a-removed-chime')).toBe(DEFAULT_CHIME);
 	});
 });
 

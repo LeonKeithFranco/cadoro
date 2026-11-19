@@ -339,6 +339,67 @@ describe('ChimePlayer', () => {
 		});
 	});
 
+	describe('previewing a chime', () => {
+		it('unlocks the player and plays the file at once, through the volume', async () => {
+			const { player, context, createContext } = setUp();
+
+			await player.preview(files.break);
+
+			expect(createContext).toHaveBeenCalledTimes(1);
+			expect(context.resumeCount).toBe(1);
+			expect(playedFile(context, 0)).toBe('break chime');
+			expect(context.sources[0]?.startedAt).toBe(0);
+			expect(context.sources[0]?.connections).toEqual([context.gains[0]]);
+		});
+
+		it('plays at the volume the player has', async () => {
+			const { player, context } = setUp();
+			player.setVolume(0.2);
+
+			await player.preview(files.target);
+
+			expect(context.gains[0]?.gain.value).toBe(0.2);
+		});
+
+		it('leaves the scheduled chime alone', async () => {
+			const { player, context } = setUpUnlocked();
+			await player.reschedule(working, start);
+			const [scheduled] = player.scheduled;
+
+			await player.preview(files.break);
+
+			expect(player.scheduled).toEqual([scheduled]);
+			expect(context.sources[0]?.isStopped).toBe(false);
+		});
+
+		it('logs a file that cannot be loaded, and plays nothing', async () => {
+			const { player, context } = setUp({ fetchFile: fakeFiles({}) });
+
+			await player.preview(files.target);
+
+			expect(logged).toHaveBeenCalledWith(
+				`Could not load the chime ${files.target}`,
+				new Error('The server answered 404')
+			);
+			expect(context.sources).toEqual([]);
+		});
+
+		it('plays nothing when the audio context cannot be made', async () => {
+			const { player } = setUp({
+				createContext: () => {
+					throw new Error('No Web Audio');
+				}
+			});
+
+			await expect(player.preview(files.target)).resolves.toBeUndefined();
+
+			expect(logged).toHaveBeenCalledWith(
+				'Could not set up the audio for the chimes',
+				new Error('No Web Audio')
+			);
+		});
+	});
+
 	describe('volume', () => {
 		it('changes the gain every chime plays through', () => {
 			const { player, context } = setUpUnlocked();

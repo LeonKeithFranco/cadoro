@@ -4,7 +4,7 @@
 // only the tab holding the `cadoro-chimes` Web Lock sounds, so each chime plays once.
 
 import { ChimePlayer, type ChimeAudioContext, type ScheduledChime } from './chime-player';
-import { chimeFilesFor, type ChimeFile } from './chimes';
+import { chimeFile, chimeFilesFor, type ChimeFile } from './chimes';
 import { percentOf } from './percent';
 import type { RunState } from './run';
 import type { Settings } from './settings';
@@ -79,6 +79,9 @@ export class RunChimes {
 	/** The name of the lock the sounding tab holds. */
 	readonly #lockName: string;
 
+	/** Turns a chime's file into the address the page fetches it from. */
+	readonly #address: (file: ChimeFile) => string;
+
 	/** Whether this tab has its turn to sound the chimes. State, so gaining it schedules the next chime. */
 	#isSounding = $state(false);
 
@@ -104,6 +107,7 @@ export class RunChimes {
 	}: RunChimesOptions) {
 		this.#locks = locks;
 		this.#lockName = lockName;
+		this.#address = address;
 		const initial = settings.settings;
 		this.#player = new ChimePlayer({
 			files: chimeFilesFor(initial, address),
@@ -163,6 +167,22 @@ export class RunChimes {
 		}
 		this.#hasAskedToSound = true;
 		void this.#waitForTurnToSound();
+	}
+
+	/**
+	 * Plays a chime at once, as Settings' Preview buttons do.
+	 *
+	 * @remarks
+	 * Call it from a user gesture, since browsers allow audio to start only then. It plays in
+	 * this tab whether or not the tab has its turn to sound the run's chimes, since the user is
+	 * here asking to hear it, and it never takes that turn or changes what's scheduled.
+	 *
+	 * @param chime - The id of the chime, as Settings keeps it. An id the app doesn't have plays
+	 * the default chime, as the run's chimes do.
+	 * @returns A promise that settles once the chime has started, or can't. It never rejects.
+	 */
+	preview(chime: string): Promise<void> {
+		return this.#player.preview(this.#address(chimeFile(chime)));
 	}
 
 	/**
