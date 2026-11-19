@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { formatElapsed, formatRemaining, minutesToMs, toUtcTimestamp } from './time';
+import {
+	formatElapsed,
+	formatRemaining,
+	fromUtcTimestamp,
+	minutesToMs,
+	toUtcTimestamp
+} from './time';
 
 /** One row of a formatting table: the rule it shows, a duration and how it should look. */
 type Case = [rule: string, ms: number, shown: string];
@@ -22,6 +28,22 @@ describe('toUtcTimestamp', () => {
 	it('keeps the milliseconds', () => {
 		// `Date.UTC` counts months from 0, so 10 is November.
 		expect(toUtcTimestamp(Date.UTC(2026, 10, 19, 9, 30, 15, 250))).toBe('2026-11-19T09:30:15.250Z');
+	});
+});
+
+describe('fromUtcTimestamp', () => {
+	it('reads midnight UTC at the start of 1970 as 0', () => {
+		expect(fromUtcTimestamp('1970-01-01T00:00:00.000Z')).toBe(0);
+	});
+
+	it('gives back the exact moment toUtcTimestamp stamped, to the millisecond', () => {
+		const moment = Date.UTC(2026, 10, 19, 9, 30, 15, 250);
+
+		expect(fromUtcTimestamp(toUtcTimestamp(moment))).toBe(moment);
+	});
+
+	it('gives NaN for a string that isn’t a timestamp', () => {
+		expect(fromUtcTimestamp('not a moment')).toBeNaN();
 	});
 });
 
