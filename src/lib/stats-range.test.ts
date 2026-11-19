@@ -54,6 +54,16 @@ describe('rangeForPreset', () => {
 		});
 	});
 
+	it('starts "all" on the first day with work however many slices there are', () => {
+		const manySlices: DaySlice[] = Array.from({ length: 300_000 }, () => ({
+			dayStart: utc('2026-11-17T05:00:00Z'),
+			workedMs: minutes(25)
+		}));
+		manySlices.push({ dayStart: utc('2026-09-02T04:00:00Z'), workedMs: minutes(25) });
+
+		expect(rangeForPreset('all', NOW, manySlices).firstDay).toBe(utc('2026-09-02T04:00:00Z'));
+	});
+
 	it('gives just today for "all" when there is no work', () => {
 		expect(rangeForPreset('all', NOW, [])).toEqual({ firstDay: TODAY, lastDay: TODAY });
 	});
