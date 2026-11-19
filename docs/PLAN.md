@@ -66,6 +66,8 @@ The user decided on 2026-11-19 that the next milestone starts while the current 
 - Briefs for agents in a worktree tell them to read `~/.claude/rules/docs-typescript.md` and `~/.claude/rules/style-guide.md`, since rules scoped by `paths` load only in the primary checkout. They also say not to edit the guardrail files and to report instead, since `.claude/settings.json`'s ask rules may not cover the worktree's paths.
 - Before `go-task pr:merge`, which deletes the branch, note the commit the worktree branched from: `git -C <worktree> merge-base HEAD origin/<current branch>`. It isn't the branch's tip once review fixes land after the worktree is made. The rebase merge rewrites the stacked commits, so afterwards, in the worktree, run `git fetch origin` and `git rebase --onto origin/main <that SHA>`. Then run `go-task check:quick` there.
 - The worktree then carries its milestone through to its own pull request, and the next milestone stacks on it the same way. Remove each worktree with `go-task worktree:done NAME=<name>` once its branch is merged.
+- Packages that only add new files may start early, in worktrees from `main` on their milestone's own branch. At 0.5.1 these were `stats`, `routines` and `alerts`, for milestone 7's pure logic, milestone 6's pure logic and milestone 5's chime files. Early agents don't touch storage, the session, config or docs, and run only `check:quick`.
+- Storage changes still go in milestone order, because each Dexie version builds on the last.
 - If a session restarts mid-overlap, `git worktree list` shows the open worktrees, and each branch's `git log origin/main..` shows its own commits.
 
 ### The reviewer's brief
