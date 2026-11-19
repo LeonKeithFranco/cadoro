@@ -73,6 +73,8 @@ type OpenScreen = {
 	storage: InMemoryStorage;
 	/** The settings the screen remembers its sort in. */
 	settingsSession: SettingsSession;
+	/** Changes the screen's props after it opened, as a run starting in another tab does. */
+	rerender: (props: { runningRoutineId: string | null }) => Promise<void>;
 };
 
 /**
@@ -81,12 +83,14 @@ type OpenScreen = {
  * @param routines - The routines saved. Alpha, Bravo and Charlie unless a test needs others.
  * @param settings - The settings the user has changed, such as the saved sort.
  * @param runs - The runs saved before the screen opens, which "last used" is worked out from.
+ * @param runningRoutineId - The id of the routine a run in progress is running, if any.
  * @returns The storage and settings behind the screen.
  */
 async function openScreen(
 	routines: Routine[] = threeRoutines(),
 	settings: Partial<Settings> = {},
-	runs: Run[] = []
+	runs: Run[] = [],
+	runningRoutineId: string | null = null
 ): Promise<OpenScreen> {
 	const storage = new InMemoryStorage({ now: (): Date => new Date(NOW) });
 	await storage.addRoutinesIfNone(routines);
@@ -96,14 +100,19 @@ async function openScreen(
 		await storage.saveRunInProgress(runInProgressWith({}), null, { run, workPeriods: [] });
 	}
 	const settingsSession = new SettingsSession(storage, settingsFrom(settings));
-	render(RoutinesScreen, {
+	const screen = await render(RoutinesScreen, {
 		storage,
 		settingsSession,
 		initialRoutines: routines,
+		runningRoutineId,
 		newId: numberedIds('new'),
 		now: () => new Date(NOW)
 	});
-	return { storage, settingsSession };
+	return {
+		storage,
+		settingsSession,
+		rerender: (props) => screen.rerender(props)
+	};
 }
 
 /**
@@ -663,6 +672,65 @@ describe('deleting a routine', () => {
 			.click();
 
 		await expect.element(cardOf('Alpha').getByRole('button', { name: 'Delete' })).toBeDisabled();
+	});
+});
+
+describe('the routine of a run in progress', () => {
+	it('can’t be edited or deleted, and says why', async () => {
+		await openScreen(threeRoutines(), {}, [], 'bravo');
+
+		const card = cardOf('Bravo');
+		await expect.element(card.getByRole('button', { name: 'Edit' })).toBeDisabled();
+		await expect.element(card.getByRole('button', { name: 'Delete' })).toBeDisabled();
+		await expect
+			.element(card.getByText('This routine is running, so it can', { exact: false }))
+			.toBeVisible();
+	});
+
+	it('leaves the other routines alone, and the running one can still be duplicated and moved', async () => {
+		await openScreen(threeRoutines(), {}, [], 'bravo');
+
+		await expect.element(cardOf('Alpha').getByRole('button', { name: 'Edit' })).toBeEnabled();
+		await expect.element(cardOf('Alpha').getByRole('button', { name: 'Delete' })).toBeEnabled();
+		await expect.element(cardOf('Bravo').getByRole('button', { name: 'Duplicate' })).toBeEnabled();
+		await expect.element(cardOf('Bravo').getByRole('button', { name: 'Move up' })).toBeEnabled();
+	});
+
+	it('enables Edit and Delete again once the run ends', async () => {
+		const { rerender } = await openScreen(threeRoutines(), {}, [], 'bravo');
+
+		await rerender({ runningRoutineId: null });
+
+		await expect.element(cardOf('Bravo').getByRole('button', { name: 'Edit' })).toBeEnabled();
+		await expect.element(cardOf('Bravo').getByRole('button', { name: 'Delete' })).toBeEnabled();
+	});
+
+	it('turns Save off, saying why, when a run of the routine being edited starts', async () => {
+		const { storage, rerender } = await openScreen();
+		await openForEditing('Alpha');
+		await typeTitle('Renamed');
+
+		await rerender({ runningRoutineId: 'alpha' });
+
+		const form = page.getByRole('form', { name: 'Edit routine' });
+		await expect.element(form.getByRole('button', { name: 'Save' })).toBeDisabled();
+		await expect
+			.element(form.getByText('A run of this routine has started', { exact: false }))
+			.toBeVisible();
+		expect((await storage.getRoutines())[0]?.title).toBe('Alpha');
+	});
+
+	it('doesn’t delete a routine whose run starts while the question is asked', async () => {
+		const { storage, rerender } = await openScreen();
+		await cardOf('Bravo').getByRole('button', { name: 'Delete' }).click();
+		await rerender({ runningRoutineId: 'bravo' });
+
+		await page
+			.getByRole('dialog', { name: 'Delete Bravo?' })
+			.getByRole('button', { name: 'Delete' })
+			.click();
+
+		expect(await storage.getRoutines()).toHaveLength(3);
 	});
 });
 

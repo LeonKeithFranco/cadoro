@@ -39,6 +39,11 @@
 		newId: () => string;
 		/** What went wrong saving, shown above the buttons, or left out when nothing did. */
 		saveError?: string | undefined;
+		/**
+		 * Why the routine can't be saved right now, such as a run of it having started in another
+		 * tab, shown above the buttons while Save stays off. Left out when it can.
+		 */
+		lockedReason?: string | undefined;
 		/** Called with the routine as changed, after each change the user makes. */
 		onchange: (draft: Routine) => void;
 		/** Called when the user presses Save, which is only possible while nothing is invalid. */
@@ -47,7 +52,7 @@
 		oncancel: () => void;
 	};
 
-	let { draft, newId, saveError, onchange, onsave, oncancel }: Props = $props();
+	let { draft, newId, saveError, lockedReason, onchange, onsave, oncancel }: Props = $props();
 
 	let problems = $derived(validateRoutine(draft));
 
@@ -102,7 +107,7 @@
 	aria-label="Edit routine"
 	onsubmit={(event: SubmitEvent): void => {
 		event.preventDefault();
-		if (isValid(problems)) {
+		if (isValid(problems) && lockedReason === undefined) {
 			onsave();
 		}
 	}}
@@ -202,6 +207,9 @@
 		</div>
 	</div>
 
+	{#if lockedReason !== undefined}
+		<p class="text-sm text-rose-700 dark:text-rose-400">{lockedReason}</p>
+	{/if}
 	{#if saveError !== undefined}
 		<p role="alert" class="text-sm text-rose-700 dark:text-rose-400">{saveError}</p>
 	{/if}
@@ -210,7 +218,7 @@
 		<button type="button" onclick={oncancel} class={SECONDARY_BUTTON_COLOURS}>Cancel</button>
 		<button
 			type="submit"
-			disabled={!isValid(problems)}
+			disabled={!isValid(problems) || lockedReason !== undefined}
 			class="{PRIMARY_BUTTON_COLOURS} disabled:cursor-not-allowed disabled:opacity-60"
 		>
 			Save
