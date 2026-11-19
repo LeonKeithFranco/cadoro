@@ -34,7 +34,11 @@ const DAYS_IN_PRESET: Record<Exclude<RangePreset, 'all'>, number> = {
 export function rangeForPreset(preset: RangePreset, now: number, slices: DaySlice[]): DayRange {
 	const today = startOfLocalDay(now);
 	if (preset === 'all') {
-		const earliestWorkDay = Math.min(today, ...slices.map((slice) => slice.dayStart));
+		// A reduce, since spreading a long list into `Math.min` throws a RangeError.
+		const earliestWorkDay = slices.reduce(
+			(earliest, slice) => Math.min(earliest, slice.dayStart),
+			today
+		);
 		return { firstDay: earliestWorkDay, lastDay: today };
 	}
 	// `startOfLocalDay` again, since in a zone whose clocks change at midnight, `subDays` can land
