@@ -5,7 +5,8 @@ import {
 	createStarterRoutines,
 	newBlock,
 	newRoutine,
-	pickableRoutines
+	pickableRoutines,
+	withTrimmedTitles
 } from './routine';
 import { validateRoutine } from './routine-validation';
 import { numberedIds } from './testing/ids';
@@ -157,6 +158,29 @@ describe('newRoutine', () => {
 		expect(blank.title).toBeDefined();
 		expect(blank.blockProblems).toEqual({});
 		expect(titled).toEqual({ blockProblems: {} });
+	});
+});
+
+describe('withTrimmedTitles', () => {
+	it('trims the routine’s title and each block’s title, and changes nothing else', () => {
+		const routine = routineWith({
+			title: '  Writing ',
+			blocks: [
+				{ id: 'b1', title: ' Draft', targetMinutes: 25, breakPercent: 20, cycles: 1 },
+				{ id: 'b2', title: 'Edit  ', targetMinutes: 10, breakPercent: 10, cycles: 2 }
+			]
+		});
+
+		const trimmed = withTrimmedTitles(routine);
+
+		expect(trimmed).toEqual({
+			...routine,
+			title: 'Writing',
+			blocks: [
+				{ id: 'b1', title: 'Draft', targetMinutes: 25, breakPercent: 20, cycles: 1 },
+				{ id: 'b2', title: 'Edit', targetMinutes: 10, breakPercent: 10, cycles: 2 }
+			]
+		});
 	});
 });
 

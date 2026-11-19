@@ -420,6 +420,43 @@ describe('editing a routine', () => {
 	});
 });
 
+describe('a change that is only spaces', () => {
+	it('isn’t unsaved changes, so opening another routine doesn’t ask', async () => {
+		await openScreen();
+		await openForEditing('Alpha');
+		await typeTitle('Alpha ');
+
+		await cardOf('Bravo').getByRole('button', { name: 'Edit' }).click();
+
+		await expect.element(page.getByRole('dialog')).not.toBeInTheDocument();
+		await expect
+			.element(page.getByRole('textbox', { name: 'Title', exact: true }))
+			.toHaveValue('Bravo');
+	});
+
+	it('is closed by Save without writing or logging anything', async () => {
+		const { storage } = await openScreen();
+		await openForEditing('Alpha');
+		await typeTitle('  Alpha  ');
+
+		await page.getByRole('button', { name: 'Save' }).click();
+
+		await expect.element(page.getByRole('form', { name: 'Edit routine' })).not.toBeInTheDocument();
+		expect(await storage.getLogEntries()).toEqual([]);
+		expect((await storage.getRoutines())[0]?.title).toBe('Alpha');
+	});
+
+	it('is still saved, trimmed, along with a real change', async () => {
+		const { storage } = await openScreen();
+		await openForEditing('Alpha');
+		await typeTitle('  Renamed  ');
+
+		await page.getByRole('button', { name: 'Save' }).click();
+
+		await expect.poll(async () => (await storage.getRoutines())[0]?.title).toBe('Renamed');
+	});
+});
+
 describe('validation', () => {
 	it('shows what is wrong beside each field and turns Save off', async () => {
 		await openScreen();
