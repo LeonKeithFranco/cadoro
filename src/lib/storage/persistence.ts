@@ -82,7 +82,7 @@ export async function isStoragePersistent(
 	try {
 		return await manager.persisted();
 	} catch (error: unknown) {
-		console.error('Persistent storage could not be checked.', error);
+		void recordError('Persistent storage could not be checked.', error);
 		return null;
 	}
 }
@@ -108,6 +108,6 @@ export async function requestPersistentStorage(
 	try {
 		await manager.persist();
 	} catch (error: unknown) {
-		console.error('Persistent storage could not be requested.', error);
+		void recordError('Persistent storage could not be requested.', error);
 	}
 }

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { tick } from 'svelte';
+import { useErrorLog } from './error-log';
 import { DEFAULT_SETTINGS } from './settings';
 import { SettingsSession } from './settings.svelte';
 import { InMemoryStorage } from './storage/in-memory-storage';
@@ -181,8 +182,9 @@ beforeEach(() => {
 	nowMs = 0;
 });
 
-// Puts back what a test spied on, such as `console.error`.
+// Puts back what a test spied on, and takes away the log a test chose for errors.
 afterEach(() => {
+	useErrorLog(null);
 	vi.restoreAllMocks();
 });
 
@@ -378,15 +380,19 @@ describe('a browser without the wake lock API', () => {
 });
 
 describe('the browser refusing', () => {
-	it('logs a refused request and carries on, asking again on the next Play', async () => {
-		const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+	it('records a refused request in the activity log and carries on, asking again on the next Play', async () => {
+		const log = new InMemoryStorage();
+		useErrorLog(log);
 		const { wakeLock, timer } = setUp();
 		wakeLock.refusal = new Error('Low battery');
 
 		timer.play();
-		await expect
-			.poll(() => logged)
-			.toHaveBeenCalledWith('Could not keep the screen on.', wakeLock.refusal);
+		await expect.poll(() => log.getLogEntries()).toHaveLength(1);
+		expect((await log.getLogEntries())[0]).toMatchObject({
+			type: 'error',
+			message: 'Could not keep the screen on.',
+			details: { message: 'Low battery' }
+		});
 		wakeLock.refusal = null;
 		timer.pause();
 		await tick();
@@ -410,8 +416,9 @@ describe('the browser refusing', () => {
 		await expect.poll(() => wakeLock.held).toHaveLength(0);
 	});
 
-	it('logs a lock that cannot be released', async () => {
-		const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+	it('records a lock that cannot be released in the activity log', async () => {
+		const log = new InMemoryStorage();
+		useErrorLog(log);
 		const { wakeLock, timer } = setUp();
 		timer.play();
 		await expect.poll(() => wakeLock.held).toHaveLength(1);
@@ -420,8 +427,11 @@ describe('the browser refusing', () => {
 
 		timer.pause();
 
-		await expect
-			.poll(() => logged)
-			.toHaveBeenCalledWith('Could not release the screen lock.', failure);
+		await expect.poll(() => log.getLogEntries()).toHaveLength(1);
+		expect((await log.getLogEntries())[0]).toMatchObject({
+			type: 'error',
+			message: 'Could not release the screen lock.',
+			details: { message: 'Already gone' }
+		});
 	});
 });

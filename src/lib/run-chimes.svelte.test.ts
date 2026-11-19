@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { useErrorLog } from './error-log';
 import { RunChimes } from './run-chimes.svelte';
 import { DEFAULT_SETTINGS, type Settings } from './settings';
 import { SettingsSession } from './settings.svelte';
@@ -142,8 +143,9 @@ beforeEach(() => {
 	lockName = `cadoro-chimes-test-${testCount}`;
 });
 
-// Puts back what a test spied on, such as `console.error`.
+// Puts back what a test spied on, and takes away the log a test chose for errors.
 afterEach(() => {
+	useErrorLog(null);
 	vi.restoreAllMocks();
 });
 
@@ -569,17 +571,19 @@ describe('one tab sounding', () => {
 		expect(secondTab.chimes.isSounding).toBe(true);
 	});
 
-	it('logs a refused lock and sounds anyway', async () => {
-		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+	it('records a refused lock in the activity log and sounds anyway', async () => {
+		const storage = new InMemoryStorage();
+		useErrorLog(storage);
 		// The browser refuses lock names that start with a hyphen, which the spec reserves.
-		const tab = openTab(new InMemoryStorage(), { name: '-refused' });
+		const tab = openTab(storage, { name: '-refused' });
 
 		tab.timer.play();
 
 		await expect.poll(() => tab.chimes.scheduled).toHaveLength(1);
-		expect(consoleError).toHaveBeenCalledWith(
-			'Could not take turns with other tabs, so this tab sounds the chimes.',
-			expect.any(DOMException)
-		);
+		await expect.poll(() => storage.getLogEntries()).toHaveLength(1);
+		expect((await storage.getLogEntries())[0]).toMatchObject({
+			type: 'error',
+			message: 'Could not take turns with other tabs, so this tab sounds the chimes.'
+		});
 	});
 });

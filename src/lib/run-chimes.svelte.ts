@@ -5,6 +5,7 @@
 
 import { ChimePlayer, type ChimeAudioContext, type ScheduledChime } from './chime-player';
 import { chimeFile, chimeFilesFor, type ChimeFile } from './chimes';
+import { recordError } from './error-log';
 import { percentOf } from './percent';
 import type { RunState } from './run';
 import type { Settings } from './settings';
@@ -286,7 +287,10 @@ export class RunChimes {
 			if (abandon.aborted) {
 				return;
 			}
-			console.error('Could not take turns with other tabs, so this tab sounds the chimes.', error);
+			void recordError(
+				'Could not take turns with other tabs, so this tab sounds the chimes.',
+				error
+			);
 			this.#isSounding = true;
 		}
 	}
