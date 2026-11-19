@@ -2,27 +2,97 @@
 
 ## Context
 
-This plan was written when the spec (`docs/SPEC.md`) was finished and before any app code existed, on top of a fresh `sv create` scaffold. It sets the order, tools and working method for building the app, and teaches Svelte 5, SvelteKit and Tailwind CSS along the way, plus browser APIs the weight tracker didn't use, such as Web Audio and Screen Wake Lock. Push notifications, containers and the homelab come in optional milestones after the release.
+The spec (`docs/SPEC.md`) was finished before any app code existed. Milestones 1 to 3 and most of 4 were built as a teaching project, in small rounds with explanations. On 2026-11-19 the user decided to finish the app to 1.0.0 with as little of their time as possible, so this plan is now the approved plan for every remaining milestone, and the work runs autonomously as "How we work" says. Push notifications, containers and the homelab stay optional, outside this run.
 
 ## How we work
 
-- The work is built in **vertical slices**. Each milestone after the first is one feature that works end to end, from logic to UI to tests, and is usable when it's done. This differs from the weight tracker, which built all the logic before any UI.
-- Each slice is cut into **steps**, each on its own branch named after its work, merged through its own pull request. A step is a few rounds of work that leaves the app working.
-- Each step is built in **small rounds** of about one commit. Each round makes a small set of changes, explains them and the related concepts, then stops for your questions before continuing.
-- Within a step, logic comes before the UI that uses it: a pure function with its unit tests, then the component, then the Playwright journey.
-- Every change reaches `main` through a pull request, from the first one. Claude merges, with a rebase merge by default, only when you ask, and once CI exists, only when it passes.
-- From the first deploy in milestone 3, every pull request that changes the app bumps the version, and its merged commit is tagged and released.
-- A milestone is done when its steps are merged, its concepts have been covered, and `docs/PROGRESS.md` and the milestone's file in `docs/decisions/` are up to date.
-- Tests are written after the code, once its behaviour is right, to guard against regressions. A bug fix starts with a regression test that's seen to fail. There are no coverage targets.
-- Commands on the homelab, in the optional milestone 11, are yours to run. Claude provides each step and explains it.
+### Rules
+
+- The work is built in vertical slices: each milestone is one feature that works end to end, from logic to UI to tests.
+- One branch and one pull request per milestone, each with one version bump and release. Branches are named after the work, such as `feat/routines`.
+- Within a milestone, logic and storage come before the components that use them, and the Playwright journeys come last.
+- Tests are written after the code, once its behaviour is right. A bug fix starts with a regression test that's seen to fail. Every rule, edge case, journey and failure gets a test. There are no coverage targets.
+- Docs are lean: SPEC, PROGRESS and ARCHITECTURE are kept true and updated once per milestone. The decision log gets short bullets, only for decisions the spec and this plan don't already hold.
+- Decide open questions with the conventional option that fits the spec, note it, and carry on.
+- Merging: Claude runs `task pr:merge` once CI is green and the review is settled. The `ask` rule stays, so the user's approval of its prompt is the sign-off. Never work around the prompt.
+- Device checks go in each release summary and are never waited on.
+- Commands on the homelab, in the optional milestone 11, are the user's to run.
+
+### Roles and models
+
+Opus orchestrates and subagents implement. The main session writes no code, tests or docs itself, because its context is re-read on every turn and keeping file contents and diffs out of it is the biggest token saving. Writers work one at a time in the main checkout, on the milestone's branch. Only read-only agents run in parallel.
+
+| Job                                                                                                                 | Who                                                         | Notes                                                                                                                   |
+| ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Orchestrate: cut briefs, triage review findings, run the git, check, CI and release tasks                           | Opus (main session)                                         | Doesn't read the files it delegates. Works from the SPEC's headings, ARCHITECTURE's codemap and the subagents' reports. |
+| Almost all implementation: logic, storage, components, tests, journeys, lint and type fixes, docs, memory, settings | Sonnet subagent (`general-purpose`, `model: sonnet`)        | One work package at a time. Continue the same agent with SendMessage for follow-up fixes in the same package.           |
+| The two hard cores                                                                                                  | Opus subagent (`general-purpose`, `model: opus`)            | The shared-run session and storage (milestone 4) and the chime scheduler (milestone 5).                                 |
+| Lookups: "where is X used", summarising a failed CI log                                                             | Haiku (`Explore`, `model: haiku`)                           | Only when a direct `grep`, or `task ci:logs` piped through `tail`, wouldn't do.                                         |
+| Milestone review                                                                                                    | Opus subagent (`general-purpose`, `model: opus`), fresh one | Once per milestone, never the agent that wrote the code.                                                                |
+
+Don't set an `effort` on subagents. No agent teams, no workflows, and no worktrees unless a hotfix needs one.
+
+### A work package brief
+
+Each brief gives the goal in two or three sentences, the SPEC sections by heading, the files to create or change, the existing functions to reuse by path, any design already settled, and this definition of done:
+
+- `go-task check:quick` passes.
+- Every rule, edge case and failure in the package has a test, found by role and label in component and Playwright tests. For each new rule, break the code once, see the test fail, and restore it.
+- Every declaration, type, field and prop has a true TSDoc comment. Signatures are fully typed.
+- Conventional Commits, small and logical, each staging only the files the package touched (`git add <files>`, never `git add -A`).
+- Never skip, delete or loosen an existing test or a check to get to green. If an existing test seems wrong, stop and report it.
+- Report back in under 150 words: commits made, decisions taken that the spec didn't settle, anything unfinished.
+
+### The milestone loop
+
+1. `go-task branch:new BRANCH=<branch>`. Read the milestone's SPEC sections and the current milestone's file in `docs/decisions/`.
+2. Run the work packages in order.
+3. Visual check of new or changed screens: a Sonnet agent follows the visual-checks recipe (`PORT=5199` dev server, light and dark at 1280, 800 and Pixel 7), compares against the existing screens, and fixes what's off.
+4. Docs round (Sonnet): SPEC for any behaviour decided along the way, PROGRESS, ARCHITECTURE, short decision-log bullets built from the packages' reports, and the README when tasks, credits or usage changed.
+5. `go-task release:bump LEVEL=<level>`, `go-task check`, push, and open the pull request. Its description lists what was built, decisions taken, guardrail files changed (or "none"), tests removed or changed (or "none"), and device checks for the user.
+6. In parallel: `go-task ci:watch` in the background, and the reviewer.
+7. Triage the review. Fix real bugs, spec mismatches and missing tests, not style or hypotheticals. Re-check only the fixed hunks, with the same reviewer through SendMessage.
+8. When CI is green and the review is settled, run `go-task pr:merge`, which prompts the user. Wait.
+9. After the merge: `go-task ci:watch-main` in the background, then `go-task pages:check`, then `go-task release:publish`.
+10. Print a summary of at most 15 lines: what's live, decisions taken, device checks to try. Go straight on to the next milestone.
+
+### The reviewer's brief
+
+Read-only. Give the reviewer `git diff main...HEAD`, the milestone's SPEC sections, and the invariants in `docs/ARCHITECTURE.md`. Ask for findings ranked by severity, each with file, line and a concrete failing scenario, and no style comments. It checks:
+
+- Bugs and behaviour that differs from the SPEC.
+- Rules, edge cases or failures with no test, and tests that can't fail.
+- Any test deleted, skipped or loosened, from `git diff main...HEAD -- '*.test.ts' '*.spec.ts'`.
+- Any change to a guardrail file: `eslint.config.js`, `tsconfig.json`, `.github/workflows/**`, `playwright.config.ts`, `vite.config.ts`'s test projects, `Taskfile.yml`'s check tasks, `.claude/settings.json`.
+- Any change to what's stored without a new Dexie version, an upgrade and an upgrade test.
+- Doc comments that are false against the code.
+
+### Stop rules
+
+The run stops and reports only for:
+
+- The merge prompt, a guardrail-edit prompt, or an install prompt for a package this plan doesn't name.
+- The same failure surviving three fix attempts (a check, a CI job, a flaky journey). Report what was tried. Never raise a timeout, add a retry or skip a test to get past it.
+- A deploy to Pages failing twice, or `pages:check` failing after a deploy.
+- Anything that would delete or rewrite the user's stored data outside a tested Dexie upgrade.
+
+Everything else: decide and note.
+
+### Token rules
+
+- Pipe long output through `tail` or `grep`, with `set -o pipefail` so a failure still fails.
+- CI watches and dev servers run in the background, with no wait loops. Stop servers with TaskStop.
+- Subagent reports stay under 150 words, and milestone summaries under 15 lines.
+- Docs are written once per milestone, not per package.
+- No explanations of concepts, anywhere.
 
 ## Stack
 
 | Concern                     | Choice                                                | Why                                                                                      |
 | --------------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| Framework                   | SvelteKit 3 with `adapter-static`                     | Learning goal; builds static files for Pages and self-hosting                            |
-| UI                          | Svelte 5 with runes, TypeScript (strict)              | Learning goal                                                                            |
-| Styling                     | Tailwind CSS 4 and `@tailwindcss/forms`               | Learning goal; the forms plugin makes native form controls easy to style                 |
+| Framework                   | SvelteKit 3 with `adapter-static`                     | Builds static files for Pages and self-hosting                                           |
+| UI                          | Svelte 5 with runes, TypeScript (strict)              | The project's chosen framework                                                           |
+| Styling                     | Tailwind CSS 4 and `@tailwindcss/forms`               | The forms plugin makes native form controls easy to style                                |
 | UI building blocks          | Native elements                                       | `<dialog>`, `<select>`, range and radio inputs cover every widget, accessible by default |
 | Storage                     | Dexie over IndexedDB                                  | Known from the weight tracker, with live queries and schema versions                     |
 | Dates                       | date-fns                                              | Plain functions on native dates for local days, Monday weeks and splitting at midnight   |
@@ -38,16 +108,12 @@ This plan was written when the spec (`docs/SPEC.md`) was finished and before any
 | Push (milestone 10)         | A small push server, such as a free Cloudflare Worker | Locked-phone alerts; chosen in that milestone                                            |
 | Self-hosting (milestone 11) | Podman, unprivileged nginx, Quadlet, Caddy, Avahi     | As planned for the weight tracker's homelab                                              |
 
-## Before milestone 1
-
-- Merge this docs pull request, which holds the spec, the plan, the progress and decision logs, and the project's `CLAUDE.md`.
-
 ## Milestones
 
 The work runs in three phases, plus an optional fourth:
 
-1. **Pipeline:** finish the setup and add CI, so everything after it is checked automatically.
-2. **Slices:** each milestone is one usable feature, end to end. The app is online from milestone 3, so each later slice reaches your phone when it merges.
+1. **Pipeline:** the setup and CI, so everything after it is checked automatically.
+2. **Slices:** each milestone is one usable feature, end to end. The app is online from milestone 3, so each later slice reaches the phone when it merges.
 3. **Release:** the README and 1.0.0.
 4. **Optional:** push notifications and the homelab, after the release.
 
@@ -63,8 +129,6 @@ The work runs in three phases, plus an optional fourth:
 - Add `pipeline.yml` with a `Checks` job that runs lint, formatting, type checks, unit and component tests, the build and Playwright, saving the report and traces when a test fails
 - Protect `main` with a ruleset that requires a pull request and a passing `Checks` job
 
-**Learn:** a SvelteKit project's layout (`src/routes`, `+layout.svelte`, `+page.svelte`, `app.html`, `#lib`), SvelteKit config inside `vite.config.ts`, adapters and single-page mode, how Tailwind is wired in and what `@import 'tailwindcss'` and `@plugin` do, Vitest browser mode compared with jsdom, `svelte-check`
-
 ## Phase 2: Slices
 
 ### 2. Run a routine
@@ -77,8 +141,6 @@ The first usable version: run the two starter routines on the dev server, with n
 - Build the timer screen: the routine picker, each block's work and break boxes, the highlighted active timer and position, the live earned break, the overtime look, and the controls
 - Add the Finish confirmation and the run summary as native dialogs
 
-**Learn:** Svelte components and props, runes (`$state`, `$derived`, `$effect`, `$props`), template syntax (`{#if}`, `{#each}` with keys, snippets), events and bindings, Svelte compared with React; Tailwind utilities, spacing and colour scales, responsive and `dark:` variants; modelling a state machine with discriminated unions; injecting a clock; Playwright's clock API
-
 ### 3. PWA and GitHub Pages
 
 The app goes online and becomes installable, as version 0.1.0.
@@ -89,75 +151,93 @@ The app goes online and becomes installable, as version 0.1.0.
 - Deploy to GitHub Pages from `pipeline.yml` after `Checks` passes on `main`, with the fallback page as `404.html`
 - Add a Playwright project that builds for production at `/cadoro/` and checks offline use
 - Add the release steps to the README and release 0.1.0, then show the version in Settings and release it as 0.2.0
-- Check install, offline use and updates on your desktop and phone
 
-**Learn:** SvelteKit's `paths.base` and building links that follow it, how `@vite-pwa/sveltekit` fits SvelteKit's build, semantic versioning in the 0.x range
+### 0. Guardrails and the new workflow
+
+Branch `build/agent-guardrails`, released as 0.5.1. Added before the remaining milestones, so the autonomous run is checked mechanically.
+
+- Install the packages the remaining milestones need, in one command
+- Lint and type guardrails: explicit return types, typed promise rules, the Vitest and Playwright test plugins, inline ESLint configuration banned, and `noUncheckedIndexedAccess`
+- A checked-in `.claude/settings.json` that asks before edits to the guardrail files
+- This plan's workflow, and the matching `CLAUDE.md`, memory and docs
 
 ### 4. Keep runs
 
-Runs survive reloads, every work period is recorded, and every open tab shows the same run.
+Runs survive reloads, every work period is recorded, and every open tab shows the same run. Steps 1 to 3 are released (0.3.0 to 0.5.0): storage with its Dexie and in-memory backends, the records of runs and work periods, and the run in progress saved and restored paused.
 
-- Define the storage interface, with a Dexie backend for the app and an in-memory one for tests, sharing one test suite
-- Create the starter routines in storage on first launch
-- Record work periods, with their unpaused segments, and runs
-- Save the run in progress, with a heartbeat every second and when the page is hidden, and restore it paused at the last heartbeat on reopening
-- Ask for persistent storage after the first work period is saved
-- Version the Dexie schema from the start, because the app is already deployed and later milestones change what's stored
-- Share the run between open tabs, each following the saved run through a Dexie live query, so work is recorded once
+#### Last step: share the run across tabs
 
-**Learn:** loading async data in SvelteKit's `load`, Dexie live queries in Svelte, Svelte's context API compared with props, the Page Visibility API and `pagehide`, IndexedDB schema versions and upgrades
+Branch `feat/shared-run`, 0.6.0. An Opus subagent writes the session and storage changes with their tests. Sonnet writes the journey and the docs.
+
+- `CadoroStorage` gains a way to watch the run in progress, backed by Dexie's `liveQuery` in `DexieStorage` and by plain subscribers in `InMemoryStorage`. The shared suite in `storage.browser.test.ts` covers both.
+- `TimerSession` (`src/lib/timer.svelte.ts`) follows the saved run: a change from another tab replaces its run without being saved again.
+- Three hazards to design against and test:
+  - **A stale tab overwriting a press.** A heartbeat must never write a whole run. Storage gets a heartbeat-only write, and a press's save is conditional on the row it was computed from (a revision counter), inside one transaction. A refused press takes the newer run instead.
+  - **A new tab pausing a live run.** Opening the app restores the run paused at its heartbeat, and a second tab must not do that while another tab is alive. Heartbeats can be a minute stale in a hidden tab, so liveness can't come from the heartbeat's age. Hold a Web Lock for the tab's lifetime and check `navigator.locks.query()` at startup, or settle an equivalent.
+  - **Work recorded once.** Each work period and run is saved by the tab that made the press, and only by it.
+- A revision field changes what's stored, so it needs Dexie version 2 with an upgrade and an upgrade test.
+- Journey `e2e/shared-run.spec.ts`, two pages in one context, as the update journeys do: a press in one shows in the other; work periods are saved once (`e2e/storage.ts`'s `savedWorkPeriods`); a second tab opened mid-run joins without pausing it; closing every tab and reopening still restores paused.
+- Docs: ARCHITECTURE's bird's eye view and invariants, which say each tab keeps its own session.
 
 ### 5. Alerts and Settings
 
-Chimes play on time, the screen stays awake, and Settings has its first options.
+Branch `feat/alerts-and-settings`, 0.7.0. SPEC: Alerts, Keeping the screen awake, Settings, Persistent storage, the `Settings` type.
 
-- Choose a small set of openly licensed chimes, normalise their loudness, and record each one's source and licence
-- Play chimes through Web Audio, unlocked by pressing Play and scheduled on the audio clock, so they're on time in a background tab, and rescheduled on Pause and Next
-- Keep the screen awake during a run with the Screen Wake Lock API, asking again when the page becomes visible
-- Build Settings: the theme (System, Light or Dark, defaulting to Dark), a chime picker with a preview for each alert, the volume, keeping the screen awake, the persistent storage status and the version
+1. **Settings in storage (Sonnet).** The `Settings` type with the spec's defaults, a `settings` table (a new Dexie version with an upgrade and test), `getSettings` and `saveSettings` on `CadoroStorage`, watched like the run so every tab follows a change.
+2. **Theme (Sonnet).** System, Light and Dark through `data-theme` on `<html>`, defaulting to Dark. Avoid a flash of the wrong theme on load, and note how.
+3. **Chimes (Sonnet for the files, an Opus subagent for the scheduler).**
+   - Find 3 to 5 chime recordings under CC0 or an equally open licence. Verify each licence on its source page. Put them in `static/chimes/`, and record each source and licence in the README's Credits and beside the files. `ffmpeg` and `sox` aren't installed, so normalise loudness in a container through the `containers` skill.
+   - If a file can't be downloaded or its licence can't be verified, synthesise 3 to 5 chimes with Web Audio instead, at matched loudness, and note it. Don't mix unverified files in.
+   - Add the audio files to the service worker's precache in `vite.config.ts`, so chimes work offline.
+   - A pure function works out when chimes are due from the run and the moment (target reached, break over). A thin Web Audio player unlocks on the Play press and schedules on the audio clock, rescheduling on Pause, Next, Finish, a restore and another tab's change.
+   - With shared tabs, only one tab may sound each chime. Settle how (a Web Lock is the natural fit) and test it.
+4. **Screen wake lock (Sonnet).** Asked for during a run, again when the page becomes visible, off when the setting is off. Where unsupported, the setting says so.
+5. **Settings screen (Sonnet).** Theme, a chime picker and preview for each alert, volume, keep the screen awake, persistent storage status with a button to ask again, the version. `lastRoutineId` saved when a run starts, and the Timer opening on it.
+6. **Journeys (Sonnet).** A target reached and a break ending each trigger their chime, observed through the player rather than the speakers; settings survive a reload; the theme changes the page; Pause moves a scheduled chime.
 
-**Learn:** Web Audio (`AudioContext`, decoding, scheduling, browsers' autoplay rules), loudness normalisation, the Screen Wake Lock API, theming with Tailwind's `dark:` variant controlled by a setting
+Device checks: a chime on time in a background desktop tab; the phone's screen staying on during a run.
 
 ### 6. Routines
 
-Routines can be created, edited, sorted and reordered.
+Branch `feat/routines`, 0.8.0. SPEC: Routines and blocks, Routines screen, Editing a routine, The timer screen, Activity log (changes).
 
-- Build routine validation, every sort order, duplicating and reordering as pure functions
-- Build the Routines screen: the list and its sort, a new routine, editing in place one at a time with a prompt before discarding changes, and duplicating and deleting routines
-- Build block editing: add, duplicate, delete, Move up and Move down, and dragging with svelte-dnd-action
-- Make the timer's picker follow the sort and open on the last routine used, and lock editing during a run
-- Keep long routines usable on the timer screen: pin the controls at the bottom with `position: sticky`, and scroll the active block into view when the run moves to one that's out of view
-- Record every routine change in the activity log at the storage interface, keeping the newest 5,000 entries, so a failed log write never blocks the change
-
-**Learn:** forms and `bind:` in Svelte, validation messages, keyed lists and the `flip` animation, svelte-dnd-action, warning before leaving with unsaved changes (`beforeNavigate`), `position: sticky`, `scrollIntoView` and `scroll-margin`
+1. **Pure logic (Sonnet).** Validation against the data model's limits, the seven sort orders, duplicating a routine and a block, reordering, a new routine's defaults, and the single-block rule that resets cycles to 1.
+2. **Storage (Sonnet).** Create, save, soft-delete (`deletedAt`) and reorder routines; what "last used" and "most work" need from runs and work periods; refusing to delete the last routine. Every routine change is written to a `log` table at the storage interface, with old and new values, keeping the newest 5,000, and a failed log write never blocks the change. New Dexie version, upgrade and test. Routines are watched, so the Timer and other tabs follow an edit.
+3. **Routines screen (Sonnet).** The list and its remembered sort; "+ New routine"; editing in place, one at a time, with "Discard changes?" on opening another or leaving (`beforeNavigate`); Duplicate; Delete with confirmation, disabled on the last routine with a hint; Move up and Move down; drag handles with svelte-dnd-action, shown only in custom order.
+4. **Block editing (Sonnet).** Add, duplicate, delete with confirmation (disabled on the last block), Move up and Move down, drag handles, the disabled cycles field with its hint.
+5. **Timer changes (Sonnet).** The picker follows the sort. The running routine can't be edited or deleted. The controls are pinned with `position: sticky`, and the active block scrolls into view, as planned in `docs/decisions/03-pwa-and-github-pages.md`.
+6. **Journeys (Sonnet).** Create, edit, reorder and delete a routine; build a multi-block routine and run it exactly as configured; the discard prompt; the last routine can't be deleted.
 
 ### 7. Stats
 
-The Stats screen shows what you've done.
+Branch `feat/stats`, 0.9.0. SPEC: Stats.
 
-- Build every stat as a pure function with date-fns: splitting work at midnight, daily, weekly and monthly totals, all-time totals per routine, streaks, time against target and targets reached
-- Build the Stats screen: today, the daily chart with LayerChart and its range presets, weekly and monthly totals, all time, the streak, the target stats, and the routine filter
-
-**Learn:** date-fns, daylight saving time and why days aren't always 24 hours, LayerChart, accessible charts
+1. **Pure logic with date-fns (Sonnet).** Splitting segments at local midnight; daily, weekly (Monday) and monthly totals; all-time totals per routine, deleted ones included; current and longest streak, with today kept alive; time against target; targets reached; the range presets; the routine filter. Tests pin the time zone and include a period across midnight and across a daylight saving change, checked against hand-calculated values.
+2. **Stats screen (Sonnet).** Today, the daily chart with LayerChart and its presets, weekly and monthly totals, all time, the streak, the target stats and the routine filter. The chart needs a text alternative that a screen reader can use. An empty state for no work yet.
+3. **Journeys (Sonnet).** Run a routine on the fake clock and see its work in Stats; the filter; the presets.
 
 ### 8. Backup and activity log
 
-Data can be exported, backed up and restored, and errors are recorded.
+Branch `feat/backup-and-log`, 0.10.0. SPEC: Export and import, Activity log, Settings.
 
-- Build the CSV export, and the JSON backup and import, with validation, a summary of what the file holds, and replacing all data once confirmed
-- Build the activity log page and its JSON export
-- Record uncaught errors with a global handler, SvelteKit's error hook and Svelte's error boundaries
-
-**Learn:** `<svelte:boundary>`, SvelteKit's `handleError` hook, validating untrusted JSON
+1. **Export and import logic (Sonnet).** The CSV of work periods; the JSON backup of routines, runs, work periods and settings, with a format version; validation that rejects an invalid file whole; the summary of what a file holds.
+2. **Storage (Sonnet).** Reading everything for a backup, and replacing everything in one transaction on import. The import is logged. Reading log entries newest first.
+3. **Settings additions (Sonnet).** CSV export, JSON backup, import with its summary and confirmation, and the activity log page under Settings with its JSON export.
+4. **Errors (Sonnet).** Uncaught errors recorded by a global handler, SvelteKit's `handleError` and a `<svelte:boundary>`. The existing `console.error` calls for failed saves become log entries.
+5. **Journeys (Sonnet).** Back up in one browser context and restore into a fresh one with everything intact; an invalid file changes nothing; the log shows a routine edit.
 
 ## Phase 3: Release
 
 ### 9. Release 1.0
 
-- Write the README as a portfolio piece, covering why the app exists, how it was built with an AI agent, the technical highlights, installing and using the app, the data limitations and self-hosting
-- Bump the version to 1.0.0, then tag the merged commit and publish a GitHub release
+Branch `docs/release-1-0`, 1.0.0 (`LEVEL=major`).
 
-**Learn:** writing docs for users and self-hosters
+1. **Spec sweep (Sonnet, read-only, then fixes).** Walk `docs/SPEC.md` feature by feature against the app and its tests, and list every gap. Fix each with its test.
+2. **Accessibility and polish pass (Sonnet).** Keyboard use of every screen, focus order in dialogs, contrast at the levels ARCHITECTURE states, both themes, phone and desktop.
+3. **README (Sonnet).** Practical: what the app is, installing and using it, the data limitations from the spec, self-hosting, development, tasks, releasing, credits. No build story.
+4. **Self-host check.** Build with no base path, serve the files from a plain static server with a fallback page, and follow only the README.
+5. **Node.** Move `.nvmrc` and `@types/node` from Node 22 to the current LTS in its own commit. If it breaks CI in a way that isn't a quick fix, revert it and leave the item open.
+6. Final summary: every decision taken during the run, and one device checklist covering all milestones.
 
 ## Phase 4: Optional
 
@@ -167,13 +247,9 @@ Data can be exported, backed up and restored, and errors are recorded.
 - Ask for notification permission, subscribe through the service worker, and schedule, move or cancel a push when a work period starts, pauses or ends
 - Show the notification from the service worker, even with the phone locked or the app closed
 
-**Learn:** the Push API, VAPID keys, service worker push events, serverless functions and scheduling, secrets in CI
-
 ### 11. Container image and homelab
 
 As planned for the weight tracker: a Podman image with unprivileged nginx, published to `ghcr.io`, then run on the homelab with Quadlet, Caddy and Avahi.
-
-**Learn:** as in the weight tracker's plan, for whichever of the two projects does it first
 
 ## Risks
 
@@ -184,7 +260,7 @@ As planned for the weight tracker: a Podman image with unprivileged nginx, publi
 | Chimes are missed on a locked phone                              | Documented; the screen stays awake by default; optional milestone 10 adds Web Push                           |
 | Stored data changes shape after the app is deployed              | Dexie schema versions with upgrade functions, each covered by a test                                         |
 | The phone kills the app mid-run                                  | A heartbeat every second, and the run restores paused                                                        |
-| Learning Svelte and Tailwind at once slows the work              | Small rounds with explanations, and the plain logic is kept apart from both                                  |
+| An autonomous run weakens its own checks or tests                | Guardrail files prompt before edits; the reviewer checks guardrail and test diffs; stop rules                |
 | A library such as LayerChart or svelte-dnd-action changes        | Versions fixed by the lockfile; each is used in one place                                                    |
 | Other Pages sites on the account can read the app's storage      | Host no untrusted code on the account's Pages                                                                |
 | Someone takes a freed username and publishes at the address      | Keep the username, and back up regularly                                                                     |
@@ -193,14 +269,15 @@ As planned for the weight tracker: a Podman image with unprivileged nginx, publi
 
 ## Verification
 
-Every pull request must pass lint, formatting, type checks, tests and the build in CI, from milestone 1. Beyond that:
+Every pull request must pass lint, formatting, type checks, tests and the build in CI, and have its review settled. Beyond that:
 
+- **Milestone 0:** each new lint rule and the `ask` rule shown to fire on a broken example, and `go-task check` passes with all of them on.
 - **Milestone 1:** a pull request with a deliberately failing test can't be merged.
 - **Milestone 2:** you can run both starter routines through work, overtime, break and Finish on the dev server, on the desktop and the phone.
 - **Milestone 3:** the app installs from Pages on your phone and desktop, opens in airplane mode, and a merged change reaches the installed copy as a new version.
 - **Milestone 4:** reloading, or the phone killing the app, mid-run restores the run paused, with the right times, and the work periods are saved. Two tabs show the same run, and record its work once.
-- **Milestone 5:** a chime plays on time in a background desktop tab, and the screen stays on during a run on the phone.
+- **Milestone 5:** the chime journeys pass. A chime plays on time in a background desktop tab, and the screen stays on during a run on the phone (device checks).
 - **Milestone 6:** a routine you build, reorder and edit runs exactly as configured.
 - **Milestone 7:** the stats match hand-calculated values for synthetic data, including a period across midnight and a daylight saving change.
 - **Milestone 8:** a backup from one browser restores into another with everything intact.
-- **Milestone 9:** a fresh self-hosted setup following only the README works.
+- **Milestone 9:** the spec sweep finds no gap, and a fresh self-hosted setup following only the README works.
