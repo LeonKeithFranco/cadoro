@@ -129,6 +129,15 @@ export default defineConfig(
 		}
 	},
 	{
+		// Every function states its return type, so a change to what it returns shows in the
+		// signature. `tsc` accepts a missing return type and infers it.
+		files: ['**/*.ts', '**/*.svelte'],
+		rules: {
+			// A callback whose type comes from where it's passed stays untyped, like its parameters.
+			'@typescript-eslint/explicit-function-return-type': 'error'
+		}
+	},
+	{
 		// A component's own doc comment is an HTML comment starting `@component`, which editors
 		// show when hovering over the component where it's used.
 		files: ['**/*.svelte'],

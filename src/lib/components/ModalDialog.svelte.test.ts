@@ -11,7 +11,9 @@ import ModalDialog from './ModalDialog.svelte';
  * A test can't write `{#snippet}` markup in a `.ts` file, so this builds the snippet from HTML. A
  * raw snippet must render exactly one root element.
  */
-const content = createRawSnippet(() => ({ render: () => '<p>Some content</p>' }));
+const content = createRawSnippet(() => ({
+	render: (): string => '<p>Some content</p>'
+}));
 
 /**
  * Two buttons for the dialog's foot, as the Finish confirmation has.
@@ -20,7 +22,7 @@ const content = createRawSnippet(() => ({ render: () => '<p>Some content</p>' })
  * The `<span>` is the single root a raw snippet needs.
  */
 const actions = createRawSnippet(() => ({
-	render: () => '<span><button>First</button><button>Second</button></span>'
+	render: (): string => '<span><button>First</button><button>Second</button></span>'
 }));
 
 describe('a modal dialog', () => {

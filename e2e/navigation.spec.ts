@@ -22,7 +22,7 @@ const OTHER_SCREENS: Screen[] = [
  * @param page - The browser page.
  * @param screen - The screen that should be showing.
  */
-async function expectScreenShowing(page: Page, screen: Screen) {
+async function expectScreenShowing(page: Page, screen: Screen): Promise<void> {
 	const navigation = page.getByRole('navigation', { name: 'Screens' });
 
 	await expect(page).toHaveURL(screen.path);

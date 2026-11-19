@@ -47,7 +47,7 @@
 		const interval = setInterval(() => session.tick(), TICK_INTERVAL_MS);
 		// Runs before the effect runs again and when the screen is removed, so a paused timer, or
 		// one on another screen, stops ticking.
-		return () => clearInterval(interval);
+		return (): void => clearInterval(interval);
 	});
 
 	// SvelteKit removes the screen when another one opens, and the session outlives it.
@@ -87,7 +87,7 @@
 <!-- `pagehide` fires as the page is closed, reloaded or left for another site, including into
      the browser's back-forward cache, where `unload` doesn't fire. -->
 <svelte:document onvisibilitychange={saveHeartbeatIfHidden} />
-<svelte:window onpagehide={() => session.tick()} />
+<svelte:window onpagehide={(): void => session.tick()} />
 
 <ScreenHeading title="Timer" />
 
@@ -97,7 +97,7 @@
 		routines={session.routines}
 		selectedId={session.routine.id}
 		disabled={session.view.isInProgress}
-		onselect={(id) => session.select(id)}
+		onselect={(id): void => session.select(id)}
 	/>
 
 	{#if positionLabel}
@@ -116,14 +116,21 @@
 		{isRunning}
 		isInProgress={session.view.isInProgress}
 		onplaypause={playOrPause}
-		onnext={() => session.next()}
-		onfinish={() => (isConfirmingFinish = true)}
+		onnext={(): void => session.next()}
+		onfinish={(): void => {
+			isConfirmingFinish = true;
+		}}
 	/>
 </div>
 
 <!-- The run keeps counting behind the question, so Cancel changes nothing. -->
 {#if isConfirmingFinish}
-	<FinishConfirmation onconfirm={confirmFinish} oncancel={() => (isConfirmingFinish = false)} />
+	<FinishConfirmation
+		onconfirm={confirmFinish}
+		oncancel={(): void => {
+			isConfirmingFinish = false;
+		}}
+	/>
 {/if}
 
 <!-- Shown for as long as the run has ended, so it opens whenever a run ends, by Finish or by its
@@ -133,6 +140,6 @@
 	<RunSummary
 		routineTitle={session.routine.title}
 		summary={session.view.summary}
-		ondone={() => session.readyNewRun()}
+		ondone={(): void => session.readyNewRun()}
 	/>
 {/if}

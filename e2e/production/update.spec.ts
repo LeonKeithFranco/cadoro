@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { waitForActiveWorker } from '../service-worker.ts';
 import { NEXT_VERSION_COOKIE } from '../update-server.ts';
 
@@ -91,7 +91,7 @@ async function pressReload(page: Page): Promise<void> {
  * @param page - A page of the app.
  * @returns The offer's message, inside the status region.
  */
-function updateOffer(page: Page) {
+function updateOffer(page: Page): Locator {
 	return page.getByRole('status').getByText('A new version is ready.');
 }
 
