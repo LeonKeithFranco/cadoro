@@ -30,7 +30,7 @@ Opus orchestrates and subagents implement. The main session writes no code, test
 | Lookups: "where is X used", summarising a failed CI log                                                             | Haiku (`Explore`, `model: haiku`)                           | Only when a direct `grep`, or `task ci:logs` piped through `tail`, wouldn't do.                                         |
 | Milestone review                                                                                                    | Opus subagent (`general-purpose`, `model: opus`), fresh one | Once per milestone, never the agent that wrote the code.                                                                |
 
-Don't set an `effort` on subagents. No agent teams, no workflows, and no worktrees unless a hotfix needs one.
+Don't set an `effort` on subagents. No agent teams and no workflows. The only worktrees are the stacked worktree in "Overlapping milestones" and one a hotfix needs.
 
 ### A work package brief
 
@@ -55,6 +55,18 @@ Each brief gives the goal in two or three sentences, the SPEC sections by headin
 8. When CI is green and the review is settled, run `go-task pr:merge`, which prompts the user. Wait.
 9. After the merge: `go-task ci:watch-main` in the background, then `go-task pages:check`, then `go-task release:publish`.
 10. Print a summary of at most 15 lines: what's live, decisions taken, device checks to try. Go straight on to the next milestone.
+
+### Overlapping milestones
+
+The user decided on 2026-11-19 that the next milestone starts while the current one waits on CI, the review, the merge prompt and the release.
+
+- Once the pull request is open (loop step 5), make a worktree stacked on its branch: `go-task worktree:new NAME=<name> BRANCH=<next branch> BASE=origin/<current branch>`. It lands in `../pomodoro-worktrees/<name>`, set up.
+- The open pull request's review fixes stay in the checkout that holds its branch. The next milestone's writers work only in the worktree, by absolute path, and never touch the other checkout.
+- Give the worktree its own port, such as `PORT=5174 go-task check`, and run Playwright in one checkout at a time.
+- Briefs for agents in a worktree tell them to read `~/.claude/rules/docs-typescript.md` and `~/.claude/rules/style-guide.md`, since rules scoped by `paths` load only in the primary checkout. They also say not to edit the guardrail files and to report instead, since `.claude/settings.json`'s ask rules may not cover the worktree's paths.
+- Before `go-task pr:merge`, which deletes the branch, note the commit the worktree branched from: `git -C <worktree> merge-base HEAD origin/<current branch>`. It isn't the branch's tip once review fixes land after the worktree is made. The rebase merge rewrites the stacked commits, so afterwards, in the worktree, run `git fetch origin` and `git rebase --onto origin/main <that SHA>`. Then run `go-task check:quick` there.
+- The worktree then carries its milestone through to its own pull request, and the next milestone stacks on it the same way. Remove each worktree with `go-task worktree:done NAME=<name>` once its branch is merged.
+- If a session restarts mid-overlap, `git worktree list` shows the open worktrees, and each branch's `git log origin/main..` shows its own commits.
 
 ### The reviewer's brief
 
