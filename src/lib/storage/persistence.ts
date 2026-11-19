@@ -63,3 +63,50 @@ export async function askToPersistIfWorkSaved(
 		console.error('Saved work could not be checked for.', error);
 	}
 }
+
+/**
+ * Finds out whether the browser keeps the app's storage persistent, for Settings to show.
+ *
+ * @param manager - The browser's storage manager, or `undefined` where there's none.
+ * @returns A promise of `true` when storage is persistent and `false` when it isn't, or of `null`
+ * when the browser can't say: there's no storage manager, or asking failed, which is logged. It
+ * never rejects.
+ */
+export async function isStoragePersistent(
+	manager: PersistenceManager | undefined
+): Promise<boolean | null> {
+	if (manager === undefined) {
+		return null;
+	}
+	try {
+		return await manager.persisted();
+	} catch (error: unknown) {
+		console.error('Persistent storage could not be checked.', error);
+		return null;
+	}
+}
+
+/**
+ * Asks the browser for persistent storage again, as Settings' button does, whatever was asked
+ * before.
+ *
+ * @remarks
+ * Unlike {@link askToPersistOnce}, it asks every time it's called, since the user asked. The
+ * browser decides, and the answer is read back with {@link isStoragePersistent}.
+ *
+ * @param manager - The browser's storage manager, or `undefined` where there's none.
+ * @returns A promise that settles once the browser has answered. It never rejects: an error from
+ * the browser is logged.
+ */
+export async function requestPersistentStorage(
+	manager: PersistenceManager | undefined
+): Promise<void> {
+	if (manager === undefined) {
+		return;
+	}
+	try {
+		await manager.persist();
+	} catch (error: unknown) {
+		console.error('Persistent storage could not be requested.', error);
+	}
+}
