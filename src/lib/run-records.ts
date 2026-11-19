@@ -9,7 +9,7 @@ import {
 	type RunState,
 	type Segment
 } from './run';
-import { toUtcTimestamp } from './time';
+import { fromUtcTimestamp, toUtcTimestamp } from './time';
 
 /** One use of a routine, from pressing Play to the end of its last work period or Finish. */
 export type Run = {
@@ -234,6 +234,17 @@ function workPeriodRecord(
  * @param segment - The stretch, in milliseconds since 1970 (UTC).
  * @returns The same stretch, as UTC timestamps.
  */
-function storedSegment(segment: Segment): StoredSegment {
+export function storedSegment(segment: Segment): StoredSegment {
 	return { start: toUtcTimestamp(segment.start), end: toUtcTimestamp(segment.end) };
+}
+
+/**
+ * Converts a stretch of work from storage's UTC timestamps back to the engine's milliseconds,
+ * undoing {@link storedSegment}.
+ *
+ * @param segment - The stretch, as UTC timestamps.
+ * @returns The same stretch, in milliseconds since 1970 (UTC).
+ */
+export function segmentFromStored(segment: StoredSegment): Segment {
+	return { start: fromUtcTimestamp(segment.start), end: fromUtcTimestamp(segment.end) };
 }
