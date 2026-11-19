@@ -6,6 +6,19 @@ import type { Theme } from './settings';
 export type ShownTheme = 'light' | 'dark';
 
 /**
+ * The page's background in each theme, Tailwind's `white` and `zinc-950` as `app.html`'s body has
+ * them, which the `theme-color` meta gives the browser's own bars so they match the page.
+ *
+ * @remarks
+ * `src/app.html`'s inline script sets the same colours before the app loads, so a change here
+ * needs the same change there.
+ */
+export const THEME_COLOURS: Readonly<Record<ShownTheme, string>> = {
+	light: '#ffffff',
+	dark: '#09090b'
+};
+
+/**
  * Works out the theme to show.
  *
  * @remarks

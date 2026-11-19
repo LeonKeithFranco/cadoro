@@ -36,6 +36,7 @@ test.describe('the theme', () => {
 		await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
 		// Tailwind's zinc-950, which Chromium reports in the colour space Tailwind wrote it in.
 		await expect(page.locator('body')).toHaveCSS('background-color', /^oklch\(0\.141 /);
+		await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#09090b');
 	});
 
 	test('shows a saved light theme with white colours, after a reload', async ({ page }) => {
@@ -46,6 +47,7 @@ test.describe('the theme', () => {
 
 		await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
 		await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+		await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#ffffff');
 		await expect(page.getByRole('navigation', { name: 'Screens' })).toBeVisible();
 	});
 
@@ -61,6 +63,7 @@ test.describe('the theme', () => {
 		await reloadWithoutTheApp(page);
 
 		await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+		await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#ffffff');
 	});
 
 	test('shows a saved dark theme on a light device before the app has loaded', async ({ page }) => {

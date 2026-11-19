@@ -1,13 +1,14 @@
 <!--
   @component
   Keeps the page's theme in step with the theme setting. It draws nothing: it sets `data-theme` on
-  `<html>`, which the `dark:` variant in `layout.css` follows. For `system` it follows the device's
+  `<html>`, which the `dark:` variant in `layout.css` follows, and colours the browser's own bars
+  to match, through the `theme-color` meta `app.html` has. For `system` it follows the device's
   light or dark setting live, so the page changes when the device does.
 -->
 <script lang="ts">
 	import { MediaQuery } from 'svelte/reactivity';
 	import type { Theme } from '#lib/settings.ts';
-	import { resolveTheme } from '#lib/theme.ts';
+	import { resolveTheme, THEME_COLOURS } from '#lib/theme.ts';
 
 	/** Props for {@link ThemeSync}. */
 	type Props = {
@@ -21,6 +22,10 @@
 	const systemPrefersDark = new MediaQuery('prefers-color-scheme: dark');
 
 	$effect(() => {
-		document.documentElement.dataset.theme = resolveTheme(theme, systemPrefersDark.current);
+		const shown = resolveTheme(theme, systemPrefersDark.current);
+		document.documentElement.dataset.theme = shown;
+		document
+			.querySelector('meta[name="theme-color"]')
+			?.setAttribute('content', THEME_COLOURS[shown]);
 	});
 </script>
