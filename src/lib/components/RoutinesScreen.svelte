@@ -46,7 +46,23 @@
 		isNew: boolean;
 		/** What went wrong the last time Save was pressed, if anything. */
 		saveError?: string | undefined;
+		/**
+		 * Whether another tab changed this routine's title, rounds or blocks since editing started,
+		 * so Save would overwrite that change.
+		 */
+		isChangedElsewhere?: boolean;
 	};
+
+	/**
+	 * Picks out what an edit changes, so a change that only moves the routine in the list isn't
+	 * taken for an edit.
+	 *
+	 * @param routine - The routine.
+	 * @returns Its title, rounds and blocks as JSON, to compare.
+	 */
+	function contentKey(routine: Routine): string {
+		return JSON.stringify([routine.title, routine.rounds, routine.blocks]);
+	}
 </script>
 
 <script lang="ts">
@@ -124,6 +140,9 @@
 	 */
 	let afterDiscard = $state.raw<(() => void) | null>(null);
 
+	/** The notice that the routine being edited was deleted in another tab, or `null`. */
+	let deletedElsewhere = $state<string | null>(null);
+
 	/** The routine the user asked to delete, or `null` while the question isn't being asked. */
 	let routineToDelete = $state.raw<Routine | null>(null);
 
@@ -137,6 +156,7 @@
 		const stop = storage.watchRoutines(
 			(changed) => {
 				routines = changed;
+				noticeChangesToEditedRoutine(changed);
 			},
 			(error: unknown) => {
 				console.error('Changes to the routines can no longer be followed.', error);
@@ -168,6 +188,32 @@
 			void goto(resolve(screen));
 		};
 	});
+
+	/**
+	 * Reacts to the routines as another tab, or this one, changed them while a routine is edited.
+	 *
+	 * @remarks
+	 * A routine deleted elsewhere closes its form, since there's nothing left to save to, and says
+	 * so. One whose title, rounds or blocks were changed elsewhere keeps its form, which warns that
+	 * Save will overwrite that change. A new routine, and a change that only moves the routine in
+	 * the list, are left alone.
+	 *
+	 * @param changed - The routines not deleted, as storage now has them.
+	 */
+	function noticeChangesToEditedRoutine(changed: readonly Routine[]): void {
+		const current = editing;
+		if (current === null || current.isNew) {
+			return;
+		}
+
+		const latest = changed.find((routine) => routine.id === current.original.id);
+		if (latest === undefined) {
+			editing = null;
+			deletedElsewhere = `${current.original.title} was deleted in another tab, so its form was closed.`;
+		} else if (!current.isChangedElsewhere && contentKey(latest) !== contentKey(current.original)) {
+			editing = { ...current, isChangedElsewhere: true };
+		}
+	}
 
 	/**
 	 * Runs an action that would drop the edit in progress, after asking when it has unsaved changes.
@@ -214,6 +260,7 @@
 	/** Opens a new routine for editing at the top of the list. */
 	function startNewRoutine(): void {
 		discardingChanges(() => {
+			deletedElsewhere = null;
 			const created = newRoutine(now(), newId);
 			editing = { original: created, draft: created, isNew: true };
 		});
@@ -226,6 +273,7 @@
 	 */
 	function startEditing(routine: Routine): void {
 		discardingChanges(() => {
+			deletedElsewhere = null;
 			editing = { original: routine, draft: routine, isNew: false };
 		});
 	}
@@ -354,6 +402,14 @@
 	<div
 		class="rounded-xl border border-rose-700 bg-white p-4 ring-1 ring-rose-700 md:p-6 dark:border-rose-400 dark:bg-zinc-900 dark:ring-rose-400"
 	>
+		{#if current.isChangedElsewhere}
+			<p
+				role="status"
+				class="mb-4 rounded-md border border-amber-700 p-3 text-sm text-amber-900 dark:border-amber-400 dark:text-amber-200"
+			>
+				This routine was changed in another tab. Save will overwrite that change with yours.
+			</p>
+		{/if}
 		<RoutineForm
 			draft={current.draft}
 			{newId}
@@ -390,6 +446,15 @@
 {/snippet}
 
 <div class="mt-4 grid gap-4">
+	{#if deletedElsewhere !== null}
+		<p
+			role="status"
+			class="rounded-md border border-amber-700 p-3 text-sm text-amber-900 dark:border-amber-400 dark:text-amber-200"
+		>
+			{deletedElsewhere}
+		</p>
+	{/if}
+
 	{#if editing?.isNew}
 		{@render editor(editing)}
 	{/if}
