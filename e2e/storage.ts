@@ -22,11 +22,13 @@ export async function savedWorkPeriods(page: Page): Promise<WorkPeriod[]> {
 		() =>
 			new Promise<WorkPeriod[]>((resolve, reject) => {
 				const opening = indexedDB.open('cadoro');
-				opening.onerror = (): void => reject(opening.error);
+				opening.onerror = (): void =>
+					reject(opening.error ?? new Error('Opening the database failed.'));
 				opening.onsuccess = (): void => {
 					const database = opening.result;
 					const reading = database.transaction('workPeriods').objectStore('workPeriods').getAll();
-					reading.onerror = (): void => reject(reading.error);
+					reading.onerror = (): void =>
+						reject(reading.error ?? new Error('Reading the work periods failed.'));
 					reading.onsuccess = (): void => {
 						database.close();
 						resolve(reading.result);

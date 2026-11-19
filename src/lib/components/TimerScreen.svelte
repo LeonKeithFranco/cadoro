@@ -97,7 +97,7 @@
 		routines={session.routines}
 		selectedId={session.routine.id}
 		disabled={session.view.isInProgress}
-		onselect={(id): void => session.select(id)}
+		onselect={(id: string): void => session.select(id)}
 	/>
 
 	{#if positionLabel}
