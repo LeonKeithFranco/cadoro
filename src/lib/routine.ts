@@ -36,6 +36,20 @@ export type Routine = {
 };
 
 /**
+ * Trims the spaces around the routine's title and its blocks' titles, as they're saved.
+ *
+ * @param routine - The routine, as typed in the form.
+ * @returns A new routine with every title trimmed. Everything else is as it was.
+ */
+export function withTrimmedTitles(routine: Routine): Routine {
+	return {
+		...routine,
+		title: routine.title.trim(),
+		blocks: routine.blocks.map((block) => ({ ...block, title: block.title.trim() }))
+	};
+}
+
+/**
  * Picks out the routines the user can choose from, in the order they're listed.
  *
  * @param routines - Routines in any order, deleted ones included.

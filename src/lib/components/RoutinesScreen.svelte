@@ -55,7 +55,7 @@
 	import Plus from '@lucide/svelte/icons/plus';
 	import { dragHandleZone, type DndEvent } from 'svelte-dnd-action';
 	import { onMount, untrack } from 'svelte';
-	import { newRoutine, canDeleteRoutine, type Routine } from '../routine';
+	import { newRoutine, canDeleteRoutine, withTrimmedTitles, type Routine } from '../routine';
 	import { duplicateRoutine } from '../routine-duplication';
 	import { moveRoutineDown, moveRoutineUp } from '../routine-order';
 	import { sortRoutines, type RoutineUsage } from '../routine-sort';
@@ -113,7 +113,9 @@
 
 	/** Whether the edit has changes that aren't saved. */
 	let hasUnsavedChanges = $derived(
-		editing !== null && JSON.stringify(editing.draft) !== JSON.stringify(editing.original)
+		editing !== null &&
+			JSON.stringify(withTrimmedTitles(editing.draft)) !==
+				JSON.stringify(withTrimmedTitles(editing.original))
 	);
 
 	/**
@@ -235,12 +237,7 @@
 			return;
 		}
 
-		const draft = current.draft;
-		const trimmed: Routine = {
-			...draft,
-			title: draft.title.trim(),
-			blocks: draft.blocks.map((block) => ({ ...block, title: block.title.trim() }))
-		};
+		const trimmed = withTrimmedTitles(current.draft);
 		try {
 			if (current.isNew) {
 				await storage.createRoutine(trimmed);
