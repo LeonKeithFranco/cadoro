@@ -1452,3 +1452,119 @@ describe('sharing the run across tabs', () => {
 		await expect.poll(() => tabB.view).toMatchObject({ status: 'break' });
 	});
 });
+
+describe('following the routines', () => {
+	/**
+	 * Starts a session on storage that holds the routines, as the app opens, with the storage for
+	 * the test to change the routines through, as another tab does.
+	 *
+	 * @returns The storage and a session whose routines are the starter routines.
+	 */
+	async function sessionOnSavedRoutines(): Promise<{
+		storage: InMemoryStorage;
+		session: TimerSession;
+	}> {
+		const storage = new InMemoryStorage();
+		await storage.addRoutinesIfNone(routines);
+		return { storage, session: createSession(routines, { storage }) };
+	}
+
+	it('keeps the routines it opened with when storage reports the same ones', async () => {
+		const { session } = await sessionOnSavedRoutines();
+		session.select(classicWithLongBreak.id);
+
+		await waitForMicrotasks();
+
+		expect(session.routines).toBe(routines);
+		expect(session.routine).toBe(classicWithLongBreak);
+	});
+
+	it('shows a routine another tab edited, in the list and as the chosen routine', async () => {
+		const { storage, session } = await sessionOnSavedRoutines();
+
+		await storage.saveRoutine({ ...classic, title: 'Renamed', rounds: 2 });
+
+		await expect
+			.poll(() => session.routines.map((routine) => routine.title))
+			.toEqual(['Renamed', 'Classic with long break']);
+		expect(session.routine.title).toBe('Renamed');
+		expect(session.view).toMatchObject({ status: 'ready', label: 'Round 1 of 2' });
+	});
+
+	it('shows a new routine at its place in the list', async () => {
+		const { storage, session } = await sessionOnSavedRoutines();
+
+		await storage.createRoutine(routineWith({ id: 'new', title: 'New', customPosition: 0 }));
+
+		await expect
+			.poll(() => session.routines.map((routine) => routine.title))
+			.toEqual(['New', 'Classic', 'Classic with long break']);
+		expect(session.routine.id).toBe(classic.id);
+	});
+
+	it('follows a reorder', async () => {
+		const { storage, session } = await sessionOnSavedRoutines();
+
+		await storage.reorderRoutines([classicWithLongBreak.id, classic.id]);
+
+		await expect
+			.poll(() => session.routines.map((routine) => routine.title))
+			.toEqual(['Classic with long break', 'Classic']);
+	});
+
+	it('chooses the first routine when the chosen routine is deleted while its run is ready', async () => {
+		const { storage, session } = await sessionOnSavedRoutines();
+		session.select(classicWithLongBreak.id);
+
+		await storage.deleteRoutine(classicWithLongBreak.id);
+
+		await expect.poll(() => session.routine.id).toBe(classic.id);
+		expect(session.routines.map((routine) => routine.id)).toEqual([classic.id]);
+		expect(session.view).toMatchObject({ status: 'ready' });
+	});
+
+	it('keeps the run in progress as it was started, and readies the new version for the next run', async () => {
+		const { storage, session } = await sessionOnSavedRoutines();
+		session.play();
+		nowMs = seconds(10);
+
+		await storage.saveRoutine({ ...classic, title: 'Renamed' });
+
+		await expect.poll(() => session.routines[0]?.title).toBe('Renamed');
+		session.tick();
+		expect(session.routine.title).toBe('Classic');
+		expect(session.view).toMatchObject({ status: 'working', workedMs: seconds(10) });
+		session.finish();
+		session.readyNewRun();
+		expect(session.routine.title).toBe('Renamed');
+		expect(session.view).toMatchObject({ status: 'ready' });
+	});
+
+	it('ignores a report with no routines, since there is always one to run', async () => {
+		const storage = new InMemoryStorage();
+		const session = createSession(routines, { storage });
+
+		await waitForMicrotasks();
+
+		expect(session.routines).toBe(routines);
+	});
+
+	it('logs an error and carries on when the routines can no longer be followed', async () => {
+		const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+		// Typed as the interface, which has the `onError` that `InMemoryStorage` leaves out.
+		const storage: CadoroStorage = new InMemoryStorage();
+		const failure = new Error('The routines could not be read.');
+		vi.spyOn(storage, 'watchRoutines').mockImplementation((_onChange, onError) => {
+			onError(failure);
+			return (): void => {};
+		});
+
+		const session = createSession(routines, { storage });
+
+		expect(logged).toHaveBeenCalledWith(
+			'Changes to the routines can no longer be followed.',
+			failure
+		);
+		expect(session.routines).toBe(routines);
+	});
+});

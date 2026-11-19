@@ -98,8 +98,10 @@ export type AppOpening = {
  * saved, without saving it again. Heartbeats change only the saved heartbeat, never the run.
  */
 export class TimerSession {
-	/** The routines to pick from, in the picker's order. */
-	readonly routines: readonly Routine[];
+	/**
+	 * The routines to pick from, in the picker's order, as storage last reported them. Never empty.
+	 */
+	#routines: readonly Routine[];
 
 	/** Returns the current moment, in milliseconds since 1970 (UTC), such as `Date.now`. */
 	readonly #clock: () => number;
@@ -188,8 +190,8 @@ export class TimerSession {
 	 * forgotten, and the session starts as if there were none.
 	 *
 	 * @param routines - The routines to pick from, in the picker's order. There's always at least
-	 * one, since the first launch creates the starter routines, and routines can't be deleted
-	 * yet.
+	 * one, since the first launch creates the starter routines, and the last routine can't be
+	 * deleted. The session then follows storage's routines.
 	 * @param options - The clock, the storage runs are saved in, the id generators, what to do
 	 * once work is saved, what to do as a button is pressed and what to do as a run starts, as
 	 * {@link TimerSessionOptions} describes them.
@@ -220,7 +222,7 @@ export class TimerSession {
 			throw new Error('A timer session needs at least one routine.');
 		}
 
-		this.routines = routines;
+		this.#routines = $state.raw(routines);
 		this.#clock = clock;
 		this.#storage = storage;
 		this.#newId = newId;
@@ -259,6 +261,59 @@ export class TimerSession {
 			(error: unknown) => {
 				console.error('Changes to the run from other tabs can no longer be followed.', error);
 			}
+		);
+		storage.watchRoutines(
+			(changed) => {
+				this.#noticeRoutines(changed);
+			},
+			(error: unknown) => {
+				console.error('Changes to the routines can no longer be followed.', error);
+			}
+		);
+	}
+
+	/** The routines to pick from, in the picker's order, as of the last change to them. */
+	get routines(): readonly Routine[] {
+		return this.#routines;
+	}
+
+	/**
+	 * Takes on the routines as storage reports them, so an edit, a deletion or a reorder, here or
+	 * in another tab, shows without a reload.
+	 *
+	 * @remarks
+	 * A report with no routine is ignored, since there's always one to run. A report equal to
+	 * what the session has, such as the first, which repeats what the app opened with, changes
+	 * nothing. A ready run follows its routine's new version, or the first routine if its routine
+	 * was deleted. A run that has started keeps the routine it started with, which it carries in
+	 * its plan, and takes the new version when the next run is readied.
+	 *
+	 * @param changed - The routines not deleted, in custom order.
+	 */
+	#noticeRoutines(changed: readonly Routine[]): void {
+		if (changed.length === 0 || JSON.stringify(changed) === JSON.stringify(this.#routines)) {
+			return;
+		}
+
+		this.#routines = changed;
+		if (this.#run.status === 'ready') {
+			this.#routine = this.#latestVersionOf(this.#routine);
+			this.#run = createRun(this.#routine);
+		}
+	}
+
+	/**
+	 * Finds a routine's current version among the routines to pick from.
+	 *
+	 * @param routine - The routine, as the session has it.
+	 * @returns The routine with the same id as storage last reported it, or the first routine when
+	 * it was deleted.
+	 */
+	#latestVersionOf(routine: Routine): Routine {
+		return (
+			this.#routines.find((candidate) => candidate.id === routine.id) ??
+			this.#routines[0] ??
+			routine
 		);
 	}
 
@@ -308,7 +363,7 @@ export class TimerSession {
 	 * @param id - The id of the routine to choose.
 	 */
 	select(id: string): void {
-		const routine = this.routines.find((candidate) => candidate.id === id);
+		const routine = this.#routines.find((candidate) => candidate.id === id);
 		if (routine === undefined || this.view.isInProgress) {
 			return;
 		}
@@ -368,6 +423,7 @@ export class TimerSession {
 		}
 
 		const revision = this.#revision;
+		this.#routine = this.#latestVersionOf(this.#routine);
 		this.#run = createRun(this.#routine);
 		this.#record = null;
 		this.#revision = null;
@@ -590,8 +646,7 @@ export class TimerSession {
 	 *
 	 * @remarks
 	 * A forgotten run, after another tab's Done, readies a new run of the same routine. A run
-	 * whose routine this session doesn't have is left alone, which can't happen until routines
-	 * can be deleted, in milestone 6.
+	 * whose routine this session doesn't have, such as one deleted in another tab, is left alone.
 	 *
 	 * @param saved - The run in progress storage holds, or `null` when none is saved.
 	 */
@@ -602,13 +657,14 @@ export class TimerSession {
 		}
 
 		if (saved === null) {
+			this.#routine = this.#latestVersionOf(this.#routine);
 			this.#run = createRun(this.#routine);
 			this.#record = null;
 			this.#revision = null;
 			return;
 		}
 
-		const followed = followRunInProgress(saved, this.routines);
+		const followed = followRunInProgress(saved, this.#routines);
 		if (followed === null) {
 			return;
 		}
