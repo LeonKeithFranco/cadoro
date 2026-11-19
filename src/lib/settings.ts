@@ -1,6 +1,8 @@
 // The user's settings from the spec's data model, with their defaults. Pure: nothing here reads
 // storage or the page.
 
+import { DEFAULT_CHIME } from './chimes';
+
 /** How the Routines screen orders the routines. */
 export type RoutineSort =
 	'custom' | 'title-asc' | 'title-desc' | 'last-used' | 'most-work' | 'newest' | 'oldest';
@@ -30,14 +32,14 @@ export type Settings = {
  * The settings of a user who has changed none, as the spec's data model gives them.
  *
  * @remarks
- * Both chimes default to the same one, as the spec says the break chime does. The spec names no
- * chime, so it's the first of the recordings in `static/chimes`.
+ * Both chimes default to the same one, as the spec says the break chime does: `DEFAULT_CHIME`,
+ * the first of the recordings in `static/chimes`, since the spec names none.
  */
 export const DEFAULT_SETTINGS: Settings = {
 	theme: 'dark',
 	volume: 70,
-	targetChime: 'bell-ding-1',
-	breakChime: 'bell-ding-1',
+	targetChime: DEFAULT_CHIME,
+	breakChime: DEFAULT_CHIME,
 	keepScreenAwake: true,
 	routineSort: 'custom',
 	lastRoutineId: null
