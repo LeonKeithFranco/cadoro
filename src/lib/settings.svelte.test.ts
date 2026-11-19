@@ -54,6 +54,9 @@ describe('SettingsSession', () => {
 		const session = new SettingsSession(storage, { ...DEFAULT_SETTINGS, theme: 'light' });
 		const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
 		vi.spyOn(storage, 'saveSettings').mockRejectedValue(new Error('The disk is full.'));
+		// Lets the session's first report from storage arrive, so only the undo can put the theme
+		// back, not that report.
+		await storage.getSettings();
 
 		await session.save({ theme: 'system' });
 
