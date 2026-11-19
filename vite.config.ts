@@ -37,7 +37,9 @@ const FALLBACK_ADDRESS = './';
 
 /**
  * The dark theme's page background, Tailwind's `zinc-950`, for the installed app's title bar and
- * the splash screen shown while it opens. The theme is fixed to dark until Settings can change it.
+ * the splash screen shown while it opens. The manifest is one file for every user, so it keeps the
+ * default theme's colour whatever the theme setting is. Once the page loads, its `theme-color`
+ * meta follows the theme shown, which browsers prefer over the manifest's colour for the bars.
  */
 const DARK_BACKGROUND = '#09090b';
 

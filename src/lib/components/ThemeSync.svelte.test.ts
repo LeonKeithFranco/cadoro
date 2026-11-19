@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import ThemeSync from './ThemeSync.svelte';
 
@@ -78,5 +78,53 @@ describe('ThemeSync', () => {
 		device.setDark(false);
 
 		await expect.poll(() => document.documentElement.dataset.theme).toBe('dark');
+	});
+});
+
+describe('ThemeSync and the browser’s bars', () => {
+	/** The page's `theme-color` meta, as `app.html` has it, dark to start with. */
+	let themeColor: HTMLMetaElement;
+
+	// Adds the `theme-color` meta `app.html` starts with, which the test page lacks.
+	beforeEach(() => {
+		themeColor = document.createElement('meta');
+		themeColor.name = 'theme-color';
+		themeColor.content = '#09090b';
+		document.head.append(themeColor);
+	});
+
+	// Removes the meta and puts back `matchMedia`, and clears the theme the test set on the page.
+	afterEach(() => {
+		themeColor.remove();
+		vi.restoreAllMocks();
+		delete document.documentElement.dataset.theme;
+	});
+
+	it('colours the browser’s bars white for the light theme', async () => {
+		fakeDevice(true);
+
+		render(ThemeSync, { theme: 'light' });
+
+		await expect.poll(() => themeColor.content).toBe('#ffffff');
+	});
+
+	it('keeps them the dark background for the dark theme', async () => {
+		fakeDevice(false);
+		const screen = render(ThemeSync, { theme: 'light' });
+		await expect.poll(() => themeColor.content).toBe('#ffffff');
+
+		await screen.rerender({ theme: 'dark' });
+
+		await expect.poll(() => themeColor.content).toBe('#09090b');
+	});
+
+	it('follows the device for system', async () => {
+		const device = fakeDevice(true);
+		render(ThemeSync, { theme: 'system' });
+		await expect.poll(() => themeColor.content).toBe('#09090b');
+
+		device.setDark(false);
+
+		await expect.poll(() => themeColor.content).toBe('#ffffff');
 	});
 });

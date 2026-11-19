@@ -6,11 +6,15 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="text-scale" content="scale" />
+		<!-- Colours the browser's own bars to match the page, dark to start with, like the
+		     manifest's `theme_color` does for the installed app. It comes before the script below,
+		     which sets it to the saved theme's colour, and `ThemeSync` keeps it in step after. -->
+		<meta name="theme-color" content="#09090b" />
 		<!-- Shows the saved theme before the first paint, so a light or system theme doesn't flash
 		     dark while IndexedDB is still being opened. It reads the mirror of the theme setting
 		     that `DexieStorage` keeps in localStorage under `cadoro-theme`, and makes the same
-		     choice as `resolveTheme` in `src/lib/theme.ts`. Once the app loads, `ThemeSync` takes
-		     over. -->
+		     choice as `resolveTheme` in `src/lib/theme.ts`, with the bars' colours from
+		     `THEME_COLOURS` there. Once the app loads, `ThemeSync` takes over. -->
 		<script>
 			try {
 				var savedTheme = localStorage.getItem('cadoro-theme');
@@ -20,6 +24,9 @@
 							? matchMedia('(prefers-color-scheme: dark)').matches
 							: savedTheme === 'dark';
 					document.documentElement.dataset.theme = isDark ? 'dark' : 'light';
+					document
+						.querySelector('meta[name="theme-color"]')
+						.setAttribute('content', isDark ? '#09090b' : '#ffffff');
 				}
 			} catch (error) {
 				// localStorage is blocked: the page keeps the default theme.
@@ -33,9 +40,6 @@
 		<link rel="icon" href="%sveltekit.assets%/favicon.ico" sizes="48x48" />
 		<link rel="icon" href="%sveltekit.assets%/favicon.svg" sizes="any" type="image/svg+xml" />
 		<link rel="apple-touch-icon" href="%sveltekit.assets%/apple-touch-icon-180x180.png" />
-		<!-- Colours the browser's own bars to match the dark theme, like the manifest's
-		     `theme_color` does for the installed app. -->
-		<meta name="theme-color" content="#09090b" />
 		%sveltekit.head%
 	</head>
 	<body
