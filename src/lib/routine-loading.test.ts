@@ -18,7 +18,7 @@ describe('loadRoutines', () => {
 			'Classic',
 			'Classic with long break'
 		]);
-		expect(routines[0].createdAt).toBe('2026-01-05T09:00:00.000Z');
+		expect(routines[0]?.createdAt).toBe('2026-01-05T09:00:00.000Z');
 	});
 
 	it('keeps the same routines, ids and creation times when the app opens again', async () => {

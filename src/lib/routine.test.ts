@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { requireDefined } from './defined';
 import { createStarterRoutines, pickableRoutines } from './routine';
 import { routineWith } from './testing/routines';
 
@@ -103,10 +104,11 @@ describe('createStarterRoutines', () => {
 
 	it('creates new blocks every time, so changing one set leaves the next untouched', () => {
 		const first = createStarterRoutines(now, countingIds());
-		first[0].blocks[0].targetMinutes = 50;
+		const firstBlock = requireDefined(first[0]?.blocks[0], "the first routine's first block");
+		firstBlock.targetMinutes = 50;
 
 		const second = createStarterRoutines(now, countingIds());
 
-		expect(second[0].blocks[0].targetMinutes).toBe(25);
+		expect(second[0]?.blocks[0]?.targetMinutes).toBe(25);
 	});
 });

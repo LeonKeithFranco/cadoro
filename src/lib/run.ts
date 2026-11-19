@@ -1,12 +1,25 @@
 // The run engine: moving through a routine's rounds, blocks and cycles. Every function here is
 // pure, so the screen and the tests drive it the same way.
 
+import { requireDefined } from './defined';
 import { percentOf } from './percent';
 import type { Routine } from './routine';
 import { MS_PER_SECOND, minutesToMs } from './time';
 
 /** The parts of a routine that decide the order a run goes through it. */
 export type RoutinePlan = Pick<Routine, 'rounds' | 'blocks'>;
+
+/**
+ * Finds the block a position is in.
+ *
+ * @param plan - The routine's plan.
+ * @param position - A position in the plan, whose block index is always one of the plan's blocks.
+ * @returns The plan's block at the position.
+ * @throws {@link Error} When the position's block index is outside the plan's blocks.
+ */
+export function blockAt(plan: RoutinePlan, position: Position): Routine['blocks'][number] {
+	return requireDefined(plan.blocks[position.block], `the block at index ${position.block}`);
+}
 
 /**
  * Where a run is within its routine: which work period, and the break that follows it.
@@ -111,7 +124,7 @@ export function nextPosition(plan: RoutinePlan, position: Position): Position | 
 	const nextBlock = block + 1;
 	const nextCycle = cycle + 1;
 
-	const blockHasNextCycle = nextCycle < plan.blocks[block].cycles;
+	const blockHasNextCycle = nextCycle < blockAt(plan, position).cycles;
 	const roundHasNextBlock = nextBlock < plan.blocks.length;
 	const routineHasNextRound = plan.rounds === 'infinite' || nextRound < plan.rounds;
 
@@ -145,7 +158,7 @@ export function positionLabel(plan: RoutinePlan, position: Position): string {
 	const blockNumber = position.block + 1;
 	const cycleNumber = position.cycle + 1;
 	const blockCount = plan.blocks.length;
-	const cycleCount = plan.blocks[position.block].cycles;
+	const cycleCount = blockAt(plan, position).cycles;
 
 	const parts: string[] = [];
 	if (plan.rounds === 'infinite') {
@@ -483,7 +496,7 @@ export function viewRun(run: RunState, now: number): RunView {
 				isInProgress: false
 			};
 		case 'working': {
-			const block = run.plan.blocks[run.position.block];
+			const block = blockAt(run.plan, run.position);
 			const workedSoFarMs = workedMs(run.segments, run.runningSince, now);
 			const targetMs = minutesToMs(block.targetMinutes);
 			return {
@@ -503,7 +516,10 @@ export function viewRun(run: RunState, now: number): RunView {
 			const isOver = isBreakOver(run, now);
 			const isPaused = run.runningSince === null;
 			// A break's ended periods always end with the one it follows.
-			const followedPeriod = run.endedPeriods[run.endedPeriods.length - 1];
+			const followedPeriod = requireDefined(
+				run.endedPeriods[run.endedPeriods.length - 1],
+				'the work period the break follows'
+			);
 			return {
 				status: 'break',
 				block: run.position.block,
@@ -642,7 +658,7 @@ function segmentsUpTo(run: WorkingRun, now: number): readonly Segment[] {
  * @returns The work period, with its stretches up to now and its block's target.
  */
 function currentPeriodUpTo(run: WorkingRun, now: number): EndedWorkPeriod {
-	const block = run.plan.blocks[run.position.block];
+	const block = blockAt(run.plan, run.position);
 	const segments = segmentsUpTo(run, now);
 	return {
 		position: run.position,
@@ -661,7 +677,7 @@ function currentPeriodUpTo(run: WorkingRun, now: number): EndedWorkPeriod {
  * @returns The run on the work period's break, running from now, or the run completed.
  */
 function endWorkPeriod(run: WorkingRun, now: number): BreakRun | EndedRun {
-	const block = run.plan.blocks[run.position.block];
+	const block = blockAt(run.plan, run.position);
 	const endedPeriod = currentPeriodUpTo(run, now);
 	const endedPeriods = [...run.endedPeriods, endedPeriod];
 

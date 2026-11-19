@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { requireDefined } from '../defined';
 import { minutes } from '../testing/durations';
 import { routineWith } from '../testing/routines';
 import { runInProgressWith, savedRunInProgress } from '../testing/run-in-progress';
@@ -59,13 +60,14 @@ describe.each(backends)('$name', ({ create }) => {
 			const storage = create();
 			await storage.addRoutinesIfNone([routineWith({ title: 'Writing' })]);
 			const [read] = await storage.getRoutines();
-			read.title = 'Changed';
-			read.blocks[0].targetMinutes = 50;
+			const readRoutine = requireDefined(read, 'the saved routine');
+			readRoutine.title = 'Changed';
+			requireDefined(readRoutine.blocks[0], "the routine's block").targetMinutes = 50;
 
 			const [readAgain] = await storage.getRoutines();
 
-			expect(readAgain.title).toBe('Writing');
-			expect(readAgain.blocks[0].targetMinutes).toBe(25);
+			expect(readAgain?.title).toBe('Writing');
+			expect(readAgain?.blocks[0]?.targetMinutes).toBe(25);
 		});
 	});
 
@@ -121,7 +123,7 @@ describe.each(backends)('$name', ({ create }) => {
 
 			const [saved] = await storage.getRoutines();
 
-			expect(saved.title).toBe('Writing');
+			expect(saved?.title).toBe('Writing');
 		});
 	});
 
@@ -207,7 +209,7 @@ describe.each(backends)('$name', ({ create }) => {
 			const period = workPeriodWith({});
 			await storage.saveRunInProgress(savedRunInProgress, { run, workPeriods: [period] });
 			run.roundsReached = 5;
-			period.segments[0].end = '2026-11-19T11:00:00.000Z';
+			requireDefined(period.segments[0], "the period's segment").end = '2026-11-19T11:00:00.000Z';
 
 			expect(await storage.getRuns()).toEqual([runInProgress]);
 			expect(await storage.getWorkPeriods()).toEqual([firstWorkPeriod]);
@@ -337,7 +339,7 @@ describe.each(backends)('$name', ({ create }) => {
 			const storage = create();
 			await storage.saveRunInProgress(savedRunInProgress, { run: runInProgress, workPeriods: [] });
 			const [read] = await storage.getRuns();
-			read.roundsReached = 5;
+			requireDefined(read, 'the saved run').roundsReached = 5;
 
 			expect(await storage.getRuns()).toEqual([runInProgress]);
 		});
@@ -378,7 +380,8 @@ describe.each(backends)('$name', ({ create }) => {
 				workPeriods: [firstWorkPeriod]
 			});
 			const [read] = await storage.getWorkPeriods();
-			read.segments[0].end = '2026-11-19T11:00:00.000Z';
+			const readSegment = requireDefined(read?.segments[0], "the saved work period's segment");
+			readSegment.end = '2026-11-19T11:00:00.000Z';
 
 			expect(await storage.getWorkPeriods()).toEqual([firstWorkPeriod]);
 		});

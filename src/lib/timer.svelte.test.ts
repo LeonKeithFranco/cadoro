@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { requireDefined } from './defined';
 import { createStarterRoutines, type Routine } from './routine';
 import type { StoredRunInProgress } from './run-in-progress';
 import type { RunRecords } from './run-records';
@@ -11,8 +12,11 @@ import { TimerSession, type TimerSessionOptions } from './timer.svelte';
 /** The starter routines, Classic then Classic with long break, with predictable ids. */
 const routines = createStarterRoutines(new Date(0), numberedIds());
 
-/** The starter routines, by name. */
-const [classic, classicWithLongBreak] = routines;
+/** The first starter routine, Classic. */
+const classic = requireDefined(routines[0], 'the Classic routine');
+
+/** The second starter routine, Classic with long break. */
+const classicWithLongBreak = requireDefined(routines[1], 'the Classic with long break routine');
 
 /** The one-round routine's 25-minute block at 20%, repeating forever, so Next always starts a break. */
 const foreverRoutine = routineWith({ id: 'forever', title: 'Forever', rounds: 'infinite' });
