@@ -17,3 +17,14 @@ export const oneRoundRoutine: Routine = {
 	createdAt: '1970-01-01T00:00:00.000Z',
 	deletedAt: null
 };
+
+/**
+ * Makes a routine for a test, which differs from {@link oneRoundRoutine} only where it says, so
+ * each test shows just the fields it's about.
+ *
+ * @param changes - The fields that differ, such as `id` and `customPosition`.
+ * @returns A new routine with those fields changed.
+ */
+export function routineWith(changes: Partial<Routine>): Routine {
+	return { ...oneRoundRoutine, ...changes };
+}

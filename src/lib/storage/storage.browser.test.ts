@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Routine } from '../routine';
-import { oneRoundRoutine } from '../testing/routines';
+import { routineWith } from '../testing/routines';
 import { InMemoryStorage } from './in-memory-storage';
 import type { CadoroStorage } from './storage';
 
@@ -14,16 +13,6 @@ type Backend = {
 
 /** Every backend, each checked against the same tests, so they all keep the same contract. */
 const backends: Backend[] = [{ name: 'InMemoryStorage', create: () => new InMemoryStorage() }];
-
-/**
- * Makes a routine for a test, which differs from {@link oneRoundRoutine} only where it says.
- *
- * @param changes - The fields that differ, such as `id` and `customPosition`.
- * @returns A new routine with those fields changed.
- */
-function routineWith(changes: Partial<Routine>): Routine {
-	return { ...oneRoundRoutine, ...changes };
-}
 
 describe.each(backends)('$name', ({ create }) => {
 	describe('getRoutines', () => {

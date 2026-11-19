@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createStarterRoutines } from './routine';
+import { createStarterRoutines, pickableRoutines } from './routine';
+import { routineWith } from './testing/routines';
 
 /** The moment every test creates the routines at. */
 const now = new Date('2026-01-05T09:00:00.000Z');
@@ -13,6 +14,42 @@ function countingIds() {
 	let count = 0;
 	return () => `id-${++count}`;
 }
+
+describe('pickableRoutines', () => {
+	it('lists the routines lowest custom position first', () => {
+		const routines = [
+			routineWith({ id: 'third', customPosition: 2 }),
+			routineWith({ id: 'first', customPosition: 0 }),
+			routineWith({ id: 'second', customPosition: 1 })
+		];
+
+		const ids = pickableRoutines(routines).map((routine) => routine.id);
+
+		expect(ids).toEqual(['first', 'second', 'third']);
+	});
+
+	it('leaves out deleted routines', () => {
+		const routines = [
+			routineWith({ id: 'deleted', customPosition: 0, deletedAt: '2026-01-05T09:00:00.000Z' }),
+			routineWith({ id: 'kept', customPosition: 1 })
+		];
+
+		const ids = pickableRoutines(routines).map((routine) => routine.id);
+
+		expect(ids).toEqual(['kept']);
+	});
+
+	it('leaves the given list in its own order', () => {
+		const routines = [
+			routineWith({ id: 'second', customPosition: 1 }),
+			routineWith({ id: 'first', customPosition: 0 })
+		];
+
+		pickableRoutines(routines);
+
+		expect(routines.map((routine) => routine.id)).toEqual(['second', 'first']);
+	});
+});
 
 describe('createStarterRoutines', () => {
 	it('creates Classic, then Classic with long break, in that custom order', () => {
