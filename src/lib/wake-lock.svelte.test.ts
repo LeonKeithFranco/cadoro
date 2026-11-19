@@ -20,14 +20,39 @@ const foreverRoutine = routineWith({ id: 'forever', title: 'Forever', rounds: 'i
 /** The fake clock's current moment, in milliseconds since 1970, which each test moves by hand. */
 let nowMs = 0;
 
-/** A lock the fake browser granted, which remembers whether it was released. */
+/**
+ * A lock the fake browser granted, which remembers whether it was released, and tells its
+ * listeners when it is, as a `WakeLockSentinel`'s `release` event does.
+ */
 class FakeLock implements ScreenLock {
 	/** Whether the lock was released. */
 	isReleased = false;
+	/** Everything listening for the lock to be released. */
+	readonly #releaseListeners: (() => void)[] = [];
 
 	release(): Promise<void> {
-		this.isReleased = true;
+		this.#letGo();
 		return Promise.resolve();
+	}
+
+	addEventListener(_type: 'release', listener: () => void): void {
+		this.#releaseListeners.push(listener);
+	}
+
+	/** Lets the lock go by the browser's own choice, as when the system's battery saver starts. */
+	dropByBrowser(): void {
+		this.#letGo();
+	}
+
+	/** Marks the lock released and tells the listeners, once. */
+	#letGo(): void {
+		if (this.isReleased) {
+			return;
+		}
+		this.isReleased = true;
+		for (const listener of this.#releaseListeners) {
+			listener();
+		}
 	}
 }
 
@@ -280,6 +305,57 @@ describe('the page being hidden and shown', () => {
 		await afterPendingWork();
 
 		expect(wakeLock.locks).toEqual([]);
+	});
+});
+
+describe('the browser letting the lock go by itself', () => {
+	it('asks again while the page stays visible and a timer counts', async () => {
+		const { wakeLock, timer } = setUp();
+		timer.play();
+		await expect.poll(() => wakeLock.held).toHaveLength(1);
+
+		wakeLock.locks[0]?.dropByBrowser();
+
+		await expect.poll(() => wakeLock.held).toHaveLength(1);
+		expect(wakeLock.locks).toHaveLength(2);
+	});
+
+	it('keeps asking each time the browser lets go', async () => {
+		const { wakeLock, timer } = setUp();
+		timer.play();
+		await expect.poll(() => wakeLock.held).toHaveLength(1);
+
+		wakeLock.locks[0]?.dropByBrowser();
+		await expect.poll(() => wakeLock.locks).toHaveLength(2);
+		wakeLock.locks[1]?.dropByBrowser();
+
+		await expect.poll(() => wakeLock.locks).toHaveLength(3);
+		expect(wakeLock.held).toHaveLength(1);
+	});
+
+	it('does not ask again when the browser lets go as the page is hidden', async () => {
+		const { wakeLock, timer, page } = setUp();
+		timer.play();
+		await expect.poll(() => wakeLock.held).toHaveLength(1);
+
+		// The browser lets the lock go as it hides the page, before telling the page.
+		page.visibilityState = 'hidden';
+		wakeLock.locks[0]?.dropByBrowser();
+		await afterPendingWork();
+
+		expect(wakeLock.locks).toHaveLength(1);
+	});
+
+	it('does not ask again after letting the lock go itself, as on Pause', async () => {
+		const { wakeLock, timer } = setUp();
+		timer.play();
+		await expect.poll(() => wakeLock.held).toHaveLength(1);
+
+		timer.pause();
+		await afterPendingWork();
+
+		expect(wakeLock.locks).toHaveLength(1);
+		expect(wakeLock.held).toEqual([]);
 	});
 });
 
