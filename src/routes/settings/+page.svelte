@@ -1,13 +1,24 @@
 <!--
   @component
-  The Settings screen, a placeholder until there's something to set, with the app's version.
+  The Settings screen, showing the app's settings session, chimes and wake lock, which the root
+  layout's `load` made.
 -->
 <script lang="ts">
-	import ScreenPlaceholder from '#lib/components/ScreenPlaceholder.svelte';
+	import SettingsScreen from '#lib/components/SettingsScreen.svelte';
+	import type { PageProps } from './$types';
+
+	let { data }: PageProps = $props();
+
+	/**
+	 * The browser's storage manager, or `undefined` where there's none. TypeScript's DOM types say
+	 * `navigator.storage` is always there, but it's missing outside HTTPS and `localhost`.
+	 */
+	const storageManager: StorageManager | undefined = navigator.storage;
 </script>
 
-<ScreenPlaceholder
-	title="Settings"
-	message="The theme, chimes, backups and more will be set here in a later version."
+<SettingsScreen
+	settingsSession={data.settingsSession}
+	chimes={data.chimes}
+	isWakeLockSupported={data.wakeLockKeeper.isSupported}
+	{storageManager}
 />
-<p class="mt-6 text-sm text-zinc-600 dark:text-zinc-400">Version {__APP_VERSION__}</p>
