@@ -15,21 +15,36 @@ let nowMs = 0;
 
 /**
  * Starts a session on the fake clock, so a test can drive the run the screen shows without real
- * time passing. It saves to new, empty storage, which the screen's tests don't read, and its
- * `onWorkSaved` is a spy nothing checks.
+ * time passing. Its `onWorkSaved` is a spy nothing checks.
  *
  * @param routines - The routines to pick from. The starter routines unless a test needs others.
+ * @param storage - Where the session saves. New, empty storage unless a test reads what's saved.
  * @returns A new session, with the first routine chosen and its run ready.
  */
 function createSession(
-	routines: readonly Routine[] = createStarterRoutines(new Date(0), numberedIds())
+	routines: readonly Routine[] = createStarterRoutines(new Date(0), numberedIds()),
+	storage: InMemoryStorage = new InMemoryStorage()
 ): TimerSession {
 	return new TimerSession(routines, {
 		clock: () => nowMs,
-		storage: new InMemoryStorage(),
+		storage,
 		newId: numberedIds(),
 		onWorkSaved: vi.fn()
 	});
+}
+
+/**
+ * Makes the page report that it's hidden or visible, then tells the screen, as the browser does
+ * when the user switches tabs or apps.
+ *
+ * @remarks
+ * A test can't hide its own page, so `document.visibilityState` is replaced until the test ends.
+ *
+ * @param state - What the page now reports.
+ */
+function changeVisibility(state: DocumentVisibilityState): void {
+	vi.spyOn(document, 'visibilityState', 'get').mockReturnValue(state);
+	document.dispatchEvent(new Event('visibilitychange'));
 }
 
 /**
@@ -61,13 +76,16 @@ async function finishRun(): Promise<void> {
 		.click();
 }
 
+// Starts each test at the fake clock's 0, with the screen's interval faked so a test fires it.
 beforeEach(() => {
 	nowMs = 0;
 	vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
 });
 
+// Puts back the real timers and whatever a test replaced, such as the page's visibility.
 afterEach(() => {
 	vi.useRealTimers();
+	vi.restoreAllMocks();
 });
 
 describe('the Timer screen', () => {
@@ -407,5 +425,52 @@ describe('running a routine from the Timer screen', () => {
 			.element(page.getByRole('group', { name: 'Work' }))
 			.toHaveTextContent('4:00 / 25:00');
 		expect(vi.getTimerCount()).toBe(0);
+	});
+});
+
+describe('saving the run as the page goes away', () => {
+	it('saves a heartbeat as the page is hidden, so a restored run counts the work until then', async () => {
+		const storage = new InMemoryStorage();
+		render(TimerScreen, { session: createSession(undefined, storage) });
+		await page.getByRole('button', { name: 'Play' }).click();
+		nowMs = seconds(30);
+
+		changeVisibility('hidden');
+
+		await expect
+			.poll(() => storage.getRunInProgress())
+			.toMatchObject({ heartbeatAt: '1970-01-01T00:00:30.000Z' });
+	});
+
+	it('saves a heartbeat as the page is closed or reloaded', async () => {
+		const storage = new InMemoryStorage();
+		render(TimerScreen, { session: createSession(undefined, storage) });
+		await page.getByRole('button', { name: 'Play' }).click();
+		nowMs = seconds(30);
+
+		window.dispatchEvent(new PageTransitionEvent('pagehide'));
+
+		await expect
+			.poll(() => storage.getRunInProgress())
+			.toMatchObject({ heartbeatAt: '1970-01-01T00:00:30.000Z' });
+	});
+
+	it('saves nothing as the page becomes visible again', async () => {
+		const storage = new InMemoryStorage();
+		const saveSpy = vi.spyOn(storage, 'saveRunInProgress');
+		render(TimerScreen, { session: createSession(undefined, storage) });
+		await page.getByRole('button', { name: 'Play' }).click();
+		nowMs = seconds(30);
+		changeVisibility('visible');
+		nowMs = seconds(40);
+
+		changeVisibility('hidden');
+
+		// Saves reach storage in order, so once the hidden page's heartbeat is saved, any earlier
+		// one would be too.
+		await expect
+			.poll(() => storage.getRunInProgress())
+			.toMatchObject({ heartbeatAt: '1970-01-01T00:00:40.000Z' });
+		expect(saveSpy).toHaveBeenCalledTimes(2);
 	});
 });
