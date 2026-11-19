@@ -99,7 +99,7 @@
 
 		<DailyChart bars={view.days} {preset} onpreset={choosePreset} />
 
-		<div class="grid gap-4 md:grid-cols-2">
+		<div class="grid items-start gap-4 md:grid-cols-2">
 			<TotalsTable
 				heading="Weekly totals"
 				nameColumn="Week"

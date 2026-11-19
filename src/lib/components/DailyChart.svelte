@@ -60,7 +60,9 @@
 				type="button"
 				aria-pressed={option === preset}
 				onclick={(): void => onpreset(option)}
-				class={option === preset ? PRIMARY_BUTTON_COLOURS : SECONDARY_BUTTON_COLOURS}
+				class="rounded-lg px-3 py-1.5 text-sm font-medium md:text-base {option === preset
+					? PRIMARY_BUTTON_COLOURS
+					: SECONDARY_BUTTON_COLOURS}"
 			>
 				{PRESET_NAMES[option]}
 			</button>
@@ -79,7 +81,7 @@
 				x="day"
 				y="minutes"
 				padding={{ top: 8, right: 8, bottom: 24, left: 36 }}
-				props={{ xAxis: { format: formatDay, tickOcclusion: true } }}
+				props={{ bars: { strokeWidth: 0 }, xAxis: { format: formatDay, tickOcclusion: true } }}
 			/>
 		</div>
 		<table class="sr-only">
