@@ -23,34 +23,6 @@
 		newest: 'Newest',
 		oldest: 'Oldest'
 	};
-
-	/** The routine being edited, and the routine as it was before the edit. */
-	type Editing = {
-		/** The routine as it was when editing started, which Cancel goes back to. */
-		original: Routine;
-		/** The routine with the user's changes so far. */
-		draft: Routine;
-		/** Whether it's a new routine, which isn't saved until Save is pressed. */
-		isNew: boolean;
-		/** What went wrong the last time Save was pressed, if anything. */
-		saveError?: string | undefined;
-		/**
-		 * Whether another tab changed this routine's title, rounds or blocks since editing started,
-		 * so Save would overwrite that change.
-		 */
-		isChangedElsewhere?: boolean;
-	};
-
-	/**
-	 * Picks out what an edit changes, so a change that only moves the routine in the list isn't
-	 * taken for an edit.
-	 *
-	 * @param routine - The routine.
-	 * @returns Its title, rounds and blocks as JSON, to compare.
-	 */
-	function contentKey(routine: Routine): string {
-		return JSON.stringify([routine.title, routine.rounds, routine.blocks]);
-	}
 </script>
 
 <script lang="ts">
@@ -70,6 +42,13 @@
 	import { recordError } from '../error-log';
 	import { editButtonId, headingId } from '../routine-card-ids';
 	import { duplicateRoutine } from '../routine-duplication';
+	import {
+		changeElsewhere,
+		focusAfterDelete,
+		hasUnsavedChanges,
+		lockedReason,
+		type RoutineEdit
+	} from '../routine-editing';
 	import { moveDown, moveUp } from '../list-order';
 	import { NO_USAGE, sortRoutines, type RoutineUsage } from '../routine-sort';
 	import type { SettingsSession } from '../settings.svelte';
@@ -123,14 +102,10 @@
 	let canDelete = $derived(canDeleteRoutine(routines));
 
 	/** The routine being edited, or `null` when none is. */
-	let editing = $state.raw<Editing | null>(null);
+	let editing = $state.raw<RoutineEdit | null>(null);
 
 	/** Whether the edit has changes that aren't saved. */
-	let hasUnsavedChanges = $derived(
-		editing !== null &&
-			JSON.stringify(withTrimmedTitles(editing.draft)) !==
-				JSON.stringify(withTrimmedTitles(editing.original))
-	);
+	let hasUnsavedEdit = $derived(editing !== null && hasUnsavedChanges(editing));
 
 	/**
 	 * What to do once the user agrees to discard their changes, or `null` while the question isn't
@@ -196,7 +171,7 @@
 	);
 
 	beforeNavigate((navigation) => {
-		if (!hasUnsavedChanges) {
+		if (!hasUnsavedEdit) {
 			return;
 		}
 
@@ -233,11 +208,11 @@
 			return;
 		}
 
-		const latest = changed.find((routine) => routine.id === current.original.id);
-		if (latest === undefined) {
+		const change = changeElsewhere(current.original, changed);
+		if (change === 'deleted') {
 			editing = null;
 			deletedElsewhere = `${current.original.title} was deleted in another tab, so its form was closed.`;
-		} else if (!current.isChangedElsewhere && contentKey(latest) !== contentKey(current.original)) {
+		} else if (change === 'changed' && !current.isChangedElsewhere) {
 			editing = { ...current, isChangedElsewhere: true };
 		}
 	}
@@ -248,7 +223,7 @@
 	 * @param action - What to do, such as opening another routine for editing.
 	 */
 	function discardingChanges(action: () => void): void {
-		if (hasUnsavedChanges) {
+		if (hasUnsavedEdit) {
 			afterDiscard = action;
 		} else {
 			action();
@@ -270,18 +245,6 @@
 	 */
 	function reportFailure(what: string, error: unknown): void {
 		void recordError(`${what} failed.`, error);
-	}
-
-	/**
-	 * Says why an edit can't be saved, which it can't once a run of its routine has started.
-	 *
-	 * @param current - The edit.
-	 * @returns The reason, or `undefined` when it can be saved.
-	 */
-	function lockedReasonOf(current: Editing): string | undefined {
-		return !current.isNew && current.original.id === runningRoutineId
-			? 'A run of this routine has started, so it can’t be saved. Cancel, and edit it once the run ends.'
-			: undefined;
 	}
 
 	/**
@@ -318,7 +281,7 @@
 	 *
 	 * @param current - The edit being closed.
 	 */
-	function cancelEditing(current: Editing): void {
+	function cancelEditing(current: RoutineEdit): void {
 		editing = null;
 		if (current.isNew) {
 			focusOnceShown(NEW_ROUTINE_BUTTON_ID, NEW_ROUTINE_BUTTON_ID);
@@ -353,7 +316,7 @@
 	/** Saves the routine being edited, and closes the form once it's saved. */
 	async function save(): Promise<void> {
 		const current = editing;
-		if (current === null || lockedReasonOf(current) !== undefined) {
+		if (current === null || lockedReason(current, runningRoutineId) !== undefined) {
 			return;
 		}
 
@@ -361,7 +324,7 @@
 		try {
 			if (current.isNew) {
 				await storage.createRoutine(trimmed);
-			} else if (hasUnsavedChanges) {
+			} else if (hasUnsavedEdit) {
 				await storage.saveRoutine(trimmed);
 			}
 			editing = null;
@@ -401,9 +364,7 @@
 		}
 
 		actionFailure = null;
-		// The card that takes the deleted one's place, or the one above it when it was the last.
-		const position = sorted.findIndex((candidate) => candidate.id === routine.id);
-		const neighbour = sorted[position + 1] ?? sorted[position - 1];
+		const neighbour = focusAfterDelete(sorted, routine.id);
 		try {
 			await storage.deleteRoutine(routine.id);
 			if (neighbour === undefined) {
@@ -488,7 +449,7 @@
 	</button>
 </div>
 
-{#snippet editor(current: Editing)}
+{#snippet editor(current: RoutineEdit)}
 	<div
 		class="rounded-xl border border-rose-700 bg-white p-4 ring-1 ring-rose-700 md:p-6 dark:border-rose-400 dark:bg-zinc-900 dark:ring-rose-400"
 	>
@@ -504,7 +465,7 @@
 			draft={current.draft}
 			{newId}
 			saveError={current.saveError}
-			lockedReason={lockedReasonOf(current)}
+			lockedReason={lockedReason(current, runningRoutineId)}
 			onchange={(draft: Routine): void => {
 				editing = { ...current, draft, saveError: undefined };
 			}}
