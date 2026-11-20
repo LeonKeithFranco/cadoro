@@ -264,10 +264,13 @@ All stats come from saved work periods and runs.
   - The columns are `routine`, `block`, `started_at`, `ended_at`, `worked_seconds` and `target_minutes`, oldest work period first. The file has no byte order mark, its lines end with CRLF, and a field with a comma, quote or line break is quoted, with quotes doubled, as RFC 4180 says.
   - Routine and block titles are those the routine has now, or empty when the routine or the block no longer exists. A work period's start is its first segment's start and its end is its last segment's end, so pauses sit between them.
   - Times are written as UTC ISO strings, such as `2026-11-19T09:00:00.000Z`, and `worked_seconds` is the milliseconds worked divided by 1,000, such as `1500.25`.
+  - A title that starts with `=`, `+`, `-`, `@`, a tab or a carriage return gets a single quote in front, as OWASP advises against CSV injection, so a spreadsheet shows it as text instead of running it as a formula. Only the routine and block titles are changed, not the numbers and timestamps.
 - **JSON backup:** downloads everything: routines (including deleted ones), runs, work periods and settings. The run in progress and the activity log aren't in it.
   - The file is one object, `{ app, formatVersion, exportedAt, routines, runs, workPeriods, settings }`. `app` is always `"cadoro"`, `formatVersion` is 1, and `exportedAt` is a UTC timestamp. A change to the format raises `formatVersion`, and an app rejects a version it doesn't know.
 - **JSON import:** restores a backup. It shows how many routines, runs and work periods the file holds, the days of its first and last runs and the day it was made, in the user's time zone, then replaces all current data once confirmed.
-  - Import replaces the run in progress, which it forgets, since it could name a routine the backup lacks. Every other tab follows the new data. The activity log is kept, and the import is added to it.
+  - Import replaces the run in progress, which it forgets, since it could name a routine the backup lacks. Every other tab follows the new data, Stats included, whether or not a run was in progress. The activity log is kept, and the import is added to it.
+  - The backup holds every setting, so it reads on its own, but import saves only the settings that differ from the app's current defaults, as any save does, so a setting the backup holds at its default stays unchanged for later versions.
+  - A run's `endedAt` is never earlier than its `startedAt`: if the device's clock moved back before Finish, the run ends at its start.
   - Import is all or nothing: if it fails part way, the old data stays exactly as it was.
 - A file that isn't a valid backup is rejected whole with the reason, and nothing changes. It's rejected when:
   - it isn't JSON, or isn't a Cadoro backup (`app` isn't `"cadoro"`), or has a `formatVersion` the app doesn't know;
