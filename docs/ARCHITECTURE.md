@@ -168,7 +168,8 @@ Beside the timer, `RunChimes` and `WakeLockKeeper` watch the session's run and t
 
 - Tailwind classes only, with `@tailwindcss/forms` styling native controls. Native elements cover every widget, such as `<dialog>` and `<select>`.
 - The `dark:` variant follows `data-theme` on `<html>`, which `app.html` starts as `dark`, its inline script sets from the theme mirror before the first paint, and `ThemeSync` then keeps in step with the theme setting. The `theme-color` meta follows the same way, so the browser's bars match the page. The manifest's `theme_color` is one file for every user, so it stays the default dark. Every element carries both its light and its dark colours.
-- Rose is the accent and amber means overtime, and colour never carries meaning alone. Text keeps at least 5:1 contrast, and outlines and bars at least 3:1, in both themes.
+- Rose is the accent and amber means overtime, and colour never carries meaning alone. Text keeps at least 5:1 contrast, and outlines and bars at least 3:1, in both themes. Every control, button, dialog and card border is `zinc-500` in both themes (4.83:1 on white, 3.67:1 on `zinc-900`, 3.08:1 on the dialog's `zinc-800`), and a progress bar's pale track has the same outline. Only the separators, such as the header's and the tab bar's border and the list dividers, stay paler. `outline-contrast.svelte.test.ts` measures the painted colours.
+- Accessibility: the Timer has a polite `status` live region (`announcementFor`), progress bars are `progressbar`s with values, a form's opening moves the focus into its Title field, Cancel, Save and a confirmed delete put it on the routine's (or its neighbour's) Edit button, and drag handles, lists and items are out of the Tab order (`outOfTabOrder`), since Move up and Move down cover the keyboard.
 - The layout is one centred column up to `max-w-3xl`, with a bottom tab bar on phones and header links from `md` (48rem).
 
 ### Testing
