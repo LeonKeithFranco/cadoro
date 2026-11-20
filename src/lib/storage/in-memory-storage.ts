@@ -23,7 +23,12 @@ import {
 	type RunRecords,
 	type WorkPeriod
 } from '../run-records';
-import { settingsFrom, settingsWithChanges, type Settings } from '../settings';
+import {
+	settingsDifferingFromDefaults,
+	settingsFrom,
+	settingsWithChanges,
+	type Settings
+} from '../settings';
 import type { CadoroStorage, StorageOptions } from './storage';
 
 /**
@@ -267,7 +272,7 @@ export class InMemoryStorage implements CadoroStorage {
 		this.#workPeriods = new Map(
 			structuredClone(data.workPeriods).map((period) => [period.id, period])
 		);
-		this.#settings = structuredClone(data.settings);
+		this.#settings = settingsDifferingFromDefaults(data.settings);
 		this.#changeRunInProgress(null);
 		this.#reportToRoutineWatchers();
 		for (const watcher of this.#settingsWatchers) {

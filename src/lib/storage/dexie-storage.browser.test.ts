@@ -305,6 +305,29 @@ describe('DexieStorage', () => {
 		expect(await saved.table('settings').toCollection().primaryKeys()).toEqual(['current']);
 	});
 
+	it('keeps only the settings that differ from the defaults when an import replaces everything', async () => {
+		const name = newDatabaseName();
+		const storage = new DexieStorage(name);
+		const settings: Settings = { ...DEFAULT_SETTINGS, theme: 'light', volume: 12 };
+
+		await storage.replaceAllData(
+			{ routines: [], runs: [], workPeriods: [], settings },
+			{
+				formatVersion: 1,
+				exportedAt: '2026-11-17T08:00:00.000Z',
+				routineCount: 0,
+				runCount: 0,
+				workPeriodCount: 0,
+				firstRunAt: null,
+				lastRunAt: null
+			}
+		);
+
+		const saved = await openAsSaved(name);
+		expect(await saved.table('settings').toArray()).toEqual([{ theme: 'light', volume: 12 }]);
+		expect(await storage.readBackupData().then((data) => data.settings)).toEqual(settings);
+	});
+
 	it('fills in a setting a saved row lacks, as a row saved before the setting existed does', async () => {
 		const name = newDatabaseName();
 		const storage = new DexieStorage(name);
