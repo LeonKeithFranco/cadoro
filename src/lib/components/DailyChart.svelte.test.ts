@@ -8,10 +8,33 @@ import DailyChart from './DailyChart.svelte';
 
 /**
  * The width of a small phone's screen, in pixels, so the range buttons are checked where the card
- * is narrowest. The screen's own side margins and the card's padding make the buttons' row about
- * 70 pixels narrower still.
+ * is narrowest.
  */
 const SMALL_PHONE_WIDTH_PX = 320;
+
+/** The page padding the layout's `<main>` puts around a screen, in pixels (`p-4`). */
+const PAGE_PADDING_PX = 16;
+
+/** A card's border and padding on a phone, in pixels, on each side (`border` and `p-4`). */
+const CARD_INSET_PX = 1 + 16;
+
+/**
+ * Shows the chart in a container padded like the layout's `<main>`, so the range buttons get the
+ * width they have in the app, and checks that width: the screen less the page padding and the
+ * card's border and padding on both sides.
+ *
+ * @returns The range buttons' group.
+ */
+function renderChartLikeTheLayout(): HTMLElement {
+	const { container } = render(DailyChart, { bars, preset: '7d', onpreset: (): void => {} });
+	container.className = 'p-4';
+	const group = page.getByRole('group', { name: 'Range' }).element() as HTMLElement;
+	expect(group.getBoundingClientRect().width, 'the group fits as in the app').toBeCloseTo(
+		SMALL_PHONE_WIDTH_PX - 2 * PAGE_PADDING_PX - 2 * CARD_INSET_PX,
+		0
+	);
+	return group;
+}
 
 /** The height of a phone screen, in pixels. */
 const PHONE_HEIGHT_PX = 800;
@@ -60,7 +83,7 @@ describe('DailyChart range buttons on a small phone', () => {
 
 	it('keeps each name on one line inside its button, which is tall enough to touch', async () => {
 		await page.viewport(SMALL_PHONE_WIDTH_PX, PHONE_HEIGHT_PX);
-		render(DailyChart, { bars, preset: '7d', onpreset: (): void => {} });
+		renderChartLikeTheLayout();
 
 		for (const name of RANGE_BUTTON_NAMES) {
 			const button = page.getByRole('button', { name, exact: true }).element() as HTMLElement;
@@ -82,9 +105,7 @@ describe('DailyChart range buttons on a small phone', () => {
 
 	it('fills every row of buttons to the group’s right edge, leaving no gap', async () => {
 		await page.viewport(SMALL_PHONE_WIDTH_PX, PHONE_HEIGHT_PX);
-		render(DailyChart, { bars, preset: '7d', onpreset: (): void => {} });
-
-		const group = page.getByRole('group', { name: 'Range' }).element();
+		const group = renderChartLikeTheLayout();
 		const groupRight = group.getBoundingClientRect().right;
 		const boxes = RANGE_BUTTON_NAMES.map((name) =>
 			page.getByRole('button', { name, exact: true }).element().getBoundingClientRect()
