@@ -154,7 +154,7 @@ describe('ChimePlayer', () => {
 			await player.reschedule(working, start);
 
 			expect(logged).toHaveBeenCalledWith(
-				'Could not set up the audio for the chimes',
+				'Could not set up the audio for the chimes.',
 				expect.any(Error)
 			);
 			expect(player.scheduled).toEqual([]);
@@ -167,7 +167,7 @@ describe('ChimePlayer', () => {
 			await setUpUnlocked({ createContext: () => context });
 
 			expect(logged).toHaveBeenCalledWith(
-				'Could not start the audio for the chimes',
+				'Could not start the audio for the chimes.',
 				context.resumeError
 			);
 		});
@@ -483,7 +483,7 @@ describe('ChimePlayer', () => {
 			await player.reschedule(working, start);
 
 			expect(logged).toHaveBeenCalledWith(
-				`Could not load the chime ${files.target}`,
+				`Could not load the chime ${files.target}.`,
 				new Error('The server answered 404')
 			);
 			expect(context.sources).toEqual([]);
@@ -498,7 +498,7 @@ describe('ChimePlayer', () => {
 			await player.reschedule(working, start);
 
 			expect(logged).toHaveBeenCalledWith(
-				`Could not load the chime ${files.target}`,
+				`Could not load the chime ${files.target}.`,
 				new Error('Unable to decode audio data')
 			);
 			expect(context.sources).toEqual([]);
@@ -510,7 +510,7 @@ describe('ChimePlayer', () => {
 
 			await player.reschedule(working, start);
 
-			expect(logged).toHaveBeenCalledWith(`Could not load the chime ${files.target}`, offline);
+			expect(logged).toHaveBeenCalledWith(`Could not load the chime ${files.target}.`, offline);
 			expect(context.sources).toEqual([]);
 		});
 
@@ -524,7 +524,7 @@ describe('ChimePlayer', () => {
 			expect(fetchFile.mock.calls.filter(([url]) => url === files.target)).toHaveLength(1);
 			expect(
 				logged.mock.calls.filter(
-					([message]) => message === `Could not load the chime ${files.target}`
+					([message]) => message === `Could not load the chime ${files.target}.`
 				)
 			).toHaveLength(1);
 		});
@@ -580,7 +580,7 @@ describe('ChimePlayer', () => {
 			await player.preview(files.target);
 
 			expect(logged).toHaveBeenCalledWith(
-				`Could not load the chime ${files.target}`,
+				`Could not load the chime ${files.target}.`,
 				new Error('The server answered 404')
 			);
 			expect(context.sources).toEqual([]);
@@ -596,7 +596,7 @@ describe('ChimePlayer', () => {
 			await expect(player.preview(files.target)).resolves.toBeUndefined();
 
 			expect(logged).toHaveBeenCalledWith(
-				'Could not set up the audio for the chimes',
+				'Could not set up the audio for the chimes.',
 				new Error('No Web Audio')
 			);
 		});
@@ -690,7 +690,7 @@ describe('ChimePlayer', () => {
 
 			await player.reschedule(working, start);
 
-			await expect.poll(recordedMessages).toEqual(['Could not set up the audio for the chimes']);
+			await expect.poll(recordedMessages).toEqual(['Could not set up the audio for the chimes.']);
 		});
 
 		it('records an audio context that cannot resume', async () => {
@@ -699,7 +699,7 @@ describe('ChimePlayer', () => {
 
 			await setUpUnlocked({ createContext: () => context });
 
-			await expect.poll(recordedMessages).toEqual(['Could not start the audio for the chimes']);
+			await expect.poll(recordedMessages).toEqual(['Could not start the audio for the chimes.']);
 		});
 
 		it('records a chime file that cannot be loaded', async () => {
@@ -707,7 +707,7 @@ describe('ChimePlayer', () => {
 
 			await player.reschedule(working, start);
 
-			await expect.poll(recordedMessages).toContain(`Could not load the chime ${files.target}`);
+			await expect.poll(recordedMessages).toContain(`Could not load the chime ${files.target}.`);
 		});
 	});
 });
