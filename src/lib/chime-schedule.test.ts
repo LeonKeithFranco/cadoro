@@ -179,6 +179,28 @@ describe('nextChime', () => {
 
 			expect(nextChime(run, start + seconds(2))).toBeNull();
 		});
+
+		it('is due at the end of a break that includes a bank', () => {
+			// Next after 2 of 5 break minutes banks 3, and 10 minutes of work at 20% earns 2 more.
+			const banked = next(runOnBreak(), start + minutes(27));
+			const run = next(banked, start + minutes(37));
+
+			expect(nextChime(run, start + minutes(37))).toEqual({
+				alert: 'break',
+				at: start + minutes(42)
+			});
+		});
+
+		it('is due for a break that earned no time but has a bank', () => {
+			const banked = next(runOnBreak(), start + minutes(27));
+			const workedFor = start + minutes(27) + seconds(2);
+			const run = next(banked, workedFor);
+
+			expect(nextChime(run, workedFor)).toEqual({
+				alert: 'break',
+				at: workedFor + minutes(3)
+			});
+		});
 	});
 
 	describe('before and after a run', () => {

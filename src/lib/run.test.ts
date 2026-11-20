@@ -101,7 +101,8 @@ function workingAt(position: Position): WorkingRun {
 		endedPeriods: [],
 		position,
 		segments: [],
-		runningSince: 0
+		runningSince: 0,
+		bankedMs: 0
 	};
 }
 
@@ -258,7 +259,8 @@ describe('play', () => {
 			endedPeriods: [],
 			position: firstPosition,
 			segments: [],
-			runningSince: 1_000
+			runningSince: 1_000,
+			bankedMs: 0
 		});
 	});
 
@@ -378,13 +380,14 @@ describe('next', () => {
 		});
 	});
 
-	it('ends a break early and starts the next work period, losing the time left', () => {
+	it('ends a break early and starts the next work period, banking the time left', () => {
 		const onBreak = next(play(createRun(plan('infinite', 1)), 0), minutes(25));
 
 		expect(next(onBreak, minutes(26))).toMatchObject({
 			status: 'working',
 			position: { round: 1, block: 0, cycle: 0 },
-			runningSince: minutes(26)
+			runningSince: minutes(26),
+			bankedMs: minutes(4)
 		});
 	});
 
@@ -414,6 +417,126 @@ describe('next', () => {
 
 		expect(next(ready, 0)).toBe(ready);
 		expect(next(ended, minutes(30))).toBe(ended);
+	});
+});
+
+/**
+ * Plays a one-block routine (25 minutes at 20%, so a 5 minute break) through its first work
+ * period, then presses Next on the break after `intoBreakMs` of it.
+ *
+ * @param intoBreakMs - How far into the first break to press Next, in milliseconds.
+ * @returns The run in its second work period, which started `intoBreakMs` into the break.
+ */
+function workingAfterBreakEndedAt(intoBreakMs: number): WorkingRun {
+	const onBreak = next(play(createRun(plan('infinite', 1)), 0), minutes(25));
+	return inStatus(next(onBreak, minutes(25) + intoBreakMs), 'working');
+}
+
+describe('the banked break', () => {
+	it('banks the break left on Next, rounded up to whole seconds', () => {
+		// 5:00 break, 2:00.6 in, leaves 2:59.4, which the timer shows as 3:00.
+		const working = workingAfterBreakEndedAt(minutes(2) + 600);
+
+		expect(working.bankedMs).toBe(minutes(3));
+	});
+
+	it('banks the remainder of a paused break', () => {
+		const onBreak = next(play(createRun(plan('infinite', 1)), 0), minutes(25));
+		const paused = pause(onBreak, minutes(27));
+
+		const working = inStatus(next(paused, minutes(60)), 'working');
+
+		expect(working.bankedMs).toBe(minutes(3));
+	});
+
+	it('banks all of a break when Next is pressed as it starts', () => {
+		expect(workingAfterBreakEndedAt(0).bankedMs).toBe(minutes(5));
+	});
+
+	it('banks 0 when Next is pressed on a break that is already over', () => {
+		expect(workingAfterBreakEndedAt(minutes(9)).bankedMs).toBe(0);
+	});
+
+	it('adds the bank to the next break it earns, both whole and left', () => {
+		const working = workingAfterBreakEndedAt(minutes(2));
+
+		const onBreak = inStatus(next(working, minutes(27) + minutes(10)), 'break');
+
+		// 10 minutes of work at 20% earns 2 minutes, plus the 3 banked.
+		expect(onBreak.earnedMs).toBe(minutes(5));
+		expect(onBreak.remainingMs).toBe(minutes(5));
+	});
+
+	it('banks again what is left of a combined break', () => {
+		const working = workingAfterBreakEndedAt(minutes(2));
+		const onBreak = next(working, minutes(27) + minutes(10));
+
+		const banked = inStatus(next(onBreak, minutes(37) + minutes(1)), 'working');
+
+		expect(banked.bankedMs).toBe(minutes(4));
+	});
+
+	it('uses the bank up when a break runs to 0:00, even if Play comes late', () => {
+		const working = workingAfterBreakEndedAt(minutes(2));
+		const onBreak = next(working, minutes(27) + minutes(10));
+
+		const resumed = inStatus(play(onBreak, minutes(37) + minutes(5) + minutes(20)), 'working');
+
+		expect(resumed.bankedMs).toBe(0);
+	});
+
+	it('carries the bank across a block boundary and a round boundary', () => {
+		const lastShortCycle = workingAt({ round: 0, block: 0, cycle: 2 });
+		const intoBlock = inStatus(next(next(lastShortCycle, minutes(25)), minutes(27)), 'working');
+		const intoRound = inStatus(next(next(intoBlock, minutes(37)), minutes(39)), 'working');
+
+		expect(intoBlock).toMatchObject({ position: { round: 0, block: 1, cycle: 0 } });
+		expect(intoBlock.bankedMs).toBe(minutes(3));
+		expect(intoRound).toMatchObject({ position: { round: 1, block: 0, cycle: 0 } });
+		// Block 2 worked 10 minutes at 60% earns 6, plus the 3 banked makes 9, and 7 are left.
+		expect(intoRound.bankedMs).toBe(minutes(7));
+	});
+
+	it('starts a run from ready with no bank', () => {
+		expect(play(createRun(plan('infinite', 1)), 0)).toMatchObject({ bankedMs: 0 });
+	});
+
+	it('adds the bank to the break earned shown during work, which grows as the work goes on', () => {
+		const working = workingAfterBreakEndedAt(minutes(2));
+		const startedAt = minutes(27);
+
+		expect(viewRun(working, startedAt)).toMatchObject({ breakEarnedMs: minutes(3) });
+		expect(viewRun(working, startedAt + minutes(10))).toMatchObject({
+			breakEarnedMs: minutes(5)
+		});
+	});
+
+	it('drops the bank when a finite routine completes', () => {
+		const lastWork = workingAfterBreakEndedAt(minutes(2));
+		const lastOfFinite = {
+			...lastWork,
+			plan: plan(2, 1),
+			position: { round: 1, block: 0, cycle: 0 }
+		};
+
+		const ended = inStatus(next(lastOfFinite, minutes(60)), 'ended');
+
+		expect(ended).toEqual({
+			status: 'ended',
+			plan: lastOfFinite.plan,
+			endedPeriods: expect.any(Array) as unknown,
+			outcome: 'completed'
+		});
+		expect(summarizeRun(ended)).toMatchObject({ periodsCompleted: 2 });
+	});
+
+	it('drops the bank when Finish ends the run', () => {
+		const working = workingAfterBreakEndedAt(minutes(2));
+
+		const ended = inStatus(finish(working, minutes(30)), 'ended');
+
+		expect(ended).not.toHaveProperty('bankedMs');
+		expect(summarizeRun(ended)).toMatchObject({ totalWorkMs: minutes(25) + minutes(3) });
 	});
 });
 

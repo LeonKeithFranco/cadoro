@@ -82,7 +82,7 @@ describe('DexieStorage', () => {
 		expect(await upgraded.getRuns()).toEqual([runInProgress]);
 		expect(await upgraded.getWorkPeriods()).toEqual([firstWorkPeriod]);
 		expect(await upgraded.getRunInProgress()).toEqual(savedRunInProgress);
-		expect((await openAsSaved(name)).verno).toBe(4);
+		expect((await openAsSaved(name)).verno).toBe(5);
 	});
 
 	it('upgrades a version-3 database, adding the log table and keeping every row', async () => {
@@ -116,10 +116,67 @@ describe('DexieStorage', () => {
 		expect(await upgraded.getRuns()).toEqual([runInProgress]);
 		expect(await upgraded.getWorkPeriods()).toEqual([firstWorkPeriod]);
 		expect(await upgraded.getRunInProgress()).toEqual(savedRunInProgress);
-		expect((await openAsSaved(name)).verno).toBe(4);
+		expect((await openAsSaved(name)).verno).toBe(5);
 	});
 
-	it('creates schema version 4, with every table the spec defines, each with its key', async () => {
+	/**
+	 * Saves a run in progress in a database declared as schema version 4 was, then closes it.
+	 *
+	 * @param name - The database's name.
+	 * @param row - The row as version 4 saved it.
+	 * @returns When the row is saved and the connection closed.
+	 */
+	async function saveAsVersion4(name: string, row: object): Promise<void> {
+		const version4 = new Dexie(name);
+		// Version 4's schema as 0.10 declared it, written out here so a change to the app's can't
+		// change what this test starts from.
+		version4
+			.version(1)
+			.stores({ routines: 'id', runs: 'id', workPeriods: 'id', runInProgress: '' });
+		version4.version(2).stores({});
+		version4.version(3).stores({ settings: '' });
+		version4.version(4).stores({ log: '++id' });
+		await version4.table('routines').add(routineWith({ id: 'kept' }));
+		await version4.table('runs').add(runInProgress);
+		await version4.table('runInProgress').put(row, 'current');
+		version4.close();
+	}
+
+	it('upgrades a version-4 database, giving a saved working run a bank of 0', async () => {
+		const name = newDatabaseName();
+		// The saved run as version 4 kept it, with no `bankedMs`.
+		const version4Run: Record<string, unknown> = { ...savedRunInProgress.run };
+		delete version4Run.bankedMs;
+		await saveAsVersion4(name, { ...savedRunInProgress, run: version4Run });
+
+		const upgraded = new DexieStorage(name);
+
+		expect(await upgraded.getRunInProgress()).toEqual(savedRunInProgress);
+		expect(await upgraded.getRoutines()).toEqual([routineWith({ id: 'kept' })]);
+		expect((await openAsSaved(name)).verno).toBe(5);
+	});
+
+	it('upgrades a version-4 database, leaving a saved break as it was', async () => {
+		const name = newDatabaseName();
+		const onBreak = runInProgressWith({
+			run: {
+				status: 'break',
+				endedPeriods: [],
+				position: { round: 0, block: 0, cycle: 0 },
+				nextWorkPosition: { round: 1, block: 0, cycle: 0 },
+				earnedMs: 300_000,
+				remainingMs: 120_000,
+				runningSince: null
+			}
+		});
+		await saveAsVersion4(name, onBreak);
+
+		const upgraded = new DexieStorage(name);
+
+		expect(await upgraded.getRunInProgress()).toEqual(onBreak);
+	});
+
+	it('creates schema version 5, with every table the spec defines, each with its key', async () => {
 		const name = newDatabaseName();
 		await new DexieStorage(name).getRoutines();
 
@@ -131,7 +188,7 @@ describe('DexieStorage', () => {
 		const transaction = database.transaction(storeNames);
 		const keyPaths = storeNames.map((store) => [store, transaction.objectStore(store).keyPath]);
 
-		expect(saved.verno).toBe(4);
+		expect(saved.verno).toBe(5);
 		expect(keyPaths).toEqual([
 			['log', 'id'],
 			['routines', 'id'],
@@ -168,7 +225,7 @@ describe('DexieStorage', () => {
 		expect(await upgraded.getRoutines()).toEqual([routineWith({ id: 'kept' })]);
 		expect(await upgraded.getRuns()).toEqual([runInProgress]);
 		expect(await upgraded.getWorkPeriods()).toEqual([firstWorkPeriod]);
-		expect((await openAsSaved(name)).verno).toBe(4);
+		expect((await openAsSaved(name)).verno).toBe(5);
 	});
 
 	it('upgrades a version-1 database with no run in progress, leaving it with none', async () => {

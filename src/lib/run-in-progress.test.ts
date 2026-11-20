@@ -74,7 +74,8 @@ describe('toStoredRunInProgress', () => {
 				endedPeriods: [],
 				position: { round: 0, block: 0, cycle: 0 },
 				segments: [{ start: '2026-11-19T09:00:00.000Z', end: '2026-11-19T09:10:00.250Z' }],
-				runningSince: '2026-11-19T09:12:00.000Z'
+				runningSince: '2026-11-19T09:12:00.000Z',
+				bankedMs: 0
 			},
 			heartbeatAt: '2026-11-19T09:15:30.500Z',
 			revision: 'revision-1'
@@ -137,7 +138,8 @@ describe('restoreRunInProgress', () => {
 			endedPeriods: [],
 			position: { round: 0, block: 0, cycle: 0 },
 			segments: [{ start: at('09:00:00.000'), end: at('09:10:00.250') }],
-			runningSince: null
+			runningSince: null,
+			bankedMs: 0
 		});
 	});
 
@@ -260,5 +262,54 @@ describe('withHeartbeat', () => {
 
 	it('drops a heartbeat at the same moment as the one saved, since it adds nothing', () => {
 		expect(withHeartbeat(savedRunInProgress, 'revision-1', '2026-11-19T09:10:00.000Z')).toBeNull();
+	});
+});
+
+describe('the banked break in a stored run', () => {
+	/**
+	 * A work period that started after Next on a break with 3 of its 5 minutes left, so it carries
+	 * a bank of 3 minutes, running since 09:27.
+	 *
+	 * @returns The run, in that work period.
+	 */
+	function workingWithBank(): RunState {
+		const onBreak = next(play(createRun(foreverRoutine), at('09:00')), at('09:25'));
+		return next(onBreak, at('09:27'));
+	}
+
+	it('keeps a work period’s bank when it is stored and read back', () => {
+		const stored = toStoredRunInProgress(
+			runInProgress,
+			started(workingWithBank()),
+			at('09:30'),
+			'revision-1'
+		);
+
+		expect(stored.run).toMatchObject({ status: 'working', bankedMs: minutes(3) });
+		expect(followRunInProgress(structuredClone(stored), [foreverRoutine])?.run).toMatchObject({
+			bankedMs: minutes(3)
+		});
+	});
+
+	it('keeps the bank in a run restored paused at the heartbeat', () => {
+		const restored = saveAndRestore(workingWithBank(), at('09:30'))?.run;
+
+		expect(restored).toMatchObject({
+			status: 'working',
+			runningSince: null,
+			bankedMs: minutes(3)
+		});
+	});
+
+	it('keeps the bank in a run followed live', () => {
+		const working = workingWithBank();
+		const stored = toStoredRunInProgress(
+			runInProgress,
+			started(working),
+			at('09:30'),
+			'revision-1'
+		);
+
+		expect(followRunInProgress(structuredClone(stored), [foreverRoutine])?.run).toEqual(working);
 	});
 });

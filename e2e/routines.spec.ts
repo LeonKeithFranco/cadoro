@@ -432,7 +432,10 @@ test('a routine with two blocks runs exactly as built: each target, break, cycle
 		await next.click();
 
 		await expect(draftBreak).toContainText('5:00');
-		await next.click();
+		// The break runs out, which leaves nothing banked for the next one.
+		await page.clock.fastForward(minutes(5));
+		await expect(draftBreak).toHaveAccessibleName('Break over');
+		await page.getByRole('button', { name: 'Play' }).click();
 		await expect(
 			page.getByText('Round 1 of 2 · Block 1 of 2 · Cycle 2 of 2', { exact: true })
 		).toBeVisible();
@@ -442,14 +445,16 @@ test('a routine with two blocks runs exactly as built: each target, break, cycle
 		await page.clock.fastForward(minutes(10));
 		await next.click();
 		await expect(draftBreak).toContainText('5:00');
-		await next.click();
+		await page.clock.fastForward(minutes(5));
+		await page.getByRole('button', { name: 'Play' }).click();
 		await expect(page.getByText('Round 1 of 2 · Block 2 of 2', { exact: true })).toBeVisible();
 
 		await page.clock.fastForward(minutes(5));
 		await next.click();
 
 		await expect(polishBreak).toContainText('1:00');
-		await next.click();
+		await page.clock.fastForward(minutes(1));
+		await page.getByRole('button', { name: 'Play' }).click();
 	});
 
 	await test.step('round 2 starts at Draft’s first cycle again', async () => {
