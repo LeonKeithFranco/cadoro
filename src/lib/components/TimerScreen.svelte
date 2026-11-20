@@ -18,7 +18,7 @@
 	import { onDestroy, tick } from 'svelte';
 	import { viewBlock } from '../block-view';
 	import { announcementFor } from '../run-announcement';
-	import { sortRoutines, type RoutineSort, type RoutineUsage } from '../routine-sort';
+	import { NO_USAGE, sortRoutines, type RoutineSort, type RoutineUsage } from '../routine-sort';
 	import type { TimerSession } from '../timer.svelte';
 	import BlockCard from './BlockCard.svelte';
 	import ConfirmDialog from './ConfirmDialog.svelte';
@@ -37,7 +37,7 @@
 		usage?: RoutineUsage;
 	};
 
-	let { session, routineSort = 'custom', usage = { runs: [], workPeriods: [] } }: Props = $props();
+	let { session, routineSort = 'custom', usage = NO_USAGE }: Props = $props();
 
 	let pickableRoutines = $derived(sortRoutines([...session.routines], routineSort, usage));
 
@@ -156,7 +156,7 @@
 	<RoutinePicker
 		routines={pickableRoutines}
 		selectedId={session.routine.id}
-		disabled={session.view.isInProgress}
+		disabled={isInProgress}
 		onselect={(id: string): void => session.select(id)}
 	/>
 
@@ -188,7 +188,7 @@
 		<TimerControls
 			bind:playButton
 			{isRunning}
-			isInProgress={session.view.isInProgress}
+			{isInProgress}
 			onplaypause={playOrPause}
 			onnext={(): void => session.next()}
 			onfinish={(): void => {

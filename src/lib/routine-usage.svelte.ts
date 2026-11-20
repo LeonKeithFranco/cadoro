@@ -2,7 +2,7 @@
 // place, so the Timer's picker and the session's fallback routine sort from the same fresh data.
 
 import { recordError } from './error-log';
-import type { RoutineUsage } from './routine-sort';
+import { NO_USAGE, type RoutineUsage } from './routine-sort';
 import type { CadoroStorage } from './storage/storage';
 
 /**
@@ -18,7 +18,7 @@ export class RoutineUsageKeeper {
 	readonly #storage: Pick<CadoroStorage, 'getRuns' | 'getWorkPeriods'>;
 
 	/** The usage as last read, or as given at the start. */
-	#usage = $state.raw<RoutineUsage>({ runs: [], workPeriods: [] });
+	#usage = $state.raw<RoutineUsage>(NO_USAGE);
 
 	/** How many reads have started, which numbers each one so only the latest is kept. */
 	#reloadsStarted = 0;
