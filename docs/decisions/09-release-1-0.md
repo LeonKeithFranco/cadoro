@@ -131,3 +131,54 @@ Nothing here blocks the release. They need a real device, so they're listed rath
 ### Release
 
 - Released as 1.2.0, a minor version, since it's a behaviour change.
+
+## After 1.0: the refactoring sweep (`refactor/duplication-and-dead-code`), 2026-11-20
+
+### How it ran
+
+- Three read-only sweeps of the logic, the components and the tests found duplication, a little dead code, duplicated test set-up, error paths tested twice, a few brittle assertions, two test gaps and one likely bug. One pull request removes them without changing what the app does, apart from the named fixes.
+- Phase A changed production code and left the tests alone, except where a package named one, so the existing tests proved behaviour was kept. Phase B changed tests and left production code alone, so the unchanged code proved the tests still test it. Phase C was the guardrail edit, the visual check, the docs and the release.
+- Every fix got a regression test that was seen failing first, and every new or rewritten assertion was seen failing against broken code.
+
+### The three decisions with the user
+
+- **Visuals:** the five visible inconsistencies the shared classes exposed are unified, each in its own `fix` commit, so a `refactor` commit swaps only strings that were already identical.
+- **Test overlap:** same-level duplicate tests are merged, and a journey is trimmed only where a component test covers the same steps. Each removed test is listed in the pull request with the test that still covers it.
+- **Depth:** the shared components (`Card`, `DragHandle`, `CompactButton`) and the Routines screen's pure decisions (`routine-editing.ts`) moved to `src/lib`. The Stats route's logic stays.
+
+### The journeys in parallel
+
+- The user chose the same day to run the journeys package in parallel, in a stacked worktree, since it touched only `e2e/`. The plan had one writer at a time in the main checkout.
+
+### The guardrail edit
+
+- The main session made the `eslint.config.js` edit itself, early, so its permission prompt came while the user was there, rather than leaving it to a writer at the end. `PURE_MODULES` gained the pure modules it missed (`run-announcement`, `time`, `percent`, `list-order`, `screens`, `theme`, `export-files`, `log`, `defined`) and the new ones (`plural`, `routine-editing`).
+
+### The fixes
+
+- **Back to the log with unsaved changes:** the Routines screen cancelled the navigation and showed no dialog, because it listed only four routes as screens. It now carries on to wherever the navigation goes, and the list is gone.
+- **Stats title ties:** `allTimeTotals` broke ties with a bare `localeCompare`, while the Routines screen ignores case and accents. Both use `compareTitles` now.
+- **The chime messages** gained the full stop every other recorded message has.
+- **The usage read error** is worded for both screens, since the Routines screen now shares the Timer's `RoutineUsageKeeper`.
+- **Five `fix(ui)` changes:** the "Repeat forever" checkbox takes the shared checkbox colours; dark error text is one shade and links one style; the error screen's button takes the regular button shape; the two half-styled disabled buttons get the full disabled pair; `RoutineCard` gets `md:p-6`, matching the form that replaces it.
+
+### Left alone
+
+- Code that looks alike but means different things: the id-uniqueness checks in `InMemoryStorage` and the backup parsing, the two clamps in the list-order modules, the "latest wins" counters, the `toStored*` and `*FromStored` pairs, `RunSummary`'s and `StatsScreen`'s figure snippets, `app.html`'s theme script and `ThemeSync`, and `UpdatePrompt`'s inverted button colours.
+- Seams for tests: exports and default arguments only tests use.
+- Decided before: `@vitest/coverage-v8` and the `dependencies` npm script.
+- Not worth the risk: the Stats route's logic, a shared labelled-select component, `TimerSession`'s picker order, `WakeLockKeeper` having no `destroy`, repeated values in the Taskfile and config files, and the different button order in `RoutineCard` and `BlockEditor`.
+- Tests: the a/b/c routines and the Focus and Reading datasets stay visible in each test, a screen's tests overlapping its pure module's are a different level, and the wait on `svelte-dnd-action`'s internal attribute stays.
+- The Routines editor box's rose border stays out of `CARD_CLASSES`, since it marks the open routine and the shared border doesn't.
+- `void sorted;` stays in `RoutinesScreen`, since no plain dependency says the same.
+- The `*:` parent classes in `UpdatePrompt` and `TimerControls` stay as they are.
+
+### Leftovers
+
+- The client hook test prints a harmless "[Unhandled error]" line, which Vite forwards from the real `window` event the test now sends.
+- `withRepeatCounted` counts an error as a repeat when the clock moves back, which moves `lastTimestamp` back. The new `log.test.ts` locks in what the code does.
+- The chime journey "Plays each alert's own chime" in `e2e/settings.spec.ts` flaked. It clicked the two Preview buttons back to back, and each preview loads its file before playing, so under load the chimes could start in either order while the journey asserted one. `main` had the same race, so the sweep didn't cause it. The journey now waits until the first chime has started before it clicks the second, as a user would, with no timeout, retry or sleep.
+
+### Release
+
+- Released as 1.2.1, a patch version, since it changes no behaviour apart from the fixes.
