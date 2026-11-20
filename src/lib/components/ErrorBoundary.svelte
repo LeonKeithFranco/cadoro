@@ -8,7 +8,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { recordError } from '#lib/error-log.ts';
-	import { PRIMARY_BUTTON_COLOURS } from './button-classes';
+	import { BUTTON_SHAPE, PRIMARY_BUTTON_COLOURS } from './button-classes';
 
 	/** The props the boundary takes. */
 	type Props = {
@@ -52,7 +52,7 @@
 				<button
 					type="button"
 					onclick={reset}
-					class="mt-4 rounded-md px-4 py-2 {PRIMARY_BUTTON_COLOURS}"
+					class={['mt-4', BUTTON_SHAPE, PRIMARY_BUTTON_COLOURS]}
 				>
 					Try again
 				</button>
