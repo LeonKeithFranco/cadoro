@@ -90,4 +90,26 @@ describe('init', () => {
 			.poll(() => recordedErrors(storage))
 			.toEqual([['An uncaught error occurred.', 'Not a function']]);
 	});
+
+	it('records an unhandled rejection on the window in the activity log', async () => {
+		const storage = new InMemoryStorage();
+		useErrorLog(storage);
+		await initWithCleanup();
+		const reason = new Error('Nobody caught this');
+		// Handled here, so the browser never sees a rejection that nothing caught.
+		const rejected = Promise.reject(reason);
+		rejected.catch(() => {});
+		// Marks the event as handled for the test runner's own listener.
+		window.addEventListener('unhandledrejection', (caught) => caught.preventDefault(), {
+			once: true
+		});
+
+		window.dispatchEvent(
+			new PromiseRejectionEvent('unhandledrejection', { promise: rejected, reason })
+		);
+
+		await expect
+			.poll(() => recordedErrors(storage))
+			.toEqual([['A promise was rejected and nothing handled it.', 'Nobody caught this']]);
+	});
 });
