@@ -40,21 +40,32 @@
 		let revisionShown = data.runInProgress?.revision ?? null;
 		let latestSaved = data.runInProgress;
 		let reading = 0;
+		/** The number of the latest read started, so an older read that finishes later is dropped. */
+		let latestRead = 0;
+		/** Whether the latest read failed, so the work periods shown may be older than the run. */
+		let isLatestReadFailed = false;
 
 		/** Reads the routines and work periods again, showing them once both have arrived. */
 		function readAgain(): void {
 			reading += 1;
+			latestRead += 1;
+			const thisRead = latestRead;
 			void Promise.all([data.storage.getAllRoutines(), data.storage.getWorkPeriods()])
 				.then(([readRoutines, readWorkPeriods]) => {
-					if (stopped) {
+					// A newer read has started since, and will show what's newer than this.
+					if (stopped || thisRead !== latestRead) {
 						return;
 					}
 					routines = readRoutines;
 					workPeriods = readWorkPeriods;
 					runInProgress = latestSaved;
+					isLatestReadFailed = false;
 					now = Date.now();
 				})
 				.catch((error: unknown) => {
+					if (thisRead === latestRead) {
+						isLatestReadFailed = true;
+					}
 					void recordError('Could not read the work periods for Stats.', error);
 				})
 				.finally(() => {
@@ -67,8 +78,10 @@
 				latestSaved = saved;
 				const changed = (saved?.revision ?? null) !== revisionShown;
 				if (!changed) {
-					// A heartbeat, which only moves the run's last save, unless a read is still pending.
-					if (reading === 0) {
+					// A heartbeat, which only moves the run's last save, unless a read is still pending or
+					// the last one failed, when the work periods shown are older than the run saved and the
+					// run on screen stays until a read succeeds.
+					if (reading === 0 && !isLatestReadFailed) {
 						runInProgress = saved;
 						now = Date.now();
 					}
