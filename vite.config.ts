@@ -150,8 +150,7 @@ export default defineConfig({
 						instances: [{ browser: 'chromium', headless: true }]
 					},
 					// Component tests, and storage tests, which need the browser's real IndexedDB.
-					include: ['src/**/*.svelte.test.ts', 'src/**/*.browser.test.ts'],
-					exclude: ['src/lib/server/**']
+					include: ['src/**/*.svelte.test.ts', 'src/**/*.browser.test.ts']
 				}
 			},
 
