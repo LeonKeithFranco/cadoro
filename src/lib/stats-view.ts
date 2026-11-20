@@ -57,6 +57,8 @@ export type DayBar = {
 	day: string;
 	/** The day as shown on the chart's axis, such as `Nov 19`. */
 	label: string;
+	/** The day with its year, such as `Nov 19, 2026`, for the table, where a long range repeats days. */
+	dateLabel: string;
 	/** The work time, in minutes at full precision, as the bar's height. */
 	minutes: number;
 	/** The work time as text such as `25:00`, for the table that describes the chart. */
@@ -119,6 +121,7 @@ export function viewStats(input: StatsInput): StatsView {
 		days: dailyTotals(slices, range).map((total) => ({
 			day: format(total.start, 'yyyy-MM-dd'),
 			label: format(total.start, 'MMM d'),
+			dateLabel: format(total.start, 'MMM d, yyyy'),
 			minutes: total.workedMs / MS_PER_MINUTE,
 			duration: formatElapsed(total.workedMs)
 		})),

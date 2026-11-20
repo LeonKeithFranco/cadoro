@@ -173,6 +173,26 @@ describe('the daily chart', () => {
 			.toHaveTextContent('0:00');
 	});
 
+	it('names each day of the table with its year, so All over several years has no repeats', async () => {
+		render(StatsScreen, {
+			workPeriods: [
+				period('focus', '2025-11-19T12:00:00.000Z', '2025-11-19T12:10:00.000Z', 10 * MINUTE, 25),
+				...workPeriods
+			],
+			routines,
+			now: NOW
+		});
+
+		await page.getByRole('button', { name: 'All' }).click();
+
+		await expect
+			.element(chartTable().getByRole('row', { name: 'Nov 19, 2025' }))
+			.toHaveTextContent('10:00');
+		await expect
+			.element(chartTable().getByRole('row', { name: 'Nov 19, 2026' }))
+			.toHaveTextContent('1:10:00');
+	});
+
 	it('starts on 7 days: a header row and a row for each day', async () => {
 		renderStats();
 
