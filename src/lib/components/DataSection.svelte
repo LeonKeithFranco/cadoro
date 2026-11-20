@@ -16,7 +16,7 @@
 	import { counted } from '../plural';
 	import type { SaveFile } from '../file-download';
 	import type { CadoroStorage } from '../storage/storage';
-	import { SECONDARY_BUTTON_COLOURS } from './button-colours';
+	import { BUTTON_SHAPE, SECONDARY_BUTTON_COLOURS } from './button-classes';
 	import ConfirmDialog from './ConfirmDialog.svelte';
 
 	/** The props the card takes. */
@@ -54,7 +54,7 @@
 	const fileInputId = `${idPrefix}-import`;
 
 	/** The colours of a button in this card. */
-	const buttonClasses = ['rounded-lg px-4 py-2 font-medium', SECONDARY_BUTTON_COLOURS];
+	const buttonClasses = [BUTTON_SHAPE, SECONDARY_BUTTON_COLOURS];
 
 	/**
 	 * Reads the data and hands the user a file made from it, saying so if that fails.

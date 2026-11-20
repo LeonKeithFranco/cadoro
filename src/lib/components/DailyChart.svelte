@@ -8,7 +8,7 @@
 	import { BarChart } from 'layerchart';
 	import { RANGE_PRESETS, type RangePreset } from '../stats-range';
 	import type { DayBar } from '../stats-view';
-	import { PRIMARY_BUTTON_COLOURS, SECONDARY_BUTTON_COLOURS } from './button-colours';
+	import { PRIMARY_BUTTON_COLOURS, SECONDARY_BUTTON_COLOURS } from './button-classes';
 
 	/** The props the daily chart takes. */
 	type Props = {

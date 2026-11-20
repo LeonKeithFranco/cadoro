@@ -7,6 +7,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import type { Attachment } from 'svelte/attachments';
+	import { DIALOG_ACTIONS } from './button-classes';
 
 	/** The props the dialog takes. */
 	type Props = {
@@ -53,7 +54,7 @@
 	{@render children()}
 	<!-- The `*:` classes give every button the same shape, and each dialog gives them their
 	     colours. -->
-	<div class="mt-6 flex justify-end gap-3 *:rounded-lg *:px-6 *:py-2 *:font-medium">
+	<div class={['mt-6', DIALOG_ACTIONS]}>
 		{@render actions()}
 	</div>
 </dialog>

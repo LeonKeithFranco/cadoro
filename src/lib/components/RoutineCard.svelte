@@ -15,7 +15,7 @@
 	import { outOfTabOrder } from '../out-of-tab-order';
 	import { editButtonId, headingId } from '../routine-card-ids';
 	import { describeRoutine, type Routine } from '../routine';
-	import { COMPACT_BUTTON_SHAPE, SECONDARY_BUTTON_COLOURS } from './button-colours';
+	import { COMPACT_BUTTON_SHAPE, SECONDARY_BUTTON_COLOURS } from './button-classes';
 
 	/** The props a routine's card takes. */
 	type Props = {

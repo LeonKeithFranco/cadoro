@@ -8,7 +8,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { recordError } from '#lib/error-log.ts';
-	import { PRIMARY_BUTTON_COLOURS } from './button-colours';
+	import { PRIMARY_BUTTON_COLOURS } from './button-classes';
 
 	/** The props the boundary takes. */
 	type Props = {
