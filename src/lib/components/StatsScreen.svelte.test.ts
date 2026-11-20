@@ -286,5 +286,9 @@ describe('the Stats screen with no work saved', () => {
 			.element(page.getByRole('heading', { name: 'Daily work time' }))
 			.not.toBeInTheDocument();
 		await expect.element(page.getByRole('combobox', { name: 'Routine' })).not.toBeInTheDocument();
+		expect(page.getByRole('term').elements()).toHaveLength(0);
+		for (const card of ['Weekly totals', 'Monthly totals', 'All time per routine']) {
+			await expect.element(page.getByRole('region', { name: card })).not.toBeInTheDocument();
+		}
 	});
 });
