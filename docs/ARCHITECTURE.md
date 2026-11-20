@@ -81,7 +81,7 @@ Beside the timer, `RunChimes` and `WakeLockKeeper` watch the session's run and t
 ### `src/lib/components`: the Svelte components
 
 - `TimerScreen` lays out the Timer screen: `RoutinePicker`, a `BlockCard` per block, `TimerControls`, and the `FinishConfirmation` and `RunSummary` dialogs, both built on `ModalDialog`. It runs the one-second tick, ticks again as the page is hidden or closed (`<svelte:document>`, `<svelte:window>`), and pauses the run with `pauseOnLeave` when it's removed.
-- `ScreenNav` is the navigation, `ScreenHeading` gives each screen its heading and tab title, and `ScreenPlaceholder` stands in for the screens not built yet.
+- `ScreenNav` is the navigation, and `ScreenHeading` gives each screen its heading and tab title.
 - `UpdatePrompt` registers the service worker and offers to reload when a new version is waiting.
 - `SettingsScreen` is the Settings screen: the theme, a chime picker with a Preview button for each alert, the volume (saved when the slider is released), keep the screen awake (disabled where the browser has no wake lock), the persistent storage status with "Ask again", the Data card, and the version.
 - `DataSection` is the Data card: CSV export, JSON backup, import and a link to the log. A chosen file is read and parsed first, and its summary waits in a confirm dialog, in `$state.raw` since a `$state` proxy can't be cloned for IndexedDB, until the user confirms. A rejected file shows its reason and changes nothing.
