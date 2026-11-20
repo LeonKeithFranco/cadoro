@@ -124,25 +124,25 @@ beforeEach(() => {
 });
 
 // Closes the tabs the test opened, so none keeps its timer running, puts back what a test spied
-// on, and takes away the log a test chose for errors.
+// on, puts back the real timers a test faked, and takes away the log a test chose for errors.
 afterEach(() => {
 	for (const chimes of chimesOfOpenTabs.splice(0)) {
 		chimes.destroy();
 	}
 	useErrorLog(null);
 	vi.restoreAllMocks();
+	vi.useRealTimers();
 });
 
 describe('destroying the chimes', () => {
 	it('clears the catch-up interval, so no timer is left running', () => {
-		const started = vi.spyOn(globalThis, 'setInterval');
-		const cleared = vi.spyOn(globalThis, 'clearInterval');
+		vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
 		const tab = openTab(storageHolding([foreverRoutine]));
-		const intervalId = started.mock.results.at(-1)?.value as unknown;
+		expect(vi.getTimerCount()).toBe(1);
 
 		tab.chimes.destroy();
 
-		expect(cleared).toHaveBeenCalledWith(intervalId);
+		expect(vi.getTimerCount()).toBe(0);
 	});
 
 	it('stops following the run, and lets go of the turn to sound', async () => {
@@ -357,6 +357,7 @@ describe('when the audio clock stood still', () => {
 	});
 
 	it('drops a chime within a second when the wall clock jumped past it with no event, whatever screen is open', async () => {
+		vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
 		const tab = openTab(storageHolding([foreverRoutine]));
 		tab.timer.play();
 		await expect.poll(() => tab.chimes.scheduled).toHaveLength(1);
@@ -365,21 +366,24 @@ describe('when the audio clock stood still', () => {
 		// neither the audio running again nor the page showing.
 		tab.audio.currentTime = 22 * 60;
 		nowMs = minutes(45);
+		vi.advanceTimersByTime(seconds(1));
 
-		await expect.poll(() => tab.audio.sources[0]?.isStopped, { timeout: 3000 }).toBe(true);
+		await expect.poll(() => tab.audio.sources[0]?.isStopped).toBe(true);
 		expect(tab.chimes.scheduled).toEqual([]);
 	});
 
 	it('places the chime again within a second when the audio clock fell behind with no event, whatever screen is open', async () => {
+		vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
 		const tab = openTab(storageHolding([foreverRoutine]));
 		tab.timer.play();
 		await expect.poll(() => tab.chimes.scheduled).toHaveLength(1);
 
 		nowMs = minutes(20);
 		tab.audio.currentTime = 15 * 60;
+		vi.advanceTimersByTime(seconds(1));
 
 		await expect
-			.poll(() => tab.chimes.scheduled, { timeout: 3000 })
+			.poll(() => tab.chimes.scheduled)
 			.toEqual([expect.objectContaining({ at: minutes(25), startsAt: 20 * 60 })]);
 	});
 
