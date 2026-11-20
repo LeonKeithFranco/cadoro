@@ -9,7 +9,7 @@ import {
 	lockedReason,
 	type RoutineEdit
 } from './routine-editing';
-import { routineWith } from './testing/routines';
+import { blockWith as sharedBlockWith, routineWith } from './testing/routines';
 
 /**
  * Makes a block for a test.
@@ -19,7 +19,7 @@ import { routineWith } from './testing/routines';
  * @returns The block, with a 25-minute target, a 20% break and 1 cycle.
  */
 function blockWith(id: string, title: string): Block {
-	return { id, title, targetMinutes: 25, breakPercent: 20, cycles: 1 };
+	return sharedBlockWith({ id, title });
 }
 
 /** The routine the edits in these tests start from. */

@@ -1,6 +1,6 @@
 // Routines for tests, beyond the starter routines, which all repeat forever.
 
-import type { Routine } from '../routine';
+import type { Block, Routine } from '../routine';
 
 /**
  * A routine of one round of one 25-minute block at 20%, so its first Next ends the run, as a
@@ -27,6 +27,24 @@ export const oneRoundRoutine: Routine = {
  */
 export function routineWith(changes: Partial<Routine>): Routine {
 	return { ...oneRoundRoutine, ...changes };
+}
+
+/**
+ * Makes a block for a test, which is a valid 25-minute block at 20% for 1 cycle, except where it
+ * says.
+ *
+ * @param changes - The fields that differ, such as `id` and `title`.
+ * @returns A new block, with the id `block` and the title `Focus` unless changed.
+ */
+export function blockWith(changes: Partial<Block>): Block {
+	return {
+		id: 'block',
+		title: 'Focus',
+		targetMinutes: 25,
+		breakPercent: 20,
+		cycles: 1,
+		...changes
+	};
 }
 
 /**
