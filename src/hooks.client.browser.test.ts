@@ -1,7 +1,8 @@
 import type { NavigationEvent } from '@sveltejs/kit';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { useErrorLog } from '#lib/error-log.ts';
 import { InMemoryStorage } from '#lib/storage/in-memory-storage.ts';
+import { recordedErrors } from '#lib/testing/error-log.ts';
 import { handleError, init } from './hooks.client';
 
 // Takes the log away again and puts back what a test spied on.
@@ -59,12 +60,33 @@ describe('handleError', () => {
 });
 
 describe('init', () => {
-	it('starts listening for uncaught errors and unhandled rejections on the window', async () => {
+	/**
+	 * Starts the hook's listeners on the window, and removes them when the test is over, since
+	 * `init` gives no way to stop them and they would record into later tests' logs.
+	 *
+	 * @returns A promise that settles once `init` has run.
+	 */
+	async function initWithCleanup(): Promise<void> {
 		const listening = vi.spyOn(window, 'addEventListener');
-
 		await init();
+		onTestFinished(() => {
+			for (const [type, listener] of listening.mock.calls) {
+				window.removeEventListener(type, listener);
+			}
+		});
+	}
 
-		expect(listening).toHaveBeenCalledWith('error', expect.any(Function));
-		expect(listening).toHaveBeenCalledWith('unhandledrejection', expect.any(Function));
+	it('records an uncaught error on the window in the activity log', async () => {
+		const storage = new InMemoryStorage();
+		useErrorLog(storage);
+		await initWithCleanup();
+
+		// Stops the browser from also reporting the error, which would fail the test run.
+		window.addEventListener('error', (caught) => caught.preventDefault(), { once: true });
+		window.dispatchEvent(new ErrorEvent('error', { error: new TypeError('Not a function') }));
+
+		await expect
+			.poll(() => recordedErrors(storage))
+			.toEqual([['An uncaught error occurred.', 'Not a function']]);
 	});
 });
