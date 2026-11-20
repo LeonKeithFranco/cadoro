@@ -16,6 +16,7 @@
 	import { editButtonId, headingId } from '../routine-card-ids';
 	import { describeRoutine, type Routine } from '../routine';
 	import { COMPACT_BUTTON_SHAPE, SECONDARY_BUTTON_COLOURS } from './button-classes';
+	import { CARD_CLASSES } from './card-classes';
 
 	/** The props a routine's card takes. */
 	type Props = {
@@ -69,7 +70,7 @@
 	let description = $derived(describeRoutine(routine));
 </script>
 
-<div class="rounded-xl border border-zinc-500 bg-white p-4 dark:border-zinc-500 dark:bg-zinc-900">
+<div class={CARD_CLASSES}>
 	<div class="flex items-start gap-3">
 		{#if hasDragHandle}
 			<div
