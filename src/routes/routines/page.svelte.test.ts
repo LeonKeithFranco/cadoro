@@ -107,7 +107,7 @@ describe('the Routines page', () => {
 		await expect.poll(() => storage.getLogEntries()).toHaveLength(1);
 		expect((await storage.getLogEntries())[0]).toMatchObject({
 			type: 'error',
-			message: 'The runs could not be read, so the picker may be out of order.',
+			message: 'The runs could not be read, so "last used" and "most work" may be out of order.',
 			details: { message: 'The disk could not be read.' }
 		});
 		await expect.poll(listedTitles).toEqual(['Alpha', 'Bravo', 'Charlie']);

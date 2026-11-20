@@ -59,7 +59,10 @@ export class RoutineUsageKeeper {
 				this.#usage = { runs, workPeriods };
 			}
 		} catch (error: unknown) {
-			void recordError('The runs could not be read, so the picker may be out of order.', error);
+			void recordError(
+				'The runs could not be read, so "last used" and "most work" may be out of order.',
+				error
+			);
 		}
 	}
 }
