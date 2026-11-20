@@ -6,7 +6,7 @@ import type { BackupData } from '../backup-format';
 import { importLogEntry } from '../backup-log';
 import type { BackupSummary } from '../backup-summary';
 import { recordErrorIn } from '../error-log';
-import { LOG_MAX_ENTRIES, type LogEntry, type NewLogEntry } from '../log';
+import { LOG_MAX_ENTRIES, withRepeatCounted, type LogEntry, type NewLogEntry } from '../log';
 import { pickableRoutines, type Routine } from '../routine';
 import {
 	planCreate,
@@ -333,6 +333,13 @@ export class DexieStorage implements CadoroStorage {
 	async addLogEntry(entry: NewLogEntry): Promise<void> {
 		const log = this.#database.log;
 		await this.#database.transaction('rw', log, async () => {
+			// The primary key counts up, so the last key is the newest entry.
+			const counted = withRepeatCounted(await log.orderBy(':id').last(), entry);
+			if (counted !== null) {
+				await log.put(counted);
+				return;
+			}
+
 			await log.add(entry);
 			const excess = (await log.count()) - this.#logLimit;
 			if (excess > 0) {
