@@ -6,13 +6,10 @@ import { SettingsSession } from './settings.svelte';
 import type { InMemoryStorage } from './storage/in-memory-storage';
 import { FakeAudioContext, fakeFiles, type FakeSound } from './testing/audio';
 import { minutes, seconds } from './testing/durations';
-import { routineWith } from './testing/routines';
+import { foreverRoutine } from './testing/routines';
 import { storageHolding } from './testing/storage';
 import { restartRevisions, testSessionOptions } from './testing/timer-session';
 import { TimerSession } from './timer.svelte';
-
-/** A 25-minute block at 20%, repeating forever, so Next always starts a 5-minute break. */
-const foreverRoutine = routineWith({ id: 'forever', title: 'Forever', rounds: 'infinite' });
 
 /** The fake clock's current moment, in milliseconds since 1970, which each test moves by hand. */
 let nowMs = 0;

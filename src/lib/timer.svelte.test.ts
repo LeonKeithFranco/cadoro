@@ -8,7 +8,7 @@ import { InMemoryStorage } from './storage/in-memory-storage';
 import type { CadoroStorage } from './storage/storage';
 import { minutes, seconds } from './testing/durations';
 import { numberedIds } from './testing/ids';
-import { oneRoundRoutine, routineWith } from './testing/routines';
+import { foreverRoutine, oneRoundRoutine, routineWith } from './testing/routines';
 import { storageHolding } from './testing/storage';
 import { restartRevisions, testSessionOptions } from './testing/timer-session';
 import { TimerSession, type AppOpening, type TimerSessionOptions } from './timer.svelte';
@@ -21,9 +21,6 @@ const classic = requireDefined(routines[0], 'the Classic routine');
 
 /** The second starter routine, Classic with long break. */
 const classicWithLongBreak = requireDefined(routines[1], 'the Classic with long break routine');
-
-/** The one-round routine's 25-minute block at 20%, repeating forever, so Next always starts a break. */
-const foreverRoutine = routineWith({ id: 'forever', title: 'Forever', rounds: 'infinite' });
 
 /**
  * Orders routines by title, Z to A, as a picker sorted that way does.

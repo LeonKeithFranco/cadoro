@@ -28,3 +28,13 @@ export const oneRoundRoutine: Routine = {
 export function routineWith(changes: Partial<Routine>): Routine {
 	return { ...oneRoundRoutine, ...changes };
 }
+
+/**
+ * A routine of one 25-minute block at 20%, repeating forever, so Next always starts a 5-minute
+ * break and Finish ends the run.
+ */
+export const foreverRoutine: Routine = routineWith({
+	id: 'forever',
+	title: 'Forever',
+	rounds: 'infinite'
+});
