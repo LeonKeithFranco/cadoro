@@ -1,6 +1,26 @@
-// Routines for tests, beyond the starter routines, which all repeat forever.
+// Routines for tests: the starter routines, which all repeat forever, and others made for tests.
 
-import type { Block, Routine } from '../routine';
+import { requireDefined } from '../defined';
+import { createStarterRoutines, type Block, type Routine } from '../routine';
+import { numberedIds } from './ids';
+
+/**
+ * The starter routines, Classic then Classic with long break, created at the epoch with ids
+ * numbered from `id-1`.
+ */
+export const starterRoutines: readonly Routine[] = createStarterRoutines(
+	new Date(0),
+	numberedIds()
+);
+
+/** The first starter routine, Classic. */
+export const classic: Routine = requireDefined(starterRoutines[0], 'the Classic routine');
+
+/** The second starter routine, Classic with long break. */
+export const classicWithLongBreak: Routine = requireDefined(
+	starterRoutines[1],
+	'the Classic with long break routine'
+);
 
 /**
  * A routine of one round of one 25-minute block at 20%, so its first Next ends the run, as a
