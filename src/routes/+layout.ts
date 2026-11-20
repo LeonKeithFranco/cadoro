@@ -110,6 +110,9 @@ async function openApp(): Promise<AppSessions> {
 		newRevision: newId,
 		onWorkSaved: () => {
 			void askToPersist();
+		},
+		// After the save, so the read finds the run or work period that changed the usage.
+		onRunSaved: () => {
 			void routineUsage.reload();
 		},
 		onPress: () => {
@@ -117,7 +120,6 @@ async function openApp(): Promise<AppSessions> {
 		},
 		onRunStarted: (routineId) => {
 			void settingsSession.save({ lastRoutineId: routineId });
-			void routineUsage.reload();
 		}
 	};
 	const timerSession = new TimerSession(routines, options, {

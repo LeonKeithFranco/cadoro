@@ -44,6 +44,12 @@ export type TimerSessionOptions = {
 	 */
 	onWorkSaved: () => void;
 	/**
+	 * Called each time a save that held a run's record or work periods has finished, so storage
+	 * holds them when it's called, which the app uses to read the routines' usage again. It isn't
+	 * waited for. Nothing is called when left out.
+	 */
+	onRunSaved?: () => void;
+	/**
 	 * Called as any button is pressed, before the press changes the run, and from within the
 	 * press itself, which the app uses to unlock the chimes' audio, since browsers allow audio to
 	 * start only during a user gesture. Called even when the press changes nothing, but not for
@@ -118,6 +124,9 @@ export class TimerSession {
 
 	/** Called each time a save that held work periods has finished. */
 	readonly #onWorkSaved: () => void;
+
+	/** Called each time a save that held a run's record or work periods has finished. */
+	readonly #onRunSaved: () => void;
 
 	/** Called as any button is pressed, before the press changes the run. */
 	readonly #onPress: () => void;
@@ -210,6 +219,7 @@ export class TimerSession {
 			newId,
 			newRevision,
 			onWorkSaved,
+			onRunSaved = (): void => {},
 			onPress = (): void => {},
 			onRunStarted = (): void => {},
 			pickerOrder = (list): readonly Routine[] => list
@@ -230,6 +240,7 @@ export class TimerSession {
 		this.#newId = newId;
 		this.#newRevision = newRevision;
 		this.#onWorkSaved = onWorkSaved;
+		this.#onRunSaved = onRunSaved;
 		this.#onPress = onPress;
 		this.#onRunStarted = onRunStarted;
 		this.#pickerOrder = pickerOrder;
@@ -527,7 +538,8 @@ export class TimerSession {
 	 *
 	 * @remarks
 	 * The change gets a new revision at once, so the next change is worked out from it, even
-	 * before it's saved. Once a save that held work periods has finished, `onWorkSaved` is called.
+	 * before it's saved. Once a save that held work periods has finished, `onWorkSaved` is called,
+	 * and `onRunSaved` is too after one that held a run's record or work periods.
 	 * A refused save keeps nothing, and the session catches up with the run storage holds.
 	 *
 	 * @param records - What the change left to keep, besides the run in progress. A ready run
@@ -552,8 +564,13 @@ export class TimerSession {
 				const isSaved = await this.#storage.saveRunInProgress(runInProgress, savedBasis, records);
 				if (!isSaved) {
 					this.#isBehind = true;
-				} else if (hasWorkPeriods) {
-					this.#onWorkSaved();
+				} else {
+					if (hasWorkPeriods) {
+						this.#onWorkSaved();
+					}
+					if (hasWorkPeriods || records.run !== null) {
+						this.#onRunSaved();
+					}
 				}
 			} catch (error: unknown) {
 				this.#failedRevisions[revision] = savedBasis;

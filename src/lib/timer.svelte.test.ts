@@ -71,7 +71,13 @@ function createSession(
 	options: Partial<
 		Pick<
 			TimerSessionOptions,
-			'storage' | 'newId' | 'onWorkSaved' | 'onPress' | 'onRunStarted' | 'pickerOrder'
+			| 'storage'
+			| 'newId'
+			| 'onWorkSaved'
+			| 'onRunSaved'
+			| 'onPress'
+			| 'onRunStarted'
+			| 'pickerOrder'
 		>
 	> = {},
 	opening: Partial<AppOpening> = {}
@@ -810,6 +816,22 @@ describe('recording runs', () => {
 
 		await expect.poll(() => onWorkSaved).toHaveBeenCalledOnce();
 		expect(await storage.getWorkPeriods()).toHaveLength(1);
+	});
+
+	it('says a run is saved only once it has reached storage, and not for a pause', async () => {
+		const storage = storageForRuns();
+		const runsInStorage: number[] = [];
+		const onRunSaved = vi.fn(() => {
+			void storage.getRuns().then((runs) => runsInStorage.push(runs.length));
+		});
+		const session = createSession([foreverRoutine], { storage, onRunSaved });
+
+		session.play();
+
+		await expect.poll(() => runsInStorage).toEqual([1]);
+		session.pause();
+		await expect.poll(() => storage.getRunInProgress()).not.toBeNull();
+		expect(onRunSaved).toHaveBeenCalledOnce();
 	});
 
 	it('says nothing about work whose save failed', async () => {
