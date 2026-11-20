@@ -13,7 +13,7 @@
 	import type { SaveFile } from '../file-download';
 	import { LOG_MAX_ENTRIES, type LogEntry } from '../log';
 	import type { CadoroStorage } from '../storage/storage';
-	import { SECONDARY_BUTTON_COLOURS } from './button-classes';
+	import { BUTTON_SHAPE, SECONDARY_BUTTON_COLOURS } from './button-classes';
 	import { ERROR_TEXT, LINK_TEXT } from './form-classes';
 	import ScreenHeading from './ScreenHeading.svelte';
 
@@ -88,7 +88,7 @@
 			type="button"
 			onclick={exportLog}
 			disabled={entries === null}
-			class={['rounded-lg px-4 py-2 font-medium disabled:opacity-60', SECONDARY_BUTTON_COLOURS]}
+			class={[BUTTON_SHAPE, SECONDARY_BUTTON_COLOURS]}
 		>
 			Export the log (JSON)
 		</button>

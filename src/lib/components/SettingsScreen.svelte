@@ -191,7 +191,7 @@
 				disabled={!isWakeLockSupported}
 				onchange={(event): void =>
 					void settingsSession.save({ keepScreenAwake: event.currentTarget.checked })}
-				class={[CHOICE_COLOURS, 'disabled:opacity-60']}
+				class={[CHOICE_COLOURS, 'disabled:cursor-not-allowed disabled:opacity-60']}
 			/>
 			Keep the screen awake during a run
 		</label>
