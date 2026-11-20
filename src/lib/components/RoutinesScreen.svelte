@@ -144,6 +144,9 @@
 	/** The notice that the routine being edited was deleted in another tab, or `null`. */
 	let deletedElsewhere = $state<string | null>(null);
 
+	/** What went wrong in the last duplicate, delete or move, or `null` when nothing did. */
+	let actionFailure = $state<string | null>(null);
+
 	/** The routine the user asked to delete, or `null` while the question isn't being asked. */
 	let routineToDelete = $state.raw<Routine | null>(null);
 
@@ -313,10 +316,12 @@
 	 * @param routine - The routine to copy.
 	 */
 	async function duplicate(routine: Routine): Promise<void> {
+		actionFailure = null;
 		try {
 			await storage.duplicateRoutine(duplicateRoutine(routine, now(), newId), routine.id);
 		} catch (error) {
 			reportFailure('Duplicating the routine', error);
+			actionFailure = 'The routine could not be duplicated. Try again.';
 		}
 	}
 
@@ -328,10 +333,12 @@
 			return;
 		}
 
+		actionFailure = null;
 		try {
 			await storage.deleteRoutine(routine.id);
 		} catch (error) {
 			reportFailure('Deleting the routine', error);
+			actionFailure = 'The routine could not be deleted. Try again.';
 		}
 	}
 
@@ -342,10 +349,12 @@
 	 */
 	async function reorder(ordered: Routine[]): Promise<void> {
 		routines = ordered.map((routine, index) => ({ ...routine, customPosition: index }));
+		actionFailure = null;
 		try {
 			await storage.reorderRoutines(ordered.map((routine) => routine.id));
 		} catch (error) {
 			reportFailure('Reordering the routines', error);
+			actionFailure = 'The routines could not be moved. Try again.';
 			routines = await storage.getRoutines();
 		}
 	}
@@ -461,6 +470,10 @@
 		>
 			{deletedElsewhere}
 		</p>
+	{/if}
+
+	{#if actionFailure !== null}
+		<p role="alert" class="text-sm text-rose-700 dark:text-rose-400">{actionFailure}</p>
 	{/if}
 
 	{#if editing?.isNew}

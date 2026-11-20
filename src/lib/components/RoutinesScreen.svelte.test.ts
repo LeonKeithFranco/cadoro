@@ -1140,6 +1140,49 @@ describe('when saving fails', () => {
 		expect(listedTitles()).toEqual(['Alpha', 'Bravo', 'Charlie']);
 	});
 
+	it('tells the user a duplicate failed, and clears the message on the next action', async () => {
+		const { storage } = await openScreen();
+		const duplicate = vi
+			.spyOn(storage, 'duplicateRoutine')
+			.mockRejectedValueOnce(new Error('The disk is full.'));
+
+		await cardOf('Alpha').getByRole('button', { name: 'Duplicate' }).click();
+
+		const message = page.getByRole('alert').filter({ hasText: 'could not be duplicated' });
+		await expect
+			.element(message)
+			.toHaveTextContent('The routine could not be duplicated. Try again.');
+		await cardOf('Alpha').getByRole('button', { name: 'Duplicate' }).click();
+		await expect.poll(() => duplicate.mock.calls).toHaveLength(2);
+		await expect.element(message).not.toBeInTheDocument();
+	});
+
+	it('tells the user a delete failed', async () => {
+		const { storage } = await openScreen();
+		vi.spyOn(storage, 'deleteRoutine').mockRejectedValue(new Error('The disk is full.'));
+		await cardOf('Bravo').getByRole('button', { name: 'Delete' }).click();
+
+		await page
+			.getByRole('dialog', { name: 'Delete Bravo?' })
+			.getByRole('button', { name: 'Delete' })
+			.click();
+
+		await expect
+			.element(page.getByRole('alert').filter({ hasText: 'could not be deleted' }))
+			.toHaveTextContent('The routine could not be deleted. Try again.');
+	});
+
+	it('tells the user a move failed', async () => {
+		const { storage } = await openScreen();
+		vi.spyOn(storage, 'reorderRoutines').mockRejectedValue(new Error('The disk is full.'));
+
+		await cardOf('Bravo').getByRole('button', { name: 'Move up' }).click();
+
+		await expect
+			.element(page.getByRole('alert').filter({ hasText: 'could not be moved' }))
+			.toHaveTextContent('The routines could not be moved. Try again.');
+	});
+
 	it('records a failed delete in the activity log, and keeps the routine', async () => {
 		const { storage } = await openScreen();
 		useErrorLog(storage);
