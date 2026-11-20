@@ -1,5 +1,7 @@
 // Routines and their blocks, shaped as in the data model in `docs/SPEC.md`.
 
+import { counted } from './plural';
+
 /** Part of a routine: a work target, a break percentage and a number of cycles. */
 export type Block = {
 	/** A UUID. */
@@ -126,6 +128,19 @@ export function newRoutine(now: Date, newId: () => string): Routine {
  */
 export function canDeleteRoutine(routines: Routine[]): boolean {
 	return pickableRoutines(routines).length > 1;
+}
+
+/**
+ * Words a routine's rounds and blocks for its card in the Routines list.
+ *
+ * @param routine - The routine to describe.
+ * @returns The rounds, then the blocks, such as `2 rounds · 3 blocks`, `1 round · 1 block` or
+ * `Repeats forever · 2 blocks`.
+ */
+export function describeRoutine(routine: Routine): string {
+	const rounds =
+		routine.rounds === 'infinite' ? 'Repeats forever' : counted(routine.rounds, 'round');
+	return `${rounds} · ${counted(routine.blocks.length, 'block')}`;
 }
 
 /** A routine's content without what's unique to each copy, such as ids. */
