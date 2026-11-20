@@ -33,6 +33,69 @@ import {
 import type { CadoroStorage, StorageOptions } from './storage';
 
 /**
+ * The followers of one kind of data, told what it is when they start following and after each
+ * change.
+ *
+ * @typeParam T - What a follower is told: the data as it is when the report is made.
+ */
+class Watchers<T> {
+	/** The `onChange` of everything following the data. */
+	#followers = new Set<(value: T) => void>();
+
+	/** Reads the data as a follower should be told it, as a copy. */
+	readonly #read: () => T;
+
+	/**
+	 * Makes a set of followers with none.
+	 *
+	 * @param read - Reads the data as a follower should be told it, as a copy.
+	 */
+	constructor(read: () => T) {
+		this.#read = read;
+	}
+
+	/**
+	 * Adds a follower and tells it what the data is, once the current call has finished.
+	 *
+	 * @param onChange - The follower's `onChange`.
+	 * @returns A function that stops the follower.
+	 */
+	follow(onChange: (value: T) => void): () => void {
+		this.#followers.add(onChange);
+		this.#report(onChange);
+		return (): void => {
+			this.#followers.delete(onChange);
+		};
+	}
+
+	/** Tells every follower what the data is now. */
+	reportAll(): void {
+		for (const follower of this.#followers) {
+			this.#report(follower);
+		}
+	}
+
+	/**
+	 * Tells one follower what the data is, once the current call has finished, as IndexedDB's
+	 * live queries answer later too.
+	 *
+	 * @remarks
+	 * It reports the data as it is when the report is made, so changes in quick succession may be
+	 * reported with the latest more than once. A follower that has stopped following by then isn't
+	 * told.
+	 *
+	 * @param follower - The follower's `onChange`.
+	 */
+	#report(follower: (value: T) => void): void {
+		queueMicrotask(() => {
+			if (this.#followers.has(follower)) {
+				follower(this.#read());
+			}
+		});
+	}
+}
+
+/**
  * Storage kept in memory, which starts empty and is lost when the object goes.
  *
  * @remarks
@@ -53,14 +116,14 @@ export class InMemoryStorage implements CadoroStorage {
 	/** The run in progress, or `null` when none is saved. */
 	#runInProgress: StoredRunInProgress | null = null;
 
-	/** The `onChange` of everything following the run in progress. */
-	#watchers = new Set<(runInProgress: StoredRunInProgress | null) => void>();
+	/** Everything following the run in progress. */
+	#watchers = new Watchers<StoredRunInProgress | null>(() => structuredClone(this.#runInProgress));
 
 	/** The settings the user has changed, or `null` when none has been. */
 	#settings: Partial<Settings> | null = null;
 
-	/** The `onChange` of everything following the settings. */
-	#settingsWatchers = new Set<(settings: Settings) => void>();
+	/** Everything following the settings. */
+	#settingsWatchers = new Watchers<Settings>(() => settingsFrom(structuredClone(this.#settings)));
 
 	/** Returns the current moment, which stamps each log entry and each deletion. */
 	readonly #now: () => Date;
@@ -74,8 +137,10 @@ export class InMemoryStorage implements CadoroStorage {
 	/** The id the next log entry gets. */
 	#nextLogId = 1;
 
-	/** The `onChange` of everything following the routines. */
-	#routineWatchers = new Set<(routines: Routine[]) => void>();
+	/** Everything following the routines not deleted. */
+	#routineWatchers = new Watchers<Routine[]>(() =>
+		structuredClone(pickableRoutines(this.#routines))
+	);
 
 	/**
 	 * Makes empty storage.
@@ -97,11 +162,7 @@ export class InMemoryStorage implements CadoroStorage {
 
 	// It takes no `onError`, since memory can always be read.
 	watchRoutines(onChange: (routines: Routine[]) => void): () => void {
-		this.#routineWatchers.add(onChange);
-		this.#reportRoutines(onChange);
-		return (): void => {
-			this.#routineWatchers.delete(onChange);
-		};
+		return this.#routineWatchers.follow(onChange);
 	}
 
 	async createRoutine(routine: Routine): Promise<void> {
@@ -150,9 +211,7 @@ export class InMemoryStorage implements CadoroStorage {
 			return;
 		}
 
-		this.#log.push({ id: this.#nextLogId, ...structuredClone(entry) });
-		this.#nextLogId += 1;
-		this.#log = this.#log.slice(-this.#logLimit);
+		this.#appendLog(structuredClone(entry));
 	}
 
 	async addRoutinesIfNone(routines: Routine[]): Promise<boolean> {
@@ -161,7 +220,7 @@ export class InMemoryStorage implements CadoroStorage {
 		}
 
 		this.#routines = structuredClone(routines);
-		this.#reportToRoutineWatchers();
+		this.#routineWatchers.reportAll();
 		return true;
 	}
 
@@ -213,11 +272,7 @@ export class InMemoryStorage implements CadoroStorage {
 
 	// It takes no `onError`, since memory can always be read.
 	watchRunInProgress(onChange: (runInProgress: StoredRunInProgress | null) => void): () => void {
-		this.#watchers.add(onChange);
-		this.#report(onChange);
-		return (): void => {
-			this.#watchers.delete(onChange);
-		};
+		return this.#watchers.follow(onChange);
 	}
 
 	async clearRunInProgress(basedOn: string): Promise<boolean> {
@@ -235,18 +290,12 @@ export class InMemoryStorage implements CadoroStorage {
 
 	async saveSettings(changes: Partial<Settings>): Promise<void> {
 		this.#settings = structuredClone(settingsWithChanges(this.#settings, changes));
-		for (const watcher of this.#settingsWatchers) {
-			this.#reportSettings(watcher);
-		}
+		this.#settingsWatchers.reportAll();
 	}
 
 	// It takes no `onError`, since memory can always be read.
 	watchSettings(onChange: (settings: Settings) => void): () => void {
-		this.#settingsWatchers.add(onChange);
-		this.#reportSettings(onChange);
-		return (): void => {
-			this.#settingsWatchers.delete(onChange);
-		};
+		return this.#settingsWatchers.follow(onChange);
 	}
 
 	async getRuns(): Promise<Run[]> {
@@ -287,14 +336,10 @@ export class InMemoryStorage implements CadoroStorage {
 		);
 		this.#settings = settingsDifferingFromDefaults(data.settings);
 		this.#changeRunInProgress(null);
-		this.#reportToRoutineWatchers();
-		for (const watcher of this.#settingsWatchers) {
-			this.#reportSettings(watcher);
-		}
+		this.#routineWatchers.reportAll();
+		this.#settingsWatchers.reportAll();
 
-		this.#log.push({ id: this.#nextLogId, ...importLogEntry(summary, this.#now()) });
-		this.#nextLogId += 1;
-		this.#log = this.#log.slice(-this.#logLimit);
+		this.#appendLog(importLogEntry(summary, this.#now()));
 	}
 
 	async hasWorkPeriods(): Promise<boolean> {
@@ -316,46 +361,20 @@ export class InMemoryStorage implements CadoroStorage {
 			}
 		}
 
-		this.#log.push({ id: this.#nextLogId, ...structuredClone(change.entry) });
+		this.#appendLog(structuredClone(change.entry));
+		this.#routineWatchers.reportAll();
+	}
+
+	/**
+	 * Adds an entry to the end of the log, numbering it, and drops the oldest entries beyond the
+	 * log's limit.
+	 *
+	 * @param entry - The entry to add, which the log keeps as it is, so it must be a copy.
+	 */
+	#appendLog(entry: NewLogEntry): void {
+		this.#log.push({ id: this.#nextLogId, ...entry });
 		this.#nextLogId += 1;
 		this.#log = this.#log.slice(-this.#logLimit);
-		this.#reportToRoutineWatchers();
-	}
-
-	/** Tells everything following the routines what they are. */
-	#reportToRoutineWatchers(): void {
-		for (const watcher of this.#routineWatchers) {
-			this.#reportRoutines(watcher);
-		}
-	}
-
-	/**
-	 * Tells one follower of the routines what they are, once the current call has finished, as
-	 * `#reportSettings` does for the settings.
-	 *
-	 * @param watcher - The follower's `onChange`.
-	 */
-	#reportRoutines(watcher: (routines: Routine[]) => void): void {
-		queueMicrotask(() => {
-			if (this.#routineWatchers.has(watcher)) {
-				watcher(structuredClone(pickableRoutines(this.#routines)));
-			}
-		});
-	}
-
-	/**
-	 * Tells one follower of the settings what they are, once the current call has finished, as
-	 * `#report` does for the run in progress. A follower that has stopped
-	 * following by then isn't told.
-	 *
-	 * @param watcher - The follower's `onChange`.
-	 */
-	#reportSettings(watcher: (settings: Settings) => void): void {
-		queueMicrotask(() => {
-			if (this.#settingsWatchers.has(watcher)) {
-				watcher(settingsFrom(structuredClone(this.#settings)));
-			}
-		});
 	}
 
 	/**
@@ -365,27 +384,6 @@ export class InMemoryStorage implements CadoroStorage {
 	 */
 	#changeRunInProgress(runInProgress: StoredRunInProgress | null): void {
 		this.#runInProgress = structuredClone(runInProgress);
-		for (const watcher of this.#watchers) {
-			this.#report(watcher);
-		}
-	}
-
-	/**
-	 * Tells one follower the run in progress, once the current call has finished, as IndexedDB's
-	 * live queries answer later too.
-	 *
-	 * @remarks
-	 * It reports the run in progress as it is when the report is made, so changes in quick
-	 * succession may be reported with the latest more than once. A follower that has stopped
-	 * following by then isn't told.
-	 *
-	 * @param watcher - The follower's `onChange`.
-	 */
-	#report(watcher: (runInProgress: StoredRunInProgress | null) => void): void {
-		queueMicrotask(() => {
-			if (this.#watchers.has(watcher)) {
-				watcher(structuredClone(this.#runInProgress));
-			}
-		});
+		this.#watchers.reportAll();
 	}
 }
