@@ -1,6 +1,6 @@
 # Progress
 
-**Status:** 1.0.0 is live. 1.2.0 adds the banked break: Next during a break banks the time left into the next break. The spec is complete: Cadoro runs routines of blocks with work that counts up and earned breaks, keeps its data in IndexedDB, shares one run across tabs, chimes, shows stats, backs up and imports, and keeps an activity log. It works offline and is installed on the desktop and the phone.
+**Status:** 1.0.0 is live. 1.2.0 adds the banked break: Next during a break banks the time left into the next break. 1.2.1 is the refactoring sweep, which removes duplication and dead code, with a few fixes. The spec is complete: Cadoro runs routines of blocks with work that counts up and earned breaks, keeps its data in IndexedDB, shares one run across tabs, chimes, shows stats, backs up and imports, and keeps an activity log. It works offline and is installed on the desktop and the phone.
 
 **Next:** the device checks listed in `docs/decisions/09-release-1-0.md`, then the optional milestones 10 and 11.
 
@@ -33,6 +33,7 @@ Each finished milestone lists its steps' branches. Its decisions are in its file
 - [x] 9. Release 1.0: `docs/release-1-0` (1.0.0)
 - [x] After 9. Break preview: `feat/break-preview` (1.1.0)
 - [x] After 9. Banked break: `feat/banked-break` (1.2.0)
+- [x] After 9. Refactoring sweep: `refactor/duplication-and-dead-code` (1.2.1)
 
 ### Phase 4: Optional
 
