@@ -11,7 +11,6 @@ import { InMemoryStorage } from '../storage/in-memory-storage';
 import type { CadoroStorage } from '../storage/storage';
 import { numberedIds } from '../testing/ids';
 import { routineWith } from '../testing/routines';
-import { runInProgressWith } from '../testing/run-in-progress';
 import { runWith } from '../testing/run-records';
 import type { Run } from '../run-records';
 import RoutinesScreen from './RoutinesScreen.svelte';
@@ -84,7 +83,7 @@ type OpenScreen = {
  *
  * @param routines - The routines saved. Alpha, Bravo and Charlie unless a test needs others.
  * @param settings - The settings the user has changed, such as the saved sort.
- * @param runs - The runs saved before the screen opens, which "last used" is worked out from.
+ * @param runs - The runs in the usage the screen is given, which "last used" is worked out from.
  * @param runningRoutineId - The id of the routine a run in progress is running, if any.
  * @returns The storage and settings behind the screen.
  */
@@ -98,15 +97,13 @@ async function openScreen(
 	await storage.addRoutinesIfNone(routines);
 	// Saved before the session starts following the settings, which report what storage holds.
 	await storage.saveSettings(settings);
-	for (const run of runs) {
-		await storage.saveRunInProgress(runInProgressWith({}), null, { run, workPeriods: [] });
-	}
 	const settingsSession = new SettingsSession(storage, settingsFrom(settings));
 	const screen = await render(RoutinesScreen, {
 		storage,
 		settingsSession,
 		initialRoutines: routines,
 		runningRoutineId,
+		usage: { runs, workPeriods: [] },
 		newId: numberedIds('new'),
 		now: () => new Date(NOW)
 	});
@@ -247,7 +244,7 @@ describe('sorting', () => {
 		expect(settingsSession.settings.routineSort).toBe('newest');
 	});
 
-	it('sorts by last used from the saved runs', async () => {
+	it('sorts by last used from the runs in its usage', async () => {
 		await openScreen(threeRoutines(), {}, [
 			runWith({ id: 'run-1', routineId: 'charlie', startedAt: '2026-11-18T09:00:00.000Z' })
 		]);
@@ -1350,22 +1347,6 @@ describe('when reading fails', () => {
 			message: 'Changes to the routines can no longer be followed.',
 			details: { message: 'The routines could not be read.' }
 		});
-	});
-
-	it('records in the activity log that the runs could not be read, and still lists the routines', async () => {
-		const storage = new InMemoryStorage();
-		await storage.addRoutinesIfNone(threeRoutines());
-		vi.spyOn(storage, 'getRuns').mockRejectedValue(new Error('The disk could not be read.'));
-
-		openOn(storage);
-
-		await expect.poll(() => storage.getLogEntries()).toHaveLength(1);
-		expect((await storage.getLogEntries())[0]).toMatchObject({
-			type: 'error',
-			message: 'The runs could not be read, so "last used" and "most work" are off.',
-			details: { message: 'The disk could not be read.' }
-		});
-		await expect.poll(() => listedTitles()).toEqual(['Alpha', 'Bravo', 'Charlie']);
 	});
 });
 

@@ -42,7 +42,10 @@ type AppSessions = {
 	chimes: RunChimes;
 	/** The app's storage, which the Routines screen edits routines through. */
 	storage: CadoroStorage;
-	/** The runs and work periods the Timer's picker and the session's fallback routine sort by. */
+	/**
+	 * The runs and work periods the Timer's picker, the session's fallback routine and the Routines
+	 * screen sort by.
+	 */
 	routineUsage: RoutineUsageKeeper;
 };
 
