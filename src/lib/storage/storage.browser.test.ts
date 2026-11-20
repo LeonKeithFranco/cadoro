@@ -732,13 +732,13 @@ describe.each(backends)('$name', ({ create }) => {
 			 */
 			function errorAt(
 				timestamp: string,
-				changes: { message?: string; name?: string } = {}
+				changes: { message?: string; name?: string; errorMessage?: string } = {}
 			): Parameters<CadoroStorage['addLogEntry']>[0] {
 				return {
 					timestamp,
 					type: 'error',
 					message: changes.message ?? 'Something failed.',
-					details: { name: changes.name ?? 'Error', message: 'x' }
+					details: { name: changes.name ?? 'Error', message: changes.errorMessage ?? 'x' }
 				};
 			}
 
@@ -784,14 +784,15 @@ describe.each(backends)('$name', ({ create }) => {
 				expect(await storage.getLogEntries()).toHaveLength(2);
 			});
 
-			it('is a new entry when its message or its error’s name differs', async () => {
+			it('is a new entry when its message, or its error’s name or message, differs', async () => {
 				const storage = create();
 
 				await storage.addLogEntry(errorAt('2026-11-19T10:00:00.000Z'));
 				await storage.addLogEntry(errorAt('2026-11-19T10:00:01.000Z', { message: 'Other.' }));
 				await storage.addLogEntry(errorAt('2026-11-19T10:00:02.000Z', { name: 'TypeError' }));
+				await storage.addLogEntry(errorAt('2026-11-19T10:00:03.000Z', { errorMessage: 'y' }));
 
-				expect(await storage.getLogEntries()).toHaveLength(3);
+				expect(await storage.getLogEntries()).toHaveLength(4);
 			});
 
 			it('never collapses with a change entry, or two changes', async () => {

@@ -32,8 +32,8 @@ export type LogEntry = NewLogEntry & {
  *
  * @remarks
  * An error that repeats, such as an `error` event firing in a loop, would otherwise fill the
- * log and push the routine history out of it. A repeat is an error with the same message and
- * the same error name as the newest entry, which is itself an error, within
+ * log and push the routine history out of it. A repeat is an error with the same message, and
+ * the same error name and message, as the newest entry, which is itself an error, within
  * {@link ERROR_REPEAT_WINDOW_MS} of that entry's last repeat. The entry keeps its own id,
  * timestamp and details, as the first occurrence, and gains `details.count`, how many times it
  * happened, and `details.lastTimestamp`, when it last did.
@@ -50,8 +50,11 @@ export function withRepeatCounted(
 	if (newest?.type !== 'error' || entry.type !== 'error' || newest.message !== entry.message) {
 		return null;
 	}
-	if (newest.details?.['name'] !== entry.details?.['name']) {
-		return null;
+	// The same error: its name and message, or for something thrown that isn't an `Error`, its text.
+	for (const field of ['name', 'message', 'value']) {
+		if (newest.details?.[field] !== entry.details?.[field]) {
+			return null;
+		}
 	}
 
 	const lastTimestamp = newest.details?.['lastTimestamp'];
