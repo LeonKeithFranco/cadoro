@@ -9,6 +9,7 @@ import { minutes, seconds } from './testing/durations';
 import { foreverRoutine } from './testing/routines';
 import { storageHolding } from './testing/storage';
 import { restartRevisions, testSessionOptions } from './testing/timer-session';
+import { afterPendingWork } from './testing/waiting';
 import { TimerSession } from './timer.svelte';
 
 /** The fake clock's current moment, in milliseconds since 1970, which each test moves by hand. */
@@ -96,18 +97,6 @@ function openTab(
 
 /** The chimes of every tab a test opened, which are destroyed once the test ends. */
 const chimesOfOpenTabs: RunChimes[] = [];
-
-/**
- * Waits for every effect, chime load and lock request already started to finish, so a test can
- * check that something didn't happen.
- *
- * @returns A promise that settles after a few of the browser's tasks.
- */
-async function afterPendingWork(): Promise<void> {
-	await new Promise<void>((resolve) => {
-		setTimeout(resolve, 50);
-	});
-}
 
 /**
  * Holds this test's chime lock, as a tab sounding the chimes elsewhere does, until the test lets
