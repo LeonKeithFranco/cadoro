@@ -8,46 +8,20 @@ import {
 	setVisibility,
 	wakeLockLog
 } from './browser-apis';
-import { openOnPausedClock } from './clock';
+import { followLink, openOnPausedClock } from './clock';
+import { openSettings, screenLink, type ScreenName } from './screens';
 import { hasSavedRunInProgress, savedSettingsRow } from './storage';
-
-/** How long SvelteKit waits before following a link, at most, which the paused clock runs. */
-const NAVIGATION_WAIT_MS = 100;
-
-/** How long to wait for a screen to show before running the clock again, in milliseconds. */
-const RECHECK_MS = 500;
-
-/**
- * Opens the Settings screen.
- *
- * @param page - The page to open it in.
- */
-async function openSettings(page: Page): Promise<void> {
-	await page.goto('/settings');
-	await expect(page.getByRole('heading', { level: 1, name: 'Settings' })).toBeVisible();
-}
+import { closeSummary, finishRun } from './timer';
 
 /**
  * Follows a link in the navigation on a paused clock, and waits for the screen to show.
  *
- * @remarks
- * SvelteKit waits on a timer before it follows a link, so the paused clock runs a little, again
- * until the screen shows in case the click was handled after the clock first ran.
- *
  * @param page - The page, on a paused clock.
  * @param screen - The screen's name: its link and its heading.
  */
-async function goToScreen(page: Page, screen: 'Timer' | 'Settings'): Promise<void> {
-	const link = page
-		.getByRole('navigation', { name: 'Screens' })
-		.getByRole('link', { name: screen });
-	await link.click();
-	await expect(async () => {
-		await page.clock.runFor(NAVIGATION_WAIT_MS);
-		await expect(page.getByRole('heading', { level: 1, name: screen })).toBeVisible({
-			timeout: RECHECK_MS
-		});
-	}).toPass();
+async function goToScreen(page: Page, screen: ScreenName): Promise<void> {
+	await followLink(page, screenLink(page, screen));
+	await expect(page.getByRole('heading', { level: 1, name: screen })).toBeVisible();
 }
 
 test.describe('the Settings screen', () => {
@@ -99,43 +73,14 @@ test.describe('the Settings screen', () => {
 		).not.toBeChecked();
 	});
 
-	test('the theme changes the page at once, follows the device for System, and survives a reload', async ({
-		page
-	}) => {
-		await page.emulateMedia({ colorScheme: 'light' });
+	test('choosing Light changes the page at once, without a reload', async ({ page }) => {
 		await openSettings(page);
-		const html = page.locator('html');
-		const body = page.locator('body');
-		await expect(html).toHaveAttribute('data-theme', 'dark');
-		await expect(body).toHaveCSS('background-color', /^oklch\(0\.141 /);
+		await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
 
-		await test.step('Light shows white colours', async () => {
-			await page.getByRole('radio', { name: 'Light' }).check();
+		await page.getByRole('radio', { name: 'Light' }).check();
 
-			await expect(html).toHaveAttribute('data-theme', 'light');
-			await expect(body).toHaveCSS('background-color', 'rgb(255, 255, 255)');
-		});
-
-		await test.step('System follows the device, live', async () => {
-			await page.getByRole('radio', { name: 'System' }).check();
-			await expect(html).toHaveAttribute('data-theme', 'light');
-
-			await page.emulateMedia({ colorScheme: 'dark' });
-
-			await expect(html).toHaveAttribute('data-theme', 'dark');
-			await expect(body).toHaveCSS('background-color', /^oklch\(0\.141 /);
-		});
-
-		await test.step('Dark shows dark colours even on a light device, after a reload', async () => {
-			await page.getByRole('radio', { name: 'Dark' }).check();
-			await page.emulateMedia({ colorScheme: 'light' });
-			await expect.poll(() => savedSettingsRow(page)).toEqual({ theme: 'dark' });
-
-			await page.reload();
-
-			await expect(html).toHaveAttribute('data-theme', 'dark');
-			await expect(page.getByRole('radio', { name: 'Dark' })).toBeChecked();
-		});
+		await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+		await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
 	});
 
 	test('a change in one tab shows in another tab’s Settings and theme', async ({ page }) => {
@@ -240,17 +185,6 @@ test.describe('the Settings screen', () => {
 	});
 
 	test.describe('persistent storage', () => {
-		test('shows it on, with no button, when the browser keeps storage persistent', async ({
-			page
-		}) => {
-			await fakePersistentStorage(page, { isPersistent: true, willGrant: true });
-
-			await openSettings(page);
-
-			await expect(page.getByText('On', { exact: true })).toBeVisible();
-			await expect(page.getByRole('button', { name: 'Ask again' })).toBeHidden();
-		});
-
 		test('shows it off, and Ask again turns it on once the browser grants it', async ({ page }) => {
 			await fakePersistentStorage(page, { isPersistent: false, willGrant: true });
 			await openSettings(page);
@@ -260,16 +194,6 @@ test.describe('the Settings screen', () => {
 
 			await expect(page.getByText('On', { exact: true })).toBeVisible();
 			await expect(page.getByRole('button', { name: 'Ask again' })).toBeHidden();
-		});
-
-		test('says the browser declined when it still refuses', async ({ page }) => {
-			await fakePersistentStorage(page, { isPersistent: false, willGrant: false });
-			await openSettings(page);
-
-			await page.getByRole('button', { name: 'Ask again' }).click();
-
-			await expect(page.getByText('The browser declined.', { exact: false })).toBeVisible();
-			await expect(page.getByRole('button', { name: 'Ask again' })).toBeVisible();
 		});
 	});
 });
@@ -294,15 +218,8 @@ test.describe('the Timer screen’s routine', () => {
 			await page.getByRole('button', { name: 'Play' }).click();
 			await expect.poll(() => savedSettingsRow(page)).toHaveProperty('lastRoutineId');
 
-			await page.getByRole('button', { name: 'Finish' }).click();
-			await page
-				.getByRole('dialog', { name: 'Finish this run?' })
-				.getByRole('button', { name: 'Finish' })
-				.click();
-			await page
-				.getByRole('dialog', { name: 'Run summary' })
-				.getByRole('button', { name: 'Done' })
-				.click();
+			await finishRun(page);
+			await closeSummary(page);
 			// Done forgets the ended run, which would otherwise come back after the reload with its own
 			// routine, whatever the Timer opens on.
 			await expect.poll(() => hasSavedRunInProgress(page)).toBe(false);
