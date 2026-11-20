@@ -113,39 +113,42 @@ describe('TimerSession', () => {
 });
 
 describe('opening on the last routine used', () => {
-	it('chooses the routine the last run used', () => {
-		const session = createSession(routines, {}, { lastRoutineId: classicWithLongBreak.id });
+	it.each([
+		{
+			opening: 'the last run used the second routine',
+			options: {},
+			opened: { lastRoutineId: classicWithLongBreak.id },
+			chosen: classicWithLongBreak
+		},
+		{
+			opening: 'the last routine is gone',
+			options: {},
+			opened: { lastRoutineId: 'a-deleted-routine' },
+			chosen: classic
+		},
+		{
+			opening: 'no run has started yet',
+			options: {},
+			opened: { lastRoutineId: null },
+			chosen: classic
+		},
+		{
+			opening: 'there is no last routine and the picker sorts by title descending',
+			options: { pickerOrder: byTitleDescending },
+			opened: {},
+			chosen: classicWithLongBreak
+		},
+		{
+			opening: 'the last routine is gone and the picker sorts by title descending',
+			options: { pickerOrder: byTitleDescending },
+			opened: { lastRoutineId: 'a-deleted-routine' },
+			chosen: classicWithLongBreak
+		}
+	])('chooses $chosen.title, ready to run, when $opening', ({ options, opened, chosen }) => {
+		const session = createSession(routines, options, opened);
 
-		expect(session.routine).toBe(classicWithLongBreak);
+		expect(session.routine).toBe(chosen);
 		expect(session.view.status).toBe('ready');
-	});
-
-	it('falls back to the first routine when the last one is gone', () => {
-		const session = createSession(routines, {}, { lastRoutineId: 'a-deleted-routine' });
-
-		expect(session.routine).toBe(classic);
-	});
-
-	it('chooses the first routine when no run has started yet', () => {
-		const session = createSession(routines, {}, { lastRoutineId: null });
-
-		expect(session.routine).toBe(classic);
-	});
-
-	it('chooses the first routine in the picker, not in custom order, when there is no last routine', () => {
-		const session = createSession(routines, { pickerOrder: byTitleDescending });
-
-		expect(session.routine).toBe(classicWithLongBreak);
-	});
-
-	it('chooses the first routine in the picker when the last one is gone', () => {
-		const session = createSession(
-			routines,
-			{ pickerOrder: byTitleDescending },
-			{ lastRoutineId: 'a-deleted-routine' }
-		);
-
-		expect(session.routine).toBe(classicWithLongBreak);
 	});
 });
 
