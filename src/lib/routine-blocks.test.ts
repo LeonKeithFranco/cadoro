@@ -11,7 +11,7 @@ import {
 	resetSingleBlockCycles
 } from './routine-blocks';
 import { numberedIds } from './testing/ids';
-import { routineWith } from './testing/routines';
+import { blockWith as sharedBlockWith, routineWith } from './testing/routines';
 
 /**
  * Makes a block for a test.
@@ -21,7 +21,7 @@ import { routineWith } from './testing/routines';
  * @returns A new block.
  */
 function blockWith(id: string, changes: Partial<Block> = {}): Block {
-	return { id, title: `Block ${id}`, targetMinutes: 25, breakPercent: 20, cycles: 1, ...changes };
+	return sharedBlockWith({ id, title: `Block ${id}`, ...changes });
 }
 
 /**

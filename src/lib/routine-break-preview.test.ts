@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Block } from './routine';
 import { breakAtTargetMs, describeBreakAtTarget } from './routine-break-preview';
 import { hours, minutes, seconds } from './testing/durations';
+import { blockWith as sharedBlockWith } from './testing/routines';
 
 /**
  * Makes a block for a test with the target and break percentage that matter.
@@ -11,7 +12,7 @@ import { hours, minutes, seconds } from './testing/durations';
  * @returns A block with those two fields.
  */
 function blockWith(targetMinutes: number, breakPercent: number): Block {
-	return { id: 'block', title: 'Focus', targetMinutes, breakPercent, cycles: 1 };
+	return sharedBlockWith({ targetMinutes, breakPercent });
 }
 
 describe('breakAtTargetMs', () => {

@@ -10,7 +10,7 @@ import { SettingsSession } from '../settings.svelte';
 import { InMemoryStorage } from '../storage/in-memory-storage';
 import type { CadoroStorage } from '../storage/storage';
 import { numberedIds } from '../testing/ids';
-import { routineWith } from '../testing/routines';
+import { blockWith as sharedBlockWith, routineWith } from '../testing/routines';
 import { runWith } from '../testing/run-records';
 import type { Run } from '../run-records';
 import RoutinesScreen from './RoutinesScreen.svelte';
@@ -31,7 +31,7 @@ const NOW = '2026-11-19T10:00:00.000Z';
  * @returns The block, with a 25-minute target and a 20% break.
  */
 function blockWith(id: string, title: string, cycles = 1): Block {
-	return { id, title, targetMinutes: 25, breakPercent: 20, cycles };
+	return sharedBlockWith({ id, title, cycles });
 }
 
 /**

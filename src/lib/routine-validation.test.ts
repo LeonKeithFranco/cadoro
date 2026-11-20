@@ -1,24 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Block, Routine } from './routine';
 import { isValid, validateRoutine } from './routine-validation';
-import { oneRoundRoutine, routineWith } from './testing/routines';
-
-/**
- * Makes a block for a test, which differs from a valid 25-minute block only where it says.
- *
- * @param changes - The fields that differ.
- * @returns A new block.
- */
-function blockWith(changes: Partial<Block>): Block {
-	return {
-		id: 'block',
-		title: 'Focus',
-		targetMinutes: 25,
-		breakPercent: 20,
-		cycles: 1,
-		...changes
-	};
-}
+import { blockWith, oneRoundRoutine, routineWith } from './testing/routines';
 
 /**
  * Makes a two-block routine, so the blocks' cycles are free to be more than 1.
