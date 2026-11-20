@@ -120,7 +120,12 @@ test.describe('the Settings screen', () => {
 			await openSettings(page);
 
 			await page.getByRole('combobox', { name: 'Work target chime' }).selectOption('bell-ding-2');
+			// Each preview loads its file before it plays, so a second click before the first chime
+			// has started could play them in either order.
 			await page.getByRole('button', { name: 'Preview work target chime' }).click();
+			await expect
+				.poll(async () => (await chimeStarts(page)).map((chime) => chime.file))
+				.toEqual(['/chimes/bell-ding-2.mp3']);
 			await page.getByRole('button', { name: 'Preview break chime' }).click();
 
 			await expect
