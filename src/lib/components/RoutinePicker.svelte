@@ -27,7 +27,7 @@
 	<select
 		bind:value={(): string => selectedId, onselect}
 		{disabled}
-		class="mt-1 block w-full rounded-md border-zinc-300 bg-white text-zinc-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+		class="mt-1 block w-full rounded-md border-zinc-500 bg-white text-zinc-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-500 dark:bg-zinc-900 dark:text-zinc-100"
 	>
 		{#each routines as routine (routine.id)}
 			<option value={routine.id}>{routine.title}</option>

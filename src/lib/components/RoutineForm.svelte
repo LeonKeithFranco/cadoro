@@ -137,7 +137,7 @@
 					checked={draft.rounds === 'infinite'}
 					onchange={(event: Event & { currentTarget: HTMLInputElement }): void =>
 						change({ ...draft, rounds: event.currentTarget.checked ? 'infinite' : 1 })}
-					class="rounded border-zinc-300 text-rose-700 dark:border-zinc-700 dark:bg-zinc-900"
+					class="rounded border-zinc-500 text-rose-700 dark:border-zinc-500 dark:bg-zinc-900"
 				/>
 				Repeat forever
 			</label>

@@ -72,7 +72,7 @@
 	);
 </script>
 
-<div class="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+<div class="rounded-xl border border-zinc-500 bg-white p-4 dark:border-zinc-500 dark:bg-zinc-900">
 	<div class="flex items-start gap-3">
 		{#if hasDragHandle}
 			<div

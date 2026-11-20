@@ -14,4 +14,4 @@ export const COMPACT_BUTTON_SHAPE =
 
 /** The colours of the other buttons beside the main one, outlined so they step back. */
 export const SECONDARY_BUTTON_COLOURS =
-	'border border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800';
+	'border border-zinc-500 bg-white text-zinc-900 hover:bg-zinc-100 dark:border-zinc-500 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800';

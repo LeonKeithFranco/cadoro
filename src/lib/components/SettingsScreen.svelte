@@ -105,10 +105,10 @@
 
 	/** The colours of the drop-downs, in light and dark. */
 	const inputColours =
-		'rounded-md border-zinc-300 bg-white text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100';
+		'rounded-md border-zinc-500 bg-white text-zinc-900 dark:border-zinc-500 dark:bg-zinc-900 dark:text-zinc-100';
 	/** The colours of the radio buttons and the checkbox, whose ticks are rose. */
 	const choiceColours =
-		'border-zinc-400 bg-white text-rose-700 checked:bg-rose-700 focus:ring-rose-700 dark:border-zinc-500 dark:bg-zinc-900 dark:text-rose-400 dark:checked:bg-rose-400 dark:focus:ring-rose-400';
+		'border-zinc-500 bg-white text-rose-700 checked:bg-rose-700 focus:ring-rose-700 dark:border-zinc-500 dark:bg-zinc-900 dark:text-rose-400 dark:checked:bg-rose-400 dark:focus:ring-rose-400';
 </script>
 
 <ScreenHeading title="Settings" />
@@ -117,7 +117,7 @@
 	<!-- Each group of settings is a card like the Timer screen's, named by its heading. -->
 	<section
 		aria-labelledby="appearance-heading"
-		class="rounded-xl border border-zinc-200 bg-white p-4 md:p-6 dark:border-zinc-800 dark:bg-zinc-900"
+		class="rounded-xl border border-zinc-500 bg-white p-4 md:p-6 dark:border-zinc-500 dark:bg-zinc-900"
 	>
 		<h2 id="appearance-heading" class="font-semibold md:text-lg">Appearance</h2>
 		<fieldset class="mt-3">
@@ -142,7 +142,7 @@
 
 	<section
 		aria-labelledby="alerts-heading"
-		class="rounded-xl border border-zinc-200 bg-white p-4 md:p-6 dark:border-zinc-800 dark:bg-zinc-900"
+		class="rounded-xl border border-zinc-500 bg-white p-4 md:p-6 dark:border-zinc-500 dark:bg-zinc-900"
 	>
 		<h2 id="alerts-heading" class="font-semibold md:text-lg">Alerts</h2>
 		<div class="mt-3 grid gap-4">
@@ -192,7 +192,7 @@
 
 	<section
 		aria-labelledby="screen-heading"
-		class="rounded-xl border border-zinc-200 bg-white p-4 md:p-6 dark:border-zinc-800 dark:bg-zinc-900"
+		class="rounded-xl border border-zinc-500 bg-white p-4 md:p-6 dark:border-zinc-500 dark:bg-zinc-900"
 	>
 		<h2 id="screen-heading" class="font-semibold md:text-lg">Screen</h2>
 		<label class="mt-3 flex items-center gap-2">
@@ -215,7 +215,7 @@
 
 	<section
 		aria-labelledby="storage-heading"
-		class="rounded-xl border border-zinc-200 bg-white p-4 md:p-6 dark:border-zinc-800 dark:bg-zinc-900"
+		class="rounded-xl border border-zinc-500 bg-white p-4 md:p-6 dark:border-zinc-500 dark:bg-zinc-900"
 	>
 		<h2 id="storage-heading" class="font-semibold md:text-lg">Storage</h2>
 		<div class="mt-3 flex flex-wrap items-center justify-between gap-3">

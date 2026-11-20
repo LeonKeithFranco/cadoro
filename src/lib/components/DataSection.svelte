@@ -159,7 +159,7 @@
 
 <section
 	aria-labelledby="data-heading"
-	class="rounded-xl border border-zinc-200 bg-white p-4 md:p-6 dark:border-zinc-800 dark:bg-zinc-900"
+	class="rounded-xl border border-zinc-500 bg-white p-4 md:p-6 dark:border-zinc-500 dark:bg-zinc-900"
 >
 	<h2 id="data-heading" class="font-semibold md:text-lg">Data</h2>
 	<p class="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
@@ -187,7 +187,7 @@
 			accept=".json,application/json"
 			aria-describedby="{fileInputId}-hint"
 			onchange={chooseFile}
-			class="mt-2 block w-full text-sm text-zinc-700 file:mr-3 file:cursor-pointer file:rounded-lg file:border file:border-zinc-300 file:bg-white file:px-4 file:py-2 file:font-medium file:text-zinc-900 hover:file:bg-zinc-100 dark:text-zinc-300 dark:file:border-zinc-700 dark:file:bg-zinc-900 dark:file:text-zinc-100 dark:hover:file:bg-zinc-800"
+			class="mt-2 block w-full text-sm text-zinc-700 file:mr-3 file:cursor-pointer file:rounded-lg file:border file:border-zinc-500 file:bg-white file:px-4 file:py-2 file:font-medium file:text-zinc-900 hover:file:bg-zinc-100 dark:text-zinc-300 dark:file:border-zinc-500 dark:file:bg-zinc-900 dark:file:text-zinc-100 dark:hover:file:bg-zinc-800"
 		/>
 	</div>
 

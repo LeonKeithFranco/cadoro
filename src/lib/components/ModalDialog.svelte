@@ -47,7 +47,7 @@
 	{@attach openAsModal}
 	aria-labelledby={titleId}
 	{onclose}
-	class="m-auto w-[calc(100%-2rem)] max-w-sm rounded-xl border border-zinc-200 bg-white p-6 text-zinc-900 shadow-xl backdrop:bg-zinc-950/60 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+	class="m-auto w-[calc(100%-2rem)] max-w-sm rounded-xl border border-zinc-500 bg-white p-6 text-zinc-900 shadow-xl backdrop:bg-zinc-950/60 dark:border-zinc-500 dark:bg-zinc-800 dark:text-zinc-100"
 >
 	<h2 id={titleId} class="text-lg font-semibold">{title}</h2>
 	{@render children()}

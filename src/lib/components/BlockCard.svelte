@@ -25,11 +25,22 @@
 	}
 
 	/**
+	 * Says how far along a box is, in words a screen reader reads after its label.
+	 *
+	 * @param box - The box.
+	 * @returns The time with its target when it has one, such as `4:00 of 25:00`, or else just the
+	 * time.
+	 */
+	function progressText(box: TimerBoxView): string {
+		return box.target === null ? box.time : `${box.time} of ${box.target}`;
+	}
+
+	/**
 	 * Each tone's outline. The ring thickens the border without changing the box's size, so
 	 * nothing shifts when a box becomes active.
 	 */
 	const OUTLINE: Record<BoxTone, string> = {
-		idle: 'border-zinc-200 dark:border-zinc-700',
+		idle: 'border-zinc-500 dark:border-zinc-500',
 		active: 'border-rose-700 ring-1 ring-rose-700 dark:border-rose-400 dark:ring-rose-400',
 		overtime: 'border-amber-700 ring-1 ring-amber-700 dark:border-amber-400 dark:ring-amber-400'
 	};
@@ -64,7 +75,7 @@
 <!-- Named by its title, so each card is a region a screen reader can jump to. -->
 <section
 	aria-labelledby={titleId}
-	class="rounded-xl border border-zinc-200 bg-white p-4 md:p-6 dark:border-zinc-800 dark:bg-zinc-900"
+	class="rounded-xl border border-zinc-500 bg-white p-4 md:p-6 dark:border-zinc-500 dark:bg-zinc-900"
 >
 	<!-- The cycle counter sits across from the title, as a box's target sits across from its
 	     label. -->
@@ -106,10 +117,17 @@
 				{/if}
 			</p>
 		</div>
-		<!-- Hidden from screen readers, which already read the time it shows. -->
+		<!-- A progress bar named by the box's label, with its fill as the value, so a screen reader
+		     can say how far along the box is as well as read the time it shows. The track has an
+		     outline, since its pale fill alone is too faint against the card. -->
 		<div
-			aria-hidden="true"
-			class="mt-3 h-2 overflow-hidden rounded-full bg-zinc-200 md:mt-4 md:h-3 dark:bg-zinc-800"
+			role="progressbar"
+			aria-labelledby={labelId}
+			aria-valuemin={0}
+			aria-valuemax={100}
+			aria-valuenow={Math.round(box.progressPercent)}
+			aria-valuetext={progressText(box)}
+			class="mt-3 h-2 overflow-hidden rounded-full border border-zinc-500 bg-zinc-200 md:mt-4 md:h-3 dark:border-zinc-500 dark:bg-zinc-800"
 		>
 			<!-- A test id, because the bar is drawn only, with nothing a user reads to find it by. -->
 			<div

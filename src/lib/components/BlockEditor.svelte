@@ -64,7 +64,7 @@
 	}: Props = $props();
 </script>
 
-<fieldset class="rounded-lg border border-zinc-300 p-3 dark:border-zinc-700">
+<fieldset class="rounded-lg border border-zinc-500 p-3 dark:border-zinc-500">
 	<legend class="px-1 text-sm font-semibold">Block {position}</legend>
 	<div class="grid gap-3 md:grid-cols-3">
 		<div class="md:col-span-3">

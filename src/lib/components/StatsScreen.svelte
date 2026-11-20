@@ -62,7 +62,7 @@
 <!-- One headline figure: its label above its value. -->
 {#snippet figure(label: string, value: string)}
 	<div
-		class="rounded-xl border border-zinc-200 bg-white p-3 md:p-4 dark:border-zinc-800 dark:bg-zinc-900"
+		class="rounded-xl border border-zinc-500 bg-white p-3 md:p-4 dark:border-zinc-500 dark:bg-zinc-900"
 	>
 		<dt class="text-sm text-zinc-600 dark:text-zinc-400">{label}</dt>
 		<dd class="text-xl font-semibold tabular-nums md:text-2xl">{value}</dd>
@@ -83,7 +83,7 @@
 			<span class="text-sm font-medium text-zinc-700 dark:text-zinc-300">Routine</span>
 			<select
 				bind:value={filterValue}
-				class="mt-1 block w-full rounded-md border-zinc-300 bg-white text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+				class="mt-1 block w-full rounded-md border-zinc-500 bg-white text-zinc-900 dark:border-zinc-500 dark:bg-zinc-900 dark:text-zinc-100"
 			>
 				<option value={ALL_ROUTINES}>All routines</option>
 				{#each routines as routine (routine.id)}
