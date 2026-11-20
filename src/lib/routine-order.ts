@@ -1,7 +1,6 @@
 // Reordering routines in the custom order, which each routine's `customPosition` keeps.
 
-import { moveDown, moveUp } from './list-order';
-import type { Routine } from './routine';
+import { inCustomOrder, type Routine } from './routine';
 
 /**
  * Gives routines the positions 0, 1, 2 and so on, in the order the list has them.
@@ -11,40 +10,6 @@ import type { Routine } from './routine';
  */
 function numberedInOrder(routines: Routine[]): Routine[] {
 	return routines.map((routine, index) => ({ ...routine, customPosition: index }));
-}
-
-/**
- * Lists routines in custom order.
- *
- * @param routines - The routines in any order.
- * @returns A new list, lowest `customPosition` first.
- */
-function inCustomOrder(routines: Routine[]): Routine[] {
-	return routines.toSorted((a, b) => a.customPosition - b.customPosition);
-}
-
-/**
- * Moves a routine one place up the custom order, for the Move up button.
- *
- * @param routines - The routines in any order.
- * @param id - The id of the routine to move.
- * @returns New routines in the new custom order. The first routine stays first.
- * @throws {@link Error} When no routine has that id.
- */
-export function moveRoutineUp(routines: Routine[], id: string): Routine[] {
-	return numberedInOrder(moveUp(inCustomOrder(routines), id));
-}
-
-/**
- * Moves a routine one place down the custom order, for the Move down button.
- *
- * @param routines - The routines in any order.
- * @param id - The id of the routine to move.
- * @returns New routines in the new custom order. The last routine stays last.
- * @throws {@link Error} When no routine has that id.
- */
-export function moveRoutineDown(routines: Routine[], id: string): Routine[] {
-	return numberedInOrder(moveDown(inCustomOrder(routines), id));
 }
 
 /**

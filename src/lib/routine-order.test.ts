@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { insertRoutine, moveRoutineDown, moveRoutineUp } from './routine-order';
+import { insertRoutine } from './routine-order';
 import { routineWith } from './testing/routines';
 
 /** Three routines in custom order a, b, c. */
@@ -18,34 +18,6 @@ const abc = [
 function placed(routines: { id: string; customPosition: number }[]): string[] {
 	return routines.map((routine) => `${routine.id}:${routine.customPosition}`);
 }
-
-describe('moveRoutineUp', () => {
-	it('swaps a routine with the one above it', () => {
-		expect(placed(moveRoutineUp(abc, 'c'))).toEqual(['a:0', 'c:1', 'b:2']);
-	});
-
-	it('keeps the first routine first', () => {
-		expect(placed(moveRoutineUp(abc, 'a'))).toEqual(['a:0', 'b:1', 'c:2']);
-	});
-
-	it('throws when no routine has the id', () => {
-		expect(() => moveRoutineUp(abc, 'missing')).toThrow('missing');
-	});
-});
-
-describe('moveRoutineDown', () => {
-	it('swaps a routine with the one below it', () => {
-		expect(placed(moveRoutineDown(abc, 'a'))).toEqual(['b:0', 'a:1', 'c:2']);
-	});
-
-	it('keeps the last routine last', () => {
-		expect(placed(moveRoutineDown(abc, 'c'))).toEqual(['a:0', 'b:1', 'c:2']);
-	});
-
-	it('throws when no routine has the id', () => {
-		expect(() => moveRoutineDown(abc, 'missing')).toThrow('missing');
-	});
-});
 
 describe('insertRoutine', () => {
 	const added = routineWith({ id: 'new', customPosition: 99 });
