@@ -3,6 +3,7 @@
 import type { Backup } from './backup-format';
 import { localDayText } from './day-slices';
 import { counted } from './plural';
+import { runsOldestFirst } from './run-records';
 import { fromUtcTimestamp } from './time';
 
 /** What a backup holds, counted for the user to check before an import replaces their data. */
@@ -62,8 +63,7 @@ function localDay(timestamp: string): string {
  * @returns Its counts and the start of its first and last runs.
  */
 export function summarizeBackup(backup: Backup): BackupSummary {
-	const startTimes = backup.runs.map((run) => run.startedAt);
-	const byMoment = startTimes.toSorted((a, b) => fromUtcTimestamp(a) - fromUtcTimestamp(b));
+	const byMoment = runsOldestFirst(backup.runs);
 
 	return {
 		formatVersion: backup.formatVersion,
@@ -71,7 +71,7 @@ export function summarizeBackup(backup: Backup): BackupSummary {
 		routineCount: backup.routines.length,
 		runCount: backup.runs.length,
 		workPeriodCount: backup.workPeriods.length,
-		firstRunAt: byMoment.at(0) ?? null,
-		lastRunAt: byMoment.at(-1) ?? null
+		firstRunAt: byMoment.at(0)?.startedAt ?? null,
+		lastRunAt: byMoment.at(-1)?.startedAt ?? null
 	};
 }

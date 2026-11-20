@@ -107,10 +107,11 @@ export function viewStats(input: StatsInput): StatsView {
 	const everyWork = [...input.workPeriods, ...(input.workInProgress ? [input.workInProgress] : [])];
 	const allSlices = daySlicesOf(everyWork);
 	const workPeriods = filterByRoutine(input.workPeriods, input.routineId);
-	const slices = daySlicesOf(filterByRoutine(everyWork, input.routineId));
+	const routineWork = filterByRoutine(everyWork, input.routineId);
+	const slices = daySlicesOf(routineWork);
 	const range = rangeForPreset(input.preset, now, slices);
 	const streaks = streaksOf(slices, now);
-	const allTime = allTimeTotals(filterByRoutine(everyWork, input.routineId), input.routines);
+	const allTime = allTimeTotals(routineWork, input.routines);
 
 	return {
 		hasWork: allSlices.length > 0,

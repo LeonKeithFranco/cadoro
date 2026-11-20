@@ -169,7 +169,7 @@ export function requireRoutineOfNewRun(routineIds: ReadonlySet<string>, run: Run
  * @returns A new list of the runs, earliest `startedAt` first.
  */
 export function runsOldestFirst(runs: Run[]): Run[] {
-	return runs.toSorted((a, b) => Date.parse(a.startedAt) - Date.parse(b.startedAt));
+	return runs.toSorted((a, b) => fromUtcTimestamp(a.startedAt) - fromUtcTimestamp(b.startedAt));
 }
 
 /**
@@ -190,7 +190,7 @@ export function workPeriodsOldestFirst(periods: WorkPeriod[]): WorkPeriod[] {
  */
 function startOf(period: WorkPeriod): number {
 	const firstSegment = requireDefined(period.segments[0], "the work period's first segment");
-	return Date.parse(firstSegment.start);
+	return fromUtcTimestamp(firstSegment.start);
 }
 
 /**
