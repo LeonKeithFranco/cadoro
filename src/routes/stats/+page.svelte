@@ -8,6 +8,8 @@
 	import StatsScreen from '#lib/components/StatsScreen.svelte';
 	import type { StoredRunInProgress } from '#lib/run-in-progress.ts';
 	import { nextLocalDay, startOfLocalDay } from '#lib/day-slices.ts';
+	import type { Routine } from '#lib/routine.ts';
+	import type { WorkPeriod } from '#lib/run-records.ts';
 	import { MS_PER_SECOND } from '#lib/time.ts';
 	import { workInProgress } from '#lib/work-in-progress.ts';
 	import type { PageProps } from './$types';
@@ -16,23 +18,66 @@
 
 	/** The run in progress as last saved, in any tab. */
 	let runInProgress = $state.raw<StoredRunInProgress | null>(null);
+	/** The routines, deleted ones included, as last read. */
+	let routines = $state.raw<Routine[]>([]);
+	/** The saved work periods, as last read. */
+	let workPeriods = $state.raw<WorkPeriod[]>([]);
 	/** The current moment, which moves on while a work period counts. */
 	let now = $state(Date.now());
 
-	// Starts from what `load` read, then follows storage, so a run another tab starts, pauses or
-	// ends changes the figures.
+	// Starts from what `load` read, then follows storage. A change to the run in progress, such as
+	// another tab pressing Next, may have saved a work period, so the work periods and routines are
+	// read again. The figures keep what they show until that read arrives, so the work of a period
+	// that just ended never drops to zero, and keep it if the read fails.
 	$effect(() => {
 		runInProgress = data.runInProgress;
+		routines = data.routines;
+		workPeriods = data.workPeriods;
 		now = Date.now();
-		return data.storage.watchRunInProgress(
+
+		let stopped = false;
+		let revisionShown = data.runInProgress?.revision ?? null;
+		let latestSaved = data.runInProgress;
+		let reading = 0;
+		const stopFollowing = data.storage.watchRunInProgress(
 			(saved) => {
-				runInProgress = saved;
-				now = Date.now();
+				latestSaved = saved;
+				const changed = (saved?.revision ?? null) !== revisionShown;
+				if (!changed) {
+					// A heartbeat, which only moves the run's last save, unless a read is still pending.
+					if (reading === 0) {
+						runInProgress = saved;
+						now = Date.now();
+					}
+					return;
+				}
+				revisionShown = saved?.revision ?? null;
+				reading += 1;
+				void Promise.all([data.storage.getAllRoutines(), data.storage.getWorkPeriods()])
+					.then(([readRoutines, readWorkPeriods]) => {
+						if (stopped) {
+							return;
+						}
+						routines = readRoutines;
+						workPeriods = readWorkPeriods;
+						runInProgress = latestSaved;
+						now = Date.now();
+					})
+					.catch((error: unknown) => {
+						console.error('Could not read the work periods for Stats.', error);
+					})
+					.finally(() => {
+						reading -= 1;
+					});
 			},
 			(error) => {
 				console.error('Could not read the run in progress for Stats.', error);
 			}
 		);
+		return (): void => {
+			stopped = true;
+			stopFollowing();
+		};
 	});
 
 	/** Whether the run in progress is in a work period that's counting. */
@@ -82,14 +127,9 @@
 	}
 
 	/** The work so far in the current work period, or `null`. */
-	const current = $derived(workInProgress(runInProgress, data.routines, now));
+	const current = $derived(workInProgress(runInProgress, routines, now));
 </script>
 
 <svelte:document onvisibilitychange={refreshWhenVisible} />
 
-<StatsScreen
-	workPeriods={data.workPeriods}
-	routines={data.routines}
-	{now}
-	workInProgress={current}
-/>
+<StatsScreen {workPeriods} {routines} {now} workInProgress={current} />

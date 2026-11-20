@@ -60,6 +60,7 @@ async function renderStats(
 	runInProgress: StoredRunInProgress | null,
 	workPeriods: WorkPeriod[] = []
 ): Promise<void> {
+	await storage.addRoutinesIfNone([oneRoundRoutine]);
 	if (runInProgress !== null) {
 		await storage.saveRunInProgress(runInProgress, null, { run: startedRecord, workPeriods: [] });
 	}
@@ -111,6 +112,69 @@ describe('the Stats page and the run in progress', () => {
 		vi.advanceTimersByTime(3 * MINUTE);
 
 		await expect.poll(figure('All time')).toBe('23:00');
+	});
+});
+
+describe('the Stats page when the work period in progress ends', () => {
+	it('keeps its work in the figures, now as a saved work period, without dropping to zero', async () => {
+		const storage = new InMemoryStorage();
+		await renderStats(storage, countingSince(20));
+		await expect.poll(figure('All time')).toBe('20:00');
+
+		// Another tab presses Next: the period is saved and the run moves on to its break.
+		await storage.saveRunInProgress(
+			runInProgressWith({
+				record: startedRecord,
+				run: {
+					status: 'break',
+					endedPeriods: [],
+					position: { round: 0, block: 0, cycle: 0 },
+					nextWorkPosition: { round: 0, block: 0, cycle: 1 },
+					earnedMs: 4 * MINUTE,
+					remainingMs: 4 * MINUTE,
+					runningSince: new Date(START).toISOString()
+				},
+				revision: 'revision-2'
+			}),
+			'revision-1',
+			{
+				run: null,
+				workPeriods: [
+					workPeriodWith({
+						id: 'ended-period',
+						segments: [
+							{
+								start: new Date(START - 20 * MINUTE).toISOString(),
+								end: new Date(START).toISOString()
+							}
+						],
+						workedMs: 20 * MINUTE
+					})
+				]
+			}
+		);
+		await vi.advanceTimersByTimeAsync(100);
+
+		expect(figure('All time')()).toBe('20:00');
+		expect(figure('Targets reached')()).toBe('0%');
+	});
+
+	it('keeps what it shows when reading the work periods fails', async () => {
+		const storage = new InMemoryStorage();
+		await renderStats(storage, countingSince(20));
+		await expect.poll(figure('All time')).toBe('20:00');
+		vi.spyOn(storage, 'getWorkPeriods').mockRejectedValue(new Error('unreadable'));
+		const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+		await storage.saveRunInProgress(
+			runInProgressWith({ record: startedRecord, revision: 'revision-2' }),
+			'revision-1',
+			{ run: null, workPeriods: [] }
+		);
+		await vi.advanceTimersByTimeAsync(100);
+
+		expect(logged).toHaveBeenCalled();
+		expect(figure('All time')()).toBe('20:00');
 	});
 });
 
