@@ -22,6 +22,12 @@
 
 	let { bars, preset, onpreset }: Props = $props();
 
+	/**
+	 * The size of the axis labels, in pixels, which Tailwind's `text-xs` below sets as 0.75rem.
+	 * The chart is told too, since it measures the labels to leave out those that would overlap.
+	 */
+	const AXIS_LABEL_SIZE_PX = 12;
+
 	/** The name of each preset, as its button says it. */
 	const PRESET_NAMES: Record<RangePreset, string> = {
 		'7d': '7 days',
@@ -54,13 +60,16 @@
 >
 	<h2 id={headingId} class="font-semibold md:text-lg">Daily work time</h2>
 
-	<div role="group" aria-label="Range" class="mt-3 flex flex-wrap gap-2">
+	<!-- Five equal columns on phones, so the presets share one row instead of leaving "All" alone
+	     on the next. From `md` they sit side by side at their own widths. -->
+	<div role="group" aria-label="Range" class="mt-3 grid grid-cols-5 gap-2 md:flex md:flex-wrap">
 		{#each RANGE_PRESETS as option (option)}
 			<button
 				type="button"
 				aria-pressed={option === preset}
 				onclick={(): void => onpreset(option)}
-				class="rounded-lg px-3 py-1.5 text-sm font-medium md:text-base {option === preset
+				class="rounded-lg px-2 py-1.5 text-xs font-medium whitespace-nowrap sm:text-sm md:px-3 md:text-base {option ===
+				preset
 					? PRIMARY_BUTTON_COLOURS
 					: SECONDARY_BUTTON_COLOURS}"
 			>
@@ -71,17 +80,27 @@
 
 	<figure class="mt-4">
 		<!-- LayerChart draws with CSS variables, which are set here to the app's rose accent and
-		     zinc text, in both themes. -->
+		     zinc text, in both themes. Its axis labels are 10px by its own style, which is too small
+		     on a phone, so they're set to AXIS_LABEL_SIZE_PX here, with the same size given to the
+		     chart, which uses it to fit the labels. -->
 		<div
 			aria-hidden="true"
-			class="h-56 [--color-primary:var(--color-rose-700)] [--color-surface-content:var(--color-zinc-700)] md:h-72 dark:[--color-primary:var(--color-rose-400)] dark:[--color-surface-content:var(--color-zinc-300)]"
+			class="h-56 [--color-primary:var(--color-rose-700)] [--color-surface-content:var(--color-zinc-700)] md:h-72 dark:[--color-primary:var(--color-rose-400)] dark:[--color-surface-content:var(--color-zinc-300)] [&_.lc-axis-tick-label]:text-xs"
 		>
 			<BarChart
 				data={bars}
 				x="day"
 				y="minutes"
 				padding={{ top: 8, right: 8, bottom: 24, left: 36 }}
-				props={{ bars: { strokeWidth: 0 }, xAxis: { format: formatDay, tickOcclusion: true } }}
+				props={{
+					bars: { strokeWidth: 0 },
+					xAxis: {
+						format: formatDay,
+						tickOcclusion: true,
+						tickLabelProps: { fontSize: AXIS_LABEL_SIZE_PX }
+					},
+					yAxis: { tickLabelProps: { fontSize: AXIS_LABEL_SIZE_PX } }
+				}}
 			/>
 		</div>
 		<table class="sr-only">
