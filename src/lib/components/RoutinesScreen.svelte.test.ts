@@ -438,14 +438,15 @@ describe('a change that is only spaces', () => {
 
 	it('is closed by Save without writing or logging anything', async () => {
 		const { storage } = await openScreen();
+		const saveRoutine = vi.spyOn(storage, 'saveRoutine');
 		await openForEditing('Alpha');
 		await typeTitle('  Alpha  ');
 
 		await page.getByRole('button', { name: 'Save' }).click();
 
 		await expect.element(page.getByRole('form', { name: 'Edit routine' })).not.toBeInTheDocument();
+		expect(saveRoutine).not.toHaveBeenCalled();
 		expect(await storage.getLogEntries()).toEqual([]);
-		expect((await storage.getRoutines())[0]?.title).toBe('Alpha');
 	});
 
 	it('is still saved, trimmed, along with a real change', async () => {
@@ -821,6 +822,21 @@ describe('a routine changed in another tab while it is edited', () => {
 			.toHaveValue('Mine');
 	});
 
+	it('saves the user’s version over the other tab’s when Save is pressed', async () => {
+		const { storage } = await openScreen();
+		await openForEditing('Alpha');
+		await typeTitle('Mine');
+		const alpha = requireDefined((await storage.getRoutines())[0], 'Alpha');
+		await storage.saveRoutine({ ...alpha, title: 'Theirs' });
+		await expect.element(page.getByText('Save will overwrite', { exact: false })).toBeVisible();
+
+		await page.getByRole('button', { name: 'Save' }).click();
+
+		await expect.element(page.getByRole('form', { name: 'Edit routine' })).not.toBeInTheDocument();
+		await expect.poll(async () => (await storage.getRoutines())[0]?.title).toBe('Mine');
+		expect(listedTitles()).toEqual(['Mine', 'Bravo', 'Charlie']);
+	});
+
 	it('says nothing when only the routines’ order changed elsewhere', async () => {
 		const { storage } = await openScreen();
 		await openForEditing('Alpha');
@@ -1083,5 +1099,57 @@ describe('when saving fails', () => {
 			message: 'Saving the routine failed.',
 			details: { message: 'The disk is full.' }
 		});
+	});
+
+	it('records a failed duplicate in the activity log, and adds no copy', async () => {
+		const { storage } = await openScreen();
+		useErrorLog(storage);
+		vi.spyOn(storage, 'duplicateRoutine').mockRejectedValue(new Error('The disk is full.'));
+
+		await cardOf('Alpha').getByRole('button', { name: 'Duplicate' }).click();
+
+		await expect.poll(() => storage.getLogEntries()).toHaveLength(1);
+		expect((await storage.getLogEntries())[0]).toMatchObject({
+			type: 'error',
+			message: 'Duplicating the routine failed.',
+			details: { message: 'The disk is full.' }
+		});
+		expect(listedTitles()).toEqual(['Alpha', 'Bravo', 'Charlie']);
+	});
+
+	it('records a failed delete in the activity log, and keeps the routine', async () => {
+		const { storage } = await openScreen();
+		useErrorLog(storage);
+		vi.spyOn(storage, 'deleteRoutine').mockRejectedValue(new Error('The disk is full.'));
+		await cardOf('Bravo').getByRole('button', { name: 'Delete' }).click();
+
+		await page
+			.getByRole('dialog', { name: 'Delete Bravo?' })
+			.getByRole('button', { name: 'Delete' })
+			.click();
+
+		await expect.poll(() => storage.getLogEntries()).toHaveLength(1);
+		expect((await storage.getLogEntries())[0]).toMatchObject({
+			type: 'error',
+			message: 'Deleting the routine failed.',
+			details: { message: 'The disk is full.' }
+		});
+		expect(listedTitles()).toEqual(['Alpha', 'Bravo', 'Charlie']);
+	});
+
+	it('records a failed move in the activity log, and puts the routines back in their saved order', async () => {
+		const { storage } = await openScreen();
+		useErrorLog(storage);
+		vi.spyOn(storage, 'reorderRoutines').mockRejectedValue(new Error('The disk is full.'));
+
+		await cardOf('Bravo').getByRole('button', { name: 'Move up' }).click();
+
+		await expect.poll(() => storage.getLogEntries()).toHaveLength(1);
+		expect((await storage.getLogEntries())[0]).toMatchObject({
+			type: 'error',
+			message: 'Reordering the routines failed.',
+			details: { message: 'The disk is full.' }
+		});
+		await expect.poll(listedTitles).toEqual(['Alpha', 'Bravo', 'Charlie']);
 	});
 });
