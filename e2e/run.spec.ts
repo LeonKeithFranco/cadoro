@@ -88,3 +88,40 @@ test('a run goes through work, overtime and a break, then Finish shows its summa
 		await expect(page.getByRole('button', { name: 'Finish' })).toBeDisabled();
 	});
 });
+
+test('skipping the rest of a break banks it, and the next break starts from the bank plus what is earned', async ({
+	page
+}) => {
+	await openOnPausedClock(page, '/');
+	const card = page.getByRole('region', { name: 'Focus' });
+	// Each box is named by its label, which changes with the run, such as "Break earned".
+	const breakBox = card.getByRole('group', { name: /^Break/ });
+
+	await test.step('Next ends the work, and the break counts down', async () => {
+		await page.getByRole('button', { name: 'Play' }).click();
+		// 20% of 10 minutes is 2:00.
+		await page.clock.fastForward(minutes(10));
+		await page.getByRole('button', { name: 'Next' }).click();
+		await page.clock.fastForward(seconds(30));
+
+		await expect(breakBox).toHaveAccessibleName('Break');
+		await expect(breakBox).toContainText('1:30');
+	});
+
+	await test.step('Next skips the rest of the break, and the next work period starts at the bank', async () => {
+		await page.getByRole('button', { name: 'Next' }).click();
+
+		await expect(breakBox).toHaveAccessibleName('Break earned');
+		await expect(breakBox).toContainText('1:30');
+	});
+
+	await test.step('the break earned grows from the bank, and the next break counts down from the total', async () => {
+		await page.clock.fastForward(minutes(10));
+		await expect(breakBox).toContainText('3:30');
+
+		await page.getByRole('button', { name: 'Next' }).click();
+
+		await expect(breakBox).toHaveAccessibleName('Break');
+		await expect(breakBox).toContainText('3:30');
+	});
+});
