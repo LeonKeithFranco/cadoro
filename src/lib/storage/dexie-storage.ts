@@ -213,6 +213,30 @@ function connect(name: string): CadoroDatabase {
 }
 
 /**
+ * Follows what a query reads from IndexedDB, reporting it now and whenever a save changes it.
+ *
+ * @remarks
+ * Dexie runs the query again whenever a save changes what it read, from this connection or,
+ * through a `BroadcastChannel`, another tab's.
+ *
+ * @typeParam Read - What the query reads.
+ * @param query - Reads the data, and runs again after each change to it.
+ * @param onChange - Called with what the query read.
+ * @param onError - Called when the query fails.
+ * @returns A function that stops following.
+ */
+function follow<Read>(
+	query: () => Promise<Read>,
+	onChange: (read: Read) => void,
+	onError: (error: unknown) => void
+): () => void {
+	const subscription = liveQuery(query).subscribe({ next: onChange, error: onError });
+	return (): void => {
+		subscription.unsubscribe();
+	};
+}
+
+/**
  * Storage in the browser's IndexedDB, which keeps its data across reloads and restarts.
  *
  * @remarks
@@ -260,15 +284,13 @@ export class DexieStorage implements CadoroStorage {
 		onError: (error: unknown) => void
 	): () => void {
 		const table = this.#database.routines;
-		const subscription = liveQuery(() => table.toArray()).subscribe({
-			next: (routines) => {
+		return follow(
+			() => table.toArray(),
+			(routines) => {
 				onChange(pickableRoutines(routines));
 			},
-			error: onError
-		});
-		return (): void => {
-			subscription.unsubscribe();
-		};
+			onError
+		);
 	}
 
 	async createRoutine(routine: Routine): Promise<void> {
@@ -462,17 +484,13 @@ export class DexieStorage implements CadoroStorage {
 		onError: (error: unknown) => void
 	): () => void {
 		const table = this.#database.runInProgress;
-		// Dexie runs the query again whenever a save changes the row, from this connection or,
-		// through a `BroadcastChannel`, another tab's.
-		const subscription = liveQuery(() => table.get(RUN_IN_PROGRESS_KEY)).subscribe({
-			next: (runInProgress) => {
+		return follow(
+			() => table.get(RUN_IN_PROGRESS_KEY),
+			(runInProgress) => {
 				onChange(runInProgress ?? null);
 			},
-			error: onError
-		});
-		return (): void => {
-			subscription.unsubscribe();
-		};
+			onError
+		);
 	}
 
 	async clearRunInProgress(basedOn: string): Promise<boolean> {
@@ -516,17 +534,15 @@ export class DexieStorage implements CadoroStorage {
 		onError: (error: unknown) => void
 	): () => void {
 		const table = this.#database.settings;
-		const subscription = liveQuery(() => table.get(SETTINGS_KEY)).subscribe({
-			next: (row) => {
+		return follow(
+			() => table.get(SETTINGS_KEY),
+			(row) => {
 				const settings = settingsFrom(row ?? null);
 				writeThemeMirror(settings.theme);
 				onChange(settings);
 			},
-			error: onError
-		});
-		return (): void => {
-			subscription.unsubscribe();
-		};
+			onError
+		);
 	}
 
 	async getRuns(): Promise<Run[]> {
