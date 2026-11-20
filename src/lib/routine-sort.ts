@@ -1,6 +1,7 @@
 // The seven orders the Routines screen and the Timer's picker can list routines in.
 
 import { compareCustomOrder, type Routine } from './routine';
+import { workedMsByRoutine } from './routine-stats';
 import type { Run, WorkPeriod } from './run-records';
 
 /** Every order routines can be listed in, which a backup's settings may hold. */
@@ -64,21 +65,6 @@ function lastRunStartByRoutine(runs: Run[]): Map<string, string> {
 		}
 	}
 	return latest;
-}
-
-/**
- * Adds up the time worked on each routine.
- *
- * @param workPeriods - Every work period saved.
- * @returns The total `workedMs` of each routine's work periods, by routine id. Routines with no
- * work have no entry.
- */
-function workedMsByRoutine(workPeriods: WorkPeriod[]): Map<string, number> {
-	const totals = new Map<string, number>();
-	for (const period of workPeriods) {
-		totals.set(period.routineId, (totals.get(period.routineId) ?? 0) + period.workedMs);
-	}
-	return totals;
 }
 
 /**

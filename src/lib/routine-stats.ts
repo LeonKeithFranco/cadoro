@@ -50,6 +50,21 @@ export function filterByRoutine(workPeriods: WorkPeriod[], routineId: string | n
 }
 
 /**
+ * Adds up the time worked on each routine, in one pass.
+ *
+ * @param workPeriods - The work periods to add up.
+ * @returns The total `workedMs` of each routine's work periods, by routine id. Routines with no
+ * work have no entry.
+ */
+export function workedMsByRoutine(workPeriods: WorkPeriod[]): Map<string, number> {
+	const totals = new Map<string, number>();
+	for (const period of workPeriods) {
+		totals.set(period.routineId, (totals.get(period.routineId) ?? 0) + period.workedMs);
+	}
+	return totals;
+}
+
+/**
  * Adds up all the work time, overall and per routine.
  *
  * @remarks
@@ -65,12 +80,13 @@ export function filterByRoutine(workPeriods: WorkPeriod[], routineId: string | n
  */
 export function allTimeTotals(workPeriods: WorkPeriod[], routines: Routine[]): AllTimeTotals {
 	const workedMs = totalWorkedMs(workPeriods);
+	const workedByRoutine = workedMsByRoutine(workPeriods);
 	const perRoutine = routines
 		.map((routine) => ({
 			routineId: routine.id,
 			title: routine.title,
 			deleted: routine.deletedAt !== null,
-			workedMs: totalWorkedMs(filterByRoutine(workPeriods, routine.id))
+			workedMs: workedByRoutine.get(routine.id) ?? 0
 		}))
 		.filter((total) => total.workedMs > 0)
 		.sort(
