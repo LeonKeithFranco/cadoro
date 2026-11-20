@@ -310,9 +310,19 @@ export class TimerSession {
 
 		this.#routines = changed;
 		if (this.#run.status === 'ready') {
-			this.#routine = this.#latestVersionOf(this.#routine);
-			this.#run = createRun(this.#routine);
+			this.#readyLatest();
 		}
+	}
+
+	/**
+	 * Takes the session's routine at its latest version, and readies a new run of it.
+	 *
+	 * @remarks
+	 * It leaves the run's record and revision as they are, for the caller to change.
+	 */
+	#readyLatest(): void {
+		this.#routine = this.#latestVersionOf(this.#routine);
+		this.#run = createRun(this.#routine);
 	}
 
 	/**
@@ -449,8 +459,7 @@ export class TimerSession {
 		}
 
 		const revision = this.#revision;
-		this.#routine = this.#latestVersionOf(this.#routine);
-		this.#run = createRun(this.#routine);
+		this.#readyLatest();
 		this.#record = null;
 		this.#revision = null;
 		// An ended run is always saved, so it always has a revision.
@@ -688,8 +697,7 @@ export class TimerSession {
 		}
 
 		if (saved === null) {
-			this.#routine = this.#latestVersionOf(this.#routine);
-			this.#run = createRun(this.#routine);
+			this.#readyLatest();
 			this.#record = null;
 			this.#revision = null;
 			return;
@@ -713,9 +721,8 @@ export class TimerSession {
 	 * Buttons change the screen at once and storage catches up, so a slow write never holds up
 	 * the timer. Each write waits for the one before, so writes reach storage in the order they
 	 * were made whatever the backend: a run's start is never saved after its end, and a late
-	 * heartbeat can't bring back a run that Done has forgotten. A failed write is logged and the
-	 * next one still runs, until milestone 8's activity log records errors. Once the last write has
-	 * finished, the session catches up with any change it was told of meanwhile.
+	 * heartbeat can't bring back a run that Done has forgotten. A failed write is recorded as an
+	 * error in the activity log, and the next one still runs. Once the last write has finished, the session catches up with any change it was told of meanwhile.
 	 *
 	 * @param write - The write, which starts only when it's called.
 	 */
