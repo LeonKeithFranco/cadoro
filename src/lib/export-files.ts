@@ -1,5 +1,6 @@
 // The files the app offers to download: what each is called, and how the activity log is written.
 
+import { localDayText } from './day-slices';
 import type { LogEntry } from './log';
 
 /** The kinds of file the app exports, each with the start of its file name. */
@@ -16,16 +17,6 @@ const FILE_EXTENSIONS = { csv: 'csv', backup: 'json', log: 'json' } as const;
 export type ExportKind = keyof typeof FILE_NAME_STARTS;
 
 /**
- * Pads a number to two digits, such as `7` to `07`.
- *
- * @param value - A whole number from 0 to 99.
- * @returns The number as two digits.
- */
-function twoDigits(value: number): string {
-	return String(value).padStart(2, '0');
-}
-
-/**
  * Names a downloaded file after what it holds and the day it was made.
  *
  * @param kind - What the file holds.
@@ -34,9 +25,7 @@ function twoDigits(value: number): string {
  * @returns The file name, such as `cadoro-backup-2026-11-19.json`.
  */
 export function exportFileName(kind: ExportKind, now: Date): string {
-	const month = twoDigits(now.getMonth() + 1);
-	const day = twoDigits(now.getDate());
-	return `${FILE_NAME_STARTS[kind]}-${now.getFullYear()}-${month}-${day}.${FILE_EXTENSIONS[kind]}`;
+	return `${FILE_NAME_STARTS[kind]}-${localDayText(now.getTime())}.${FILE_EXTENSIONS[kind]}`;
 }
 
 /**
