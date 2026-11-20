@@ -79,4 +79,27 @@ describe('DailyChart range buttons on a small phone', () => {
 			);
 		}
 	});
+
+	it('fills every row of buttons to the group’s right edge, leaving no gap', async () => {
+		await page.viewport(SMALL_PHONE_WIDTH_PX, PHONE_HEIGHT_PX);
+		render(DailyChart, { bars, preset: '7d', onpreset: (): void => {} });
+
+		const group = page.getByRole('group', { name: 'Range' }).element();
+		const groupRight = group.getBoundingClientRect().right;
+		const boxes = RANGE_BUTTON_NAMES.map((name) =>
+			page.getByRole('button', { name, exact: true }).element().getBoundingClientRect()
+		);
+		const rowTops = new Set(boxes.map((box) => Math.round(box.top)));
+		expect(rowTops.size, 'the buttons wrap onto more than one row').toBeGreaterThan(1);
+
+		for (const rowTop of rowTops) {
+			const rowRights = boxes
+				.filter((box) => Math.round(box.top) === rowTop)
+				.map((box) => box.right);
+			expect(
+				Math.max(...rowRights),
+				`the row at ${rowTop}px: its last button against the group's right edge`
+			).toBeCloseTo(groupRight, 0);
+		}
+	});
 });
