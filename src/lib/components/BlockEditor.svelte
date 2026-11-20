@@ -10,14 +10,12 @@
 	import ArrowDown from '@lucide/svelte/icons/arrow-down';
 	import ArrowUp from '@lucide/svelte/icons/arrow-up';
 	import Copy from '@lucide/svelte/icons/copy';
-	import GripVertical from '@lucide/svelte/icons/grip-vertical';
 	import Trash from '@lucide/svelte/icons/trash';
-	import { dragHandle } from 'svelte-dnd-action';
-	import { outOfTabOrder } from '../out-of-tab-order';
 	import type { Block } from '../routine';
 	import { describeBreakAtTarget } from '../routine-break-preview';
 	import type { BlockProblems } from '../routine-validation';
-	import { COMPACT_BUTTON_SHAPE, SECONDARY_BUTTON_COLOURS } from './button-classes';
+	import CompactButton from './CompactButton.svelte';
+	import DragHandle from './DragHandle.svelte';
 	import FormField from './FormField.svelte';
 
 	/** The props a block's form takes. */
@@ -115,50 +113,16 @@
 
 	<!-- The handle comes first, as the row's leading control, and the buttons share one shape. -->
 	<div class="mt-3 flex flex-wrap items-center gap-2">
-		<div
-			use:dragHandle
-			use:outOfTabOrder
-			aria-label="Drag block {position}"
-			class="rounded-lg p-1.5 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
-		>
-			<GripVertical class="size-5" />
-		</div>
-		<button
-			type="button"
-			disabled={!canMoveUp}
-			onclick={onmoveup}
-			class="{COMPACT_BUTTON_SHAPE} {SECONDARY_BUTTON_COLOURS}"
-		>
-			<ArrowUp class="size-4" />
-			Move up
-		</button>
-		<button
-			type="button"
+		<DragHandle label="Drag block {position}" />
+		<CompactButton icon={ArrowUp} label="Move up" disabled={!canMoveUp} onclick={onmoveup} />
+		<CompactButton
+			icon={ArrowDown}
+			label="Move down"
 			disabled={!canMoveDown}
 			onclick={onmovedown}
-			class="{COMPACT_BUTTON_SHAPE} {SECONDARY_BUTTON_COLOURS}"
-		>
-			<ArrowDown class="size-4" />
-			Move down
-		</button>
-		<button
-			type="button"
-			disabled={!canDuplicate}
-			onclick={onduplicate}
-			class="{COMPACT_BUTTON_SHAPE} {SECONDARY_BUTTON_COLOURS}"
-		>
-			<Copy class="size-4" />
-			Duplicate
-		</button>
-		<button
-			type="button"
-			disabled={!canDelete}
-			onclick={ondelete}
-			class="{COMPACT_BUTTON_SHAPE} {SECONDARY_BUTTON_COLOURS}"
-		>
-			<Trash class="size-4" />
-			Delete
-		</button>
+		/>
+		<CompactButton icon={Copy} label="Duplicate" disabled={!canDuplicate} onclick={onduplicate} />
+		<CompactButton icon={Trash} label="Delete" disabled={!canDelete} onclick={ondelete} />
 	</div>
 	{#if !canDelete}
 		<p class="mt-2 text-sm text-zinc-600 dark:text-zinc-400">

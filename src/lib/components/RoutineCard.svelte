@@ -8,15 +8,13 @@
 	import ArrowDown from '@lucide/svelte/icons/arrow-down';
 	import ArrowUp from '@lucide/svelte/icons/arrow-up';
 	import Copy from '@lucide/svelte/icons/copy';
-	import GripVertical from '@lucide/svelte/icons/grip-vertical';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import Trash from '@lucide/svelte/icons/trash';
-	import { dragHandle } from 'svelte-dnd-action';
-	import { outOfTabOrder } from '../out-of-tab-order';
 	import { editButtonId, headingId } from '../routine-card-ids';
 	import { describeRoutine, type Routine } from '../routine';
-	import { COMPACT_BUTTON_SHAPE, SECONDARY_BUTTON_COLOURS } from './button-classes';
 	import { CARD_CLASSES } from './card-classes';
+	import CompactButton from './CompactButton.svelte';
+	import DragHandle from './DragHandle.svelte';
 
 	/** The props a routine's card takes. */
 	type Props = {
@@ -73,14 +71,7 @@
 <div class={CARD_CLASSES}>
 	<div class="flex items-start gap-3">
 		{#if hasDragHandle}
-			<div
-				use:dragHandle
-				use:outOfTabOrder
-				aria-label="Drag {routine.title}"
-				class="rounded-lg p-1.5 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
-			>
-				<GripVertical class="size-5" />
-			</div>
+			<DragHandle label="Drag {routine.title}" />
 		{/if}
 		<div class="min-w-0 flex-1">
 			<!-- Focusable from script only, so the screen can put the focus here when Edit is disabled. -->
@@ -98,52 +89,28 @@
 	</div>
 
 	<div class="mt-3 flex flex-wrap items-center gap-2">
-		<button
-			type="button"
+		<CompactButton
+			icon={Pencil}
+			label="Edit"
 			id={editButtonId(routine.id)}
 			disabled={isRunning}
 			onclick={onedit}
-			class="{COMPACT_BUTTON_SHAPE} {SECONDARY_BUTTON_COLOURS}"
-		>
-			<Pencil class="size-4" />
-			Edit
-		</button>
-		<button
-			type="button"
-			onclick={onduplicate}
-			class="{COMPACT_BUTTON_SHAPE} {SECONDARY_BUTTON_COLOURS}"
-		>
-			<Copy class="size-4" />
-			Duplicate
-		</button>
-		<button
-			type="button"
+		/>
+		<CompactButton icon={Copy} label="Duplicate" onclick={onduplicate} />
+		<CompactButton
+			icon={Trash}
+			label="Delete"
 			disabled={!canDelete || isRunning}
 			onclick={ondelete}
-			class="{COMPACT_BUTTON_SHAPE} {SECONDARY_BUTTON_COLOURS}"
-		>
-			<Trash class="size-4" />
-			Delete
-		</button>
+		/>
 		{#if isInCustomOrder}
-			<button
-				type="button"
-				disabled={!canMoveUp}
-				onclick={onmoveup}
-				class="{COMPACT_BUTTON_SHAPE} {SECONDARY_BUTTON_COLOURS}"
-			>
-				<ArrowUp class="size-4" />
-				Move up
-			</button>
-			<button
-				type="button"
+			<CompactButton icon={ArrowUp} label="Move up" disabled={!canMoveUp} onclick={onmoveup} />
+			<CompactButton
+				icon={ArrowDown}
+				label="Move down"
 				disabled={!canMoveDown}
 				onclick={onmovedown}
-				class="{COMPACT_BUTTON_SHAPE} {SECONDARY_BUTTON_COLOURS}"
-			>
-				<ArrowDown class="size-4" />
-				Move down
-			</button>
+			/>
 		{/if}
 	</div>
 	{#if isRunning}

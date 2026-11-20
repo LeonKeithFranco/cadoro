@@ -26,11 +26,11 @@
 	import { isValid, validateRoutine } from '../routine-validation';
 	import BlockEditor from './BlockEditor.svelte';
 	import {
-		COMPACT_BUTTON_SHAPE,
 		DIALOG_ACTIONS,
 		PRIMARY_BUTTON_COLOURS,
 		SECONDARY_BUTTON_COLOURS
 	} from './button-classes';
+	import CompactButton from './CompactButton.svelte';
 	import ConfirmDialog from './ConfirmDialog.svelte';
 	import FormField from './FormField.svelte';
 	import { CHOICE_COLOURS, ERROR_TEXT } from './form-classes';
@@ -198,15 +198,12 @@
 			<p class={['text-sm', ERROR_TEXT]}>{problems.blocks}</p>
 		{/if}
 		<div>
-			<button
-				type="button"
+			<CompactButton
+				icon={Plus}
+				label="Add block"
 				disabled={!canAddBlock(draft)}
 				onclick={(): void => change(addBlock(draft, newId))}
-				class="{COMPACT_BUTTON_SHAPE} {SECONDARY_BUTTON_COLOURS}"
-			>
-				<Plus class="size-4" />
-				Add block
-			</button>
+			/>
 			{#if !canAddBlock(draft)}
 				<p class="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
 					A routine has at most {BLOCKS_MAX} blocks.
