@@ -16,7 +16,7 @@ The code is in layers, each knowing only the one below it:
 
 Every tab has its own sessions, and all of them follow the one saved run and the saved settings. Storage tells each tab when another tab changes either, and a press that a tab makes from an out-of-date run is refused, so the tab takes the saved run instead.
 
-Beside the timer, `RunChimes` and `WakeLockKeeper` watch the session's run and the settings, and act on the browser: the first schedules chimes on the audio clock, the second keeps the screen on. Neither changes the run.
+Beside the timer, `RunChimes` and `WakeLockKeeper` watch the session's run and the settings, and act on the browser: the first schedules chimes on the audio clock, the second keeps the screen on. Neither changes the run. `RunChimes.destroy` stops its effects, listener and check timer; the app never calls it, since the chimes last as long as the page, but each test that opens a tab does.
 
 ## Codemap
 
