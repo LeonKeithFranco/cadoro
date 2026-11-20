@@ -17,18 +17,18 @@ It's built primarily for one person. Anyone else can use it from GitHub Pages, w
 - Make starting and running a routine quick, on a phone or a desktop.
 - Record every work period and show useful stats about it, without clutter.
 - Keep deployment simple: a static app hosted free on GitHub Pages, which anyone can open and install. Its built files can also be self-hosted on any web server.
-- Use Svelte 5, SvelteKit and Tailwind CSS, and browser APIs the weight tracker didn't use, such as Web Audio and Screen Wake Lock.
+- Use Svelte 5, SvelteKit and Tailwind CSS, and browser APIs such as Web Audio and Screen Wake Lock.
 
 ## Non-goals
 
 - Accounts, login or multiple users within one deployment
-- A custom backend or any server-side data storage. The optional Web Push work after 1.0 is the one exception, and it would hold only push subscriptions and due times.
+- A custom backend or any server-side data storage
 - Sync between devices (each browser has its own data)
-- Alerts while the phone is locked or the app is closed, before the optional Web Push work
+- Alerts while the phone is locked or the app is closed (see Data limitations)
 - System notifications and vibration (alerts are sound only)
 - Task lists, or labels and notes on work periods
 - Recording breaks, or the number of pauses, in stats
-- Banking unused break time (an open item, to revisit after using the app)
+- Banking unused break time
 
 ## Terms
 
@@ -118,7 +118,7 @@ type RoutineSort =
 - A routine has a title, a number of rounds (1–99, or infinite) and 1–20 blocks.
 - A block has a title, a work target in whole minutes (1–240), a break percentage (a whole number, 1–100) and a number of cycles (1–99).
 - Only a routine can repeat forever. Every block has a set number of cycles.
-- A routine with one block has 1 cycle. With one block, cycles and rounds do the same job, since 3 cycles of 2 rounds is the same run as 6 rounds, so rounds repeat a single block. Cycles only matter with two or more blocks.
+- A routine with one block has 1 cycle. With one block, cycles and rounds do the same job: one block of 3 cycles over 2 rounds is the same run as one block of 1 cycle over 6 rounds. So a single block repeats through rounds, and cycles only matter with two or more blocks.
 - A run goes through block 1's cycles, then block 2's, and so on to the last block, which makes one round. Then the next round starts at block 1.
 - Every work period is followed by its break, including at the boundary between two blocks, except the routine's very last work period. A finite routine's run ends as soon as its last work period ends, and that period's break doesn't run.
 
@@ -144,14 +144,19 @@ They can be edited and deleted like any other routine, and aren't created again 
 - **Pause** stops the work or break timer. Paused time doesn't count as work, and a paused break keeps its remaining time.
 - **Finish** asks for confirmation, then ends the run. The run keeps counting while it asks, so the current work period, if any, is saved up to the moment Finish is confirmed. Cancel or Escape leaves the run as it was. This is how an infinite routine ends, and how a finite one ends early.
 - Before a run starts, Next and Finish are disabled.
-- A routine can't be edited or deleted while it's running, or while its ended run's summary is still open, and the routine picker is locked until the run ends. The run is shared between tabs, so this holds in every tab. On the Routines screen its Edit and Delete are disabled, with a hint. A routine already open for editing when its run starts can't be saved until the run ends, and a delete confirmed after that is ignored. Storage enforces it too: saving or deleting the routine of the run in progress, which an ended run's summary keeps until Done, is refused, whatever screen or tab asks.
+- A routine can't be edited or deleted while it's running, or while its ended run's summary is still open (until Done).
+  - The routine picker is locked until the run ends.
+  - The run is shared between tabs, so this holds in every tab.
+  - On the Routines screen, its Edit and Delete are disabled, with a hint.
+  - A routine already open for editing when its run starts can't be saved until the run ends, and a delete confirmed after that is ignored.
+  - Storage enforces it too: saving or deleting the routine of the run in progress is refused, whatever screen or tab asks.
 - A run can't start on a routine that isn't saved, as when another tab imported a backup that replaced the routines before this tab heard of it. Storage refuses the new run, and the failure is logged, since a run of an unknown routine would make every later backup fail. Storage with no routines at all is never refused.
 
 ### The timer screen
 
 - The routine picker at the top selects which routine to run, in the order chosen for the Routines screen. The app opens on the routine the last run started with, saved when that run started, or on the first routine in the picker when there is none or it's been deleted.
 - The blocks stack in one column, in the order the run goes through them, on every screen size.
-- Each block shows its title, its target and break percentage, and two boxes: the work timer above the break timer, as in the original sketch.
+- Each block shows its title, its target and break percentage, and two boxes: the work timer above the break timer.
 - The active timer is highlighted, and the screen shows exactly where the run is in both rounds and cycles, such as "Round 2 of 4 · Block 2 of 3 · Cycle 1 of 3". For an infinite routine it shows "Round 5" with no total. A part whose total is 1 never changes, so it's left out: Classic shows just "Round 5", and a block of 1 cycle shows no cycle.
 - A block of two or more cycles also shows its cycle across from its title, such as `Cycle 2 / 3`, matching the position above. Before Play, the first block shows the cycle the run will start on. A block the run isn't in shows `Cycle 0 / 3`.
 - Each box has its label on the left, its time on the right and a progress bar below. Boxes not in use show zeroed times, such as `0:00 / 25:00` and `0:00`, with empty bars.
@@ -175,11 +180,15 @@ Done or Escape closes the dialog and returns the routine to its starting state, 
 
 ### Leaving and returning
 
-- The run in progress is saved whenever it changes, and a heartbeat records the time every second while the app is open, on the same tick that updates the display, and when the page is hidden.
+- The run in progress is saved whenever it changes. While a timer counts, a heartbeat records the time every second, on the same tick that updates the display, and again when the page is hidden.
 - If the app is closed, reloaded, or stopped by the phone mid-run, reopening it restores the run, paused at the last heartbeat. Time after that doesn't count as work.
 - While the app stays open in a background tab, the timer keeps running and stays accurate.
-- Opening another screen in the app, such as Stats, pauses the run, work or break, and Play resumes it on the way back. Switching screens counts as stepping away, unlike a background tab. The run is shared between tabs, so leaving the Timer screen in one tab pauses the run in every tab.
+- Opening another screen in the app, such as Stats, pauses the run, work or break, and Play resumes it on the way back. Switching screens counts as stepping away, unlike a background tab.
+
+### Several tabs
+
 - With the app open in several tabs, or installed and in a browser tab too, every tab shows the same run. A press in one shows in the others, and each work period is recorded once.
+- Leaving the Timer screen in one tab pauses the run in every tab.
 - A tab that opens while another tab is open joins the run live, without pausing it. A saved run comes back paused at its last heartbeat only when no other tab is open.
 - A press in a tab that's behind, because another tab changed the run first, is refused, and that tab shows the saved run instead.
 
@@ -195,7 +204,7 @@ Done or Escape closes the dialog and returns the routine to its starting state, 
 - With the app open in several tabs, only one tab sounds each chime, and the next tab takes over when it closes. Where the browser can't take turns, every tab that has had a button pressed sounds it.
 - A Preview plays at once in the tab where it's pressed, at the chosen volume, whether or not that tab holds the chimes' turn, and doesn't change the run's scheduled chimes.
 - A chime file that fails to load is logged once and not retried.
-- While the phone is locked or the app is closed, chimes can't be relied on, because a static PWA can't run on a schedule without a server. This is documented as a limitation. The optional Web Push work after 1.0 would address it.
+- While the phone is locked or the app is closed, chimes can't be relied on (see Data limitations).
 
 ### Keeping the screen awake
 
@@ -233,7 +242,7 @@ Done or Escape closes the dialog and returns the routine to its starting state, 
 
 ### Stats
 
-All stats come from saved work periods and runs.
+Stats come from saved work periods. The work period in progress counts too, as the last bullet below says.
 
 | Stat                | Definition                                                                                      |
 | ------------------- | ----------------------------------------------------------------------------------------------- |
@@ -335,7 +344,7 @@ type LogEntry = {
 ### Persistent storage
 
 - The app asks the browser for persistent storage with `navigator.storage.persist()`, so a browser low on space doesn't delete the data without asking.
-- It asks after the first work period is saved, and again at startup while storage isn't persistent yet. It doesn't ask on an empty first visit, because Firefox shows a prompt for it.
+- It asks at most once per launch: at startup once any work period is saved, or else after the first work period is saved. It doesn't ask on an empty first visit, because Firefox shows a prompt for it.
 - Settings shows whether storage is persistent as On or Off, or Unknown where the browser can't say, with an "Ask again" button while it's Off. A refusal shows a note that the browser declined.
 - The browser can refuse, and the app works the same either way.
 - Persistent storage doesn't protect against clearing site data, uninstalling or changing devices, so the JSON backup is still the backup.
@@ -349,12 +358,19 @@ type LogEntry = {
 
 The app is a single-page app, and each screen has its own URL. Navigation is a bottom tab bar on phones and a top nav on desktop.
 
+## Accessibility
+
+- Every screen works with the keyboard alone. Drag handles are out of the Tab order, since Move up and Move down do the same job.
+- A control that disappears when it's pressed hands the keyboard focus on, so it never falls to the page's body: opening a routine for editing focuses its title field, Cancel, Save and a confirmed delete return focus to a control on the Routines screen, and Done on the run summary focuses Play.
+- The Timer has a polite live region that says `Overtime`, `Break started`, `Break over` and `Run ended` as the run reaches each, without moving the focus, and never on a tick. The progress bars have the `progressbar` role with their values.
+- Text keeps at least 5:1 contrast, and outlines, bars and their tracks at least 3:1, in both themes.
+
 ## Deployment
 
 - The source lives in the public GitHub repo `cadoro`, under the MIT license.
 - GitHub Actions runs checks on every push and pull request.
 - The build's base path comes from an environment variable, so the same code serves from `/cadoro/` on GitHub Pages and from `/` when self-hosted.
-- Versions follow semantic versioning from the first deploy, which is 0.1.0. Every merged pull request that changes the app bumps the version and is tagged and released. 1.0.0 is the release that completes this spec.
+- Versions follow semantic versioning from the first deploy, which is 0.1.0. Every merged pull request that changes the app bumps the version and is tagged and released.
 
 ### GitHub Pages
 
@@ -369,25 +385,11 @@ The app is a single-page app, and each screen has its own URL. Navigation is a b
 - The server must return the app's fallback page for app routes, so refreshing a screen's URL works.
 - Off `localhost`, the server needs HTTPS, or the service worker won't run and the app can't be installed.
 
-### Optional, after 1.0
-
-- **Web Push:** a small server, such as a free Cloudflare Worker, that sends a push message when a target or break end is due, so alerts reach a locked phone. It holds only push subscriptions and due times, needs notification permission, and on iPhones only works for an installed app.
-- **Container image and homelab:** as in the weight tracker, a Podman image with unprivileged nginx, published to `ghcr.io`, and run on the homelab.
-
 ## Data limitations
 
-These follow from browser-only storage and should appear in the README:
+These follow from browser-only storage:
 
 - Phone and desktop hold separate data. JSON backup and import is the only way to move it.
 - Clearing browser data deletes everything that wasn't backed up.
 - Data belongs to the browser and the exact site address. Opening the app at a different address starts with an empty app, so back up first.
-- Chimes can't be relied on while the phone is locked or the app is closed.
-
-## Testing
-
-Tests guard against regressions and are written after the code, once its behaviour is right, not test-first. A bug fix starts with a regression test that's seen to fail.
-
-- **Unit:** the run's progression through blocks, cycles and rounds; earned break and its rounding; pause and resume; restoring a run from its last heartbeat; every stat, including splitting at midnight, Monday weeks and streaks; routine validation and sorting; CSV export; JSON backup validation
-- **Component:** the timer screen, the routine editor and the stats screen, run in a real browser with Vitest's browser mode
-- **End to end (Playwright):** create and edit a routine; run work, break and work with a controlled clock; reach a target and hear the chime; finish and see the summary; see the work in stats; reload mid-run and find it paused; back up and restore; run at desktop and phone sizes, plus offline against a production build
-- Test data must be synthetic.
+- Chimes can't be relied on while the phone is locked or the app is closed, because a static PWA can't run on a schedule without a server.
