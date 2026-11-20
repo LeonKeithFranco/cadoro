@@ -51,8 +51,26 @@ const LOCAL_STORAGE_GLOBAL = {
 };
 
 /**
+ * The same two, reached through an object that holds the globals, such as `window.indexedDB` or
+ * `globalThis.localStorage`, which `no-restricted-globals` doesn't see.
+ */
+const STORAGE_PROPERTIES = ['window', 'globalThis', 'self'].map((object) => ({
+	object,
+	property: 'indexedDB',
+	message: 'Only `src/lib/storage/` opens IndexedDB.'
+}));
+
+/** The `localStorage` half of {@link STORAGE_PROPERTIES}, for where IndexedDB is allowed. */
+const LOCAL_STORAGE_PROPERTIES = ['window', 'globalThis', 'self'].map((object) => ({
+	object,
+	property: 'localStorage',
+	message: 'Only `src/lib/storage/theme-mirror.ts` uses `localStorage`.'
+}));
+
+/**
  * The engine and the pure logic modules, which take the moment as an argument and import no
- * Svelte, SvelteKit or component.
+ * Svelte, SvelteKit or component. The `*.svelte.ts` files that match, which keep state, are left
+ * out where the globs are used.
  */
 const PURE_MODULES = [
 	'src/lib/run.ts',
@@ -235,7 +253,8 @@ export default defineConfig(
 		ignores: ['src/lib/storage/**', '**/*.test.ts'],
 		rules: {
 			'no-restricted-imports': ['error', { patterns: [DEXIE_IMPORT] }],
-			'no-restricted-globals': ['error', ...STORAGE_GLOBALS, LOCAL_STORAGE_GLOBAL]
+			'no-restricted-globals': ['error', ...STORAGE_GLOBALS, LOCAL_STORAGE_GLOBAL],
+			'no-restricted-properties': ['error', ...STORAGE_PROPERTIES, ...LOCAL_STORAGE_PROPERTIES]
 		}
 	},
 	{
@@ -243,7 +262,10 @@ export default defineConfig(
 		// `localStorage` is only for the theme mirror, which `app.html`'s first paint reads.
 		files: ['src/lib/storage/**/*.ts'],
 		ignores: ['src/lib/storage/theme-mirror.ts', '**/*.test.ts'],
-		rules: { 'no-restricted-globals': ['error', LOCAL_STORAGE_GLOBAL] }
+		rules: {
+			'no-restricted-globals': ['error', LOCAL_STORAGE_GLOBAL],
+			'no-restricted-properties': ['error', ...LOCAL_STORAGE_PROPERTIES]
+		}
 	},
 	{
 		// ARCHITECTURE's cross-cutting concern "A failed save ... is logged with `console.error`":
@@ -259,7 +281,7 @@ export default defineConfig(
 		// import no Svelte, SvelteKit or component. They keep the storage invariant above too,
 		// since this block's rules replace that block's for these files.
 		files: PURE_MODULES,
-		ignores: ['**/*.test.ts'],
+		ignores: ['**/*.test.ts', '**/*.svelte.ts'],
 		rules: {
 			'no-restricted-imports': [
 				'error',
@@ -273,6 +295,7 @@ export default defineConfig(
 				}
 			],
 			'no-restricted-globals': ['error', ...STORAGE_GLOBALS, LOCAL_STORAGE_GLOBAL],
+			'no-restricted-properties': ['error', ...STORAGE_PROPERTIES, ...LOCAL_STORAGE_PROPERTIES],
 			'no-restricted-syntax': [
 				'error',
 				{
