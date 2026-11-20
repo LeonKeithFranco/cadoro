@@ -1,20 +1,13 @@
 # Progress
 
-**Status:** milestone 8 is done, as version 0.10.0, which goes live once its pull request merges. Settings has a Data card that exports every work period as a CSV, backs everything up as a JSON file and imports a backup after showing what it holds, and an activity log page that lists the changes, imports and errors and exports them as JSON. Every failed save or read and every uncaught error is recorded in the log. Version 0.9.0 (Stats) is live. The app is installed on the desktop and the phone, runs both starter routines, works offline, keeps its data in IndexedDB, restores a run after a reload, and shows the same run in every tab.
+**Status:** 1.0.0 is done, and goes live once its pull request merges. It carries the test coverage audit, the spec tidy, the accessibility fixes and the README. The spec is complete: Cadoro runs routines of blocks with work that counts up and earned breaks, keeps its data in IndexedDB, shares one run across tabs, chimes, shows stats, backs up and imports, and keeps an activity log. It works offline and is installed on the desktop and the phone.
 
-**Next:** the test coverage audit (`test/coverage-audit`), then milestone 9, Release 1.0 (`docs/release-1-0`, 1.0.0). `docs/PLAN.md` has the plan for every remaining milestone. Device checks pending: a backup made on one device importing into another; dragging routines and blocks by touch on the phone, and the pinned controls above the tab bar on a long routine; killing the installed app mid-run and reopening it finds the run paused at about the moment it was left; a chime plays on time in a background desktop tab; the phone's screen stays on during a run; and the four chimes sound right by ear.
+**Next:** the device checks listed in `docs/decisions/09-release-1-0.md`, then the optional milestones 10 and 11.
 
 **Open:**
 
+- Node 22 is supported until April 2027, so it needs moving to a newer LTS before then, once Fedora ships one.
 - Banking unused break time is an open spec item, to revisit after using the app.
-- Node 22 is supported until April 2027, so it needs moving to a newer LTS before then.
-
-## Milestone 4: Keep runs
-
-1. [x] Routines in storage (`feat/routine-storage`), 0.3.0: the storage interface, its Dexie and in-memory backends, schema version 1, the starter routines created once on first launch, and the app loading them before it renders
-2. [x] Record runs (`feat/run-records`), 0.4.0: each run and work period saved as it starts and ends, and persistent storage asked for
-3. [x] Keep the run in progress (`feat/restore-run`), 0.5.0: saved on every change, every second and as the page is hidden, and restored paused at the last heartbeat
-4. [x] Share the run across tabs (`feat/shared-run`), 0.6.0: every tab following the saved run through a Dexie live query, with saves refused when a tab is out of date
 
 ## Milestones
 
@@ -37,8 +30,8 @@ Each finished milestone lists its steps' branches. Its decisions are in its file
 
 ### Phase 3: Release
 
-- [ ] Before 9. Test coverage audit: `test/coverage-audit` (0.10.1, or no bump)
-- [ ] 9. Release 1.0: `docs/release-1-0` (1.0.0)
+- [x] Before 9. Test coverage audit: `test/coverage-audit` (shipped inside 1.0.0)
+- [x] 9. Release 1.0: `docs/release-1-0` (1.0.0)
 
 ### Phase 4: Optional
 
