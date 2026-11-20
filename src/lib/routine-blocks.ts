@@ -2,7 +2,7 @@
 // a routine's only block has 1 cycle.
 
 import { requireDefined } from './defined';
-import { moveDown, moveToIndex, moveUp } from './list-order';
+import { moveDown, moveUp } from './list-order';
 import { newBlock, type Block, type Routine } from './routine';
 import { BLOCKS_MAX, BLOCKS_MIN } from './routine-limits';
 
@@ -98,20 +98,6 @@ export function deleteBlock(routine: Routine, blockId: string): Routine {
 	indexOfBlock(routine, blockId);
 	const blocks = routine.blocks.filter((block) => block.id !== blockId);
 	return resetSingleBlockCycles({ ...routine, blocks });
-}
-
-/**
- * Moves a block to an index in the run order.
- *
- * @param routine - The routine.
- * @param blockId - The id of the block to move.
- * @param index - Where it should end up, counting from 0. An index outside the blocks puts it
- * first or last.
- * @returns A new routine with the blocks in the new order.
- * @throws {@link Error} When the routine has no block with that id.
- */
-export function moveBlockToIndex(routine: Routine, blockId: string, index: number): Routine {
-	return { ...routine, blocks: moveToIndex(routine.blocks, blockId, index) };
 }
 
 /**
