@@ -51,6 +51,15 @@ The test coverage audit and the release itself, shipped together as 1.0.0 in one
 - **Drag handles** are out of the Tab order, with noisy text from `svelte-dnd-action`, since Move up and Move down cover the keyboard.
 - **The chart:** its axis labels were 10px and are larger, and the range presets fit on one row on a Pixel 7, with "All" no longer alone on a second.
 
+### Fixes from the 1.0 review
+
+- **Focus fell to the body in two more cases.** Deleting a routine below a running one, and cancelling a form locked by a run started elsewhere, aimed the focus at a disabled Edit button. The screen now falls back to the card's heading, which takes the focus from script only (`tabindex="-1"`).
+- **A pending focus pulled the user out of a form.** After Save, the focus waited for the new card, so pressing New routine first had the focus jump back to the earlier routine's Edit. Opening a form, or focus already being in one, now drops the pending focus.
+- **The routines' usage could be overwritten with older data, or read too early.** `RoutineUsageKeeper` numbers its reads and keeps only the latest, and the session's new `onRunSaved` triggers the read once the run's save has reached storage, instead of when Play is pressed.
+- **The guardrails had holes.** `routine-usage.svelte.ts` matched the pure-module glob though it keeps state, so `*.svelte.ts` is exempt there, and `window.indexedDB` or `globalThis.localStorage` slipped past `no-restricted-globals`, so `no-restricted-properties` covers `window`, `globalThis` and `self`.
+- **The chimes' timer was never cleared.** `RunChimes.destroy` clears it and stops the rest, and the tests' tabs call it. The app doesn't, since the chimes last as long as the page.
+- **Focus could sit under the tab bar (WCAG 2.4.11).** Nothing reserved scroll space, so a control already half on screen under the fixed bar stayed there when tabbed to. `<html>` has `scroll-pb-24` below `md`, and a journey tabs to each control with the page scrolled to put it half under the bar.
+
 ### Node stays on 22
 
 - The plan's step to move `.nvmrc` and `@types/node` to the current LTS was dropped on the user's word: Fedora's `nodejs` is 22 and CI follows `.nvmrc`, so moving would test a Node the machine doesn't run. Node 22 is supported until April 2027, so it stays an open item until Fedora ships a newer one.
