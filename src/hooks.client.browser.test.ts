@@ -81,7 +81,8 @@ describe('init', () => {
 		useErrorLog(storage);
 		await initWithCleanup();
 
-		// Stops the browser from also reporting the error, which would fail the test run.
+		// Marks the error as handled for the browser. Vite's forwarded console still prints it as
+		// "[Unhandled error]", which the test can't prevent, since it listens before this test does.
 		window.addEventListener('error', (caught) => caught.preventDefault(), { once: true });
 		window.dispatchEvent(new ErrorEvent('error', { error: new TypeError('Not a function') }));
 
