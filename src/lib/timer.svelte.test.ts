@@ -10,6 +10,7 @@ import { minutes, seconds } from './testing/durations';
 import { numberedIds } from './testing/ids';
 import { oneRoundRoutine, routineWith } from './testing/routines';
 import { storageHolding } from './testing/storage';
+import { restartRevisions, testSessionOptions } from './testing/timer-session';
 import { TimerSession, type AppOpening, type TimerSessionOptions } from './timer.svelte';
 
 /** The starter routines, Classic then Classic with long break, with predictable ids. */
@@ -48,12 +49,6 @@ function storageForRuns(): InMemoryStorage {
 let nowMs = 0;
 
 /**
- * Makes the revisions of every session in a test, numbered from `revision-1`, so two sessions on
- * one storage, as two tabs, never make the same one, as `crypto.randomUUID` never does.
- */
-let newRevision = numberedIds('revision');
-
-/**
  * Starts a session on the fake clock, with ids numbered from `id-1` and revisions from
  * `revision-1`.
  *
@@ -84,14 +79,7 @@ function createSession(
 ): TimerSession {
 	return new TimerSession(
 		choices,
-		{
-			clock: () => nowMs,
-			storage: storageHolding(choices),
-			newId: numberedIds(),
-			newRevision,
-			onWorkSaved: vi.fn(),
-			...options
-		},
+		testSessionOptions(() => nowMs, options.storage ?? storageHolding(choices), options),
 		{ saved: null, isAnotherTabOpen: false, ...opening }
 	);
 }
@@ -99,7 +87,7 @@ function createSession(
 // Starts each test at the fake clock's 0, with revisions numbered from `revision-1` again.
 beforeEach(() => {
 	nowMs = 0;
-	newRevision = numberedIds('revision');
+	restartRevisions();
 });
 
 describe('TimerSession', () => {

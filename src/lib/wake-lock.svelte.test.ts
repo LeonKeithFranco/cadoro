@@ -5,9 +5,9 @@ import { DEFAULT_SETTINGS } from './settings';
 import { SettingsSession } from './settings.svelte';
 import { InMemoryStorage } from './storage/in-memory-storage';
 import { minutes } from './testing/durations';
-import { numberedIds } from './testing/ids';
 import { routineWith } from './testing/routines';
 import { storageHolding } from './testing/storage';
+import { testSessionOptions } from './testing/timer-session';
 import { TimerSession } from './timer.svelte';
 import {
 	WakeLockKeeper,
@@ -148,13 +148,7 @@ function setUp({ isSupported = true }: { isSupported?: boolean } = {}): Setup {
 	const settings = new SettingsSession(storage, DEFAULT_SETTINGS);
 	const timer = new TimerSession(
 		[foreverRoutine],
-		{
-			clock: (): number => nowMs,
-			storage,
-			newId: numberedIds(),
-			newRevision: numberedIds('revision'),
-			onWorkSaved: vi.fn()
-		},
+		testSessionOptions(() => nowMs, storage),
 		{ saved: null, isAnotherTabOpen: false }
 	);
 	const keeper = new WakeLockKeeper({
