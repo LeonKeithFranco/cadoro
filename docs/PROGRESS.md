@@ -1,6 +1,6 @@
 # Progress
 
-**Status:** 1.0.0 is done, and goes live once its pull request merges. It carries the test coverage audit, the spec tidy, the accessibility fixes and the README. The spec is complete: Cadoro runs routines of blocks with work that counts up and earned breaks, keeps its data in IndexedDB, shares one run across tabs, chimes, shows stats, backs up and imports, and keeps an activity log. It works offline and is installed on the desktop and the phone.
+**Status:** 1.0.0 is live. 1.1.0 adds the break preview to the routine form. The spec is complete: Cadoro runs routines of blocks with work that counts up and earned breaks, keeps its data in IndexedDB, shares one run across tabs, chimes, shows stats, backs up and imports, and keeps an activity log. It works offline and is installed on the desktop and the phone.
 
 **Next:** the device checks listed in `docs/decisions/09-release-1-0.md`, then the optional milestones 10 and 11.
 
@@ -32,6 +32,7 @@ Each finished milestone lists its steps' branches. Its decisions are in its file
 
 - [x] Before 9. Test coverage audit: `test/coverage-audit` (shipped inside 1.0.0)
 - [x] 9. Release 1.0: `docs/release-1-0` (1.0.0)
+- [x] After 9. Break preview: `feat/break-preview` (1.1.0)
 
 ### Phase 4: Optional
 
