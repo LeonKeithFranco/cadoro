@@ -119,6 +119,8 @@ describe('ThemeSync and the browser’s bars', () => {
 	});
 
 	it('follows the device for system', async () => {
+		// Starts in the colour the dark device doesn't have, so the first check needs ThemeSync's write.
+		themeColor.content = '#ffffff';
 		const device = fakeDevice(true);
 		render(ThemeSync, { theme: 'system' });
 		await expect.poll(() => themeColor.content).toBe('#09090b');

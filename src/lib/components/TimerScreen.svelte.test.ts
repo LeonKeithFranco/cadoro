@@ -633,6 +633,7 @@ describe('a long routine on the Timer screen', () => {
 	});
 
 	it('doesn’t scroll while every block fits, however the run moves', async () => {
+		const scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView');
 		render(TimerScreen, { session: createSession([routineOfBlocks(2)]) });
 		window.scrollTo(0, 0);
 		await page.getByRole('button', { name: 'Play' }).click();
@@ -641,6 +642,11 @@ describe('a long routine on the Timer screen', () => {
 			await page.getByRole('button', { name: 'Next' }).click();
 		}
 
+		// `nearest` moves the page only when the block is out of view, as it never is here.
+		expect(scrollIntoView).toHaveBeenCalled();
+		for (const [options] of scrollIntoView.mock.calls) {
+			expect(options).toEqual({ block: 'nearest' });
+		}
 		expect(window.scrollY).toBe(0);
 	});
 });
