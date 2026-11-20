@@ -95,7 +95,7 @@
 			<tbody>
 				{#each bars as bar (bar.day)}
 					<tr>
-						<th scope="row">{bar.label}</th>
+						<th scope="row">{bar.dateLabel}</th>
 						<td>{bar.duration}</td>
 					</tr>
 				{/each}

@@ -86,6 +86,7 @@ describe('viewStats for every routine', () => {
 		expect(shown.days[0]).toEqual({
 			day: '2026-11-13',
 			label: 'Nov 13',
+			dateLabel: 'Nov 13, 2026',
 			minutes: 0,
 			duration: '0:00'
 		});
@@ -93,6 +94,7 @@ describe('viewStats for every routine', () => {
 		expect(shown.days[6]).toEqual({
 			day: '2026-11-19',
 			label: 'Nov 19',
+			dateLabel: 'Nov 19, 2026',
 			minutes: 70,
 			duration: '1:10:00'
 		});
@@ -139,6 +141,23 @@ describe('viewStats ranges', () => {
 
 		expect(shown.days).toHaveLength(20);
 		expect(shown.days[0]?.day).toBe('2026-10-31');
+	});
+});
+
+describe('viewStats over a range that spans years', () => {
+	it('gives each day its year in the date label, so days of different years differ', () => {
+		const shown = view({
+			preset: 'all',
+			workPeriods: [
+				period('focus', '2025-11-19T15:00:00.000Z', '2025-11-19T15:10:00.000Z', 10, 25),
+				...workPeriods
+			]
+		});
+
+		const labels = shown.days.map((bar) => bar.dateLabel);
+		expect(labels[0]).toBe('Nov 19, 2025');
+		expect(labels.at(-1)).toBe('Nov 19, 2026');
+		expect(new Set(labels).size).toBe(labels.length);
 	});
 });
 
