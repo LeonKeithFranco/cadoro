@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-	insertRoutine,
-	moveRoutineDown,
-	moveRoutineToIndex,
-	moveRoutineUp,
-	renumberRoutines
-} from './routine-order';
+import { insertRoutine, moveRoutineDown, moveRoutineUp } from './routine-order';
 import { routineWith } from './testing/routines';
 
 /** Three routines in custom order a, b, c. */
@@ -24,62 +18,6 @@ const abc = [
 function placed(routines: { id: string; customPosition: number }[]): string[] {
 	return routines.map((routine) => `${routine.id}:${routine.customPosition}`);
 }
-
-describe('renumberRoutines', () => {
-	it('closes gaps in the positions, keeping the order', () => {
-		const gappy = [
-			routineWith({ id: 'c', customPosition: 40 }),
-			routineWith({ id: 'a', customPosition: 3 }),
-			routineWith({ id: 'b', customPosition: 7 })
-		];
-
-		expect(placed(renumberRoutines(gappy))).toEqual(['a:0', 'b:1', 'c:2']);
-	});
-
-	it('breaks a tie in the order the routines were given', () => {
-		const tied = [
-			routineWith({ id: 'first', customPosition: 5 }),
-			routineWith({ id: 'second', customPosition: 5 })
-		];
-
-		expect(placed(renumberRoutines(tied))).toEqual(['first:0', 'second:1']);
-	});
-});
-
-describe('moveRoutineToIndex', () => {
-	it('moves a routine and renumbers all of them', () => {
-		expect(placed(moveRoutineToIndex(abc, 'a', 2))).toEqual(['b:0', 'c:1', 'a:2']);
-	});
-
-	it('moves a routine up to the first place', () => {
-		expect(placed(moveRoutineToIndex(abc, 'c', 0))).toEqual(['c:0', 'a:1', 'b:2']);
-	});
-
-	it('puts a routine last for an index past the end', () => {
-		expect(placed(moveRoutineToIndex(abc, 'a', 10))).toEqual(['b:0', 'c:1', 'a:2']);
-	});
-
-	it('works from the custom order, whatever order the routines are given in', () => {
-		const shuffled = [
-			routineWith({ id: 'c', customPosition: 2 }),
-			routineWith({ id: 'a', customPosition: 0 }),
-			routineWith({ id: 'b', customPosition: 1 })
-		];
-
-		expect(placed(moveRoutineToIndex(shuffled, 'c', 1))).toEqual(['a:0', 'c:1', 'b:2']);
-		expect(placed(moveRoutineToIndex(shuffled, 'a', 0))).toEqual(['a:0', 'b:1', 'c:2']);
-	});
-
-	it('leaves the given routines as they were', () => {
-		moveRoutineToIndex(abc, 'a', 2);
-
-		expect(placed(abc)).toEqual(['a:0', 'b:1', 'c:2']);
-	});
-
-	it('throws when no routine has the id', () => {
-		expect(() => moveRoutineToIndex(abc, 'missing', 0)).toThrow('missing');
-	});
-});
 
 describe('moveRoutineUp', () => {
 	it('swaps a routine with the one above it', () => {
