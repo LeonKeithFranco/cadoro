@@ -21,7 +21,7 @@
 	import { sortRoutines, type RoutineSort, type RoutineUsage } from '../routine-sort';
 	import type { TimerSession } from '../timer.svelte';
 	import BlockCard from './BlockCard.svelte';
-	import FinishConfirmation from './FinishConfirmation.svelte';
+	import ConfirmDialog from './ConfirmDialog.svelte';
 	import RoutinePicker from './RoutinePicker.svelte';
 	import RunSummary from './RunSummary.svelte';
 	import ScreenHeading from './ScreenHeading.svelte';
@@ -200,7 +200,10 @@
 
 <!-- The run keeps counting behind the question, so Cancel changes nothing. -->
 {#if isConfirmingFinish}
-	<FinishConfirmation
+	<ConfirmDialog
+		title="Finish this run?"
+		message="This ends the run and shows its summary."
+		confirmLabel="Finish"
 		onconfirm={confirmFinish}
 		oncancel={(): void => {
 			isConfirmingFinish = false;
