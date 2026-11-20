@@ -42,12 +42,31 @@ describe('timeAgainstTarget', () => {
 		expect(timeAgainstTarget(periods)).toBeCloseTo(93.3333, 4);
 	});
 
+	it('counts a period that Finish ended early at the time it worked, against its full target', () => {
+		// Finish after 10 of 25 minutes, beside a period that worked all 25: 35 minutes against 50.
+		const periods = [
+			workPeriodWith({ targetMinutes: 25, workedMs: minutes(25) }),
+			workPeriodWith({ targetMinutes: 25, workedMs: minutes(10) })
+		];
+
+		expect(timeAgainstTarget(periods)).toBe(70);
+	});
+
 	it('is 0 when nothing was worked against a target', () => {
 		expect(timeAgainstTarget([workPeriodWith({ targetMinutes: 25, workedMs: 0 })])).toBe(0);
 	});
 });
 
 describe('targetsReached', () => {
+	it('counts a period that Finish ended before its target as not reached', () => {
+		const periods = [
+			workPeriodWith({ targetMinutes: 25, workedMs: minutes(25) }),
+			workPeriodWith({ targetMinutes: 25, workedMs: minutes(10) })
+		];
+
+		expect(targetsReached(periods)).toBe(50);
+	});
+
 	it('is null when there are no work periods', () => {
 		expect(targetsReached([])).toBeNull();
 	});
