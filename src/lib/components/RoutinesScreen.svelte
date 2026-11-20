@@ -449,17 +449,26 @@
 	</button>
 </div>
 
+<!-- A notice about what another tab did, in amber, announced politely. -->
+{#snippet notice(message: string)}
+	<p
+		role="status"
+		class="rounded-md border border-amber-700 p-3 text-sm text-amber-900 dark:border-amber-400 dark:text-amber-200"
+	>
+		{message}
+	</p>
+{/snippet}
+
 {#snippet editor(current: RoutineEdit)}
 	<div
 		class="rounded-xl border border-rose-700 bg-white p-4 ring-1 ring-rose-700 md:p-6 dark:border-rose-400 dark:bg-zinc-900 dark:ring-rose-400"
 	>
 		{#if current.isChangedElsewhere}
-			<p
-				role="status"
-				class="mb-4 rounded-md border border-amber-700 p-3 text-sm text-amber-900 dark:border-amber-400 dark:text-amber-200"
-			>
-				This routine was changed in another tab. Save will overwrite that change with yours.
-			</p>
+			<div class="mb-4">
+				{@render notice(
+					'This routine was changed in another tab. Save will overwrite that change with yours.'
+				)}
+			</div>
 		{/if}
 		<RoutineForm
 			draft={current.draft}
@@ -496,12 +505,7 @@
 
 <div class="mt-4 grid gap-4">
 	{#if deletedElsewhere !== null}
-		<p
-			role="status"
-			class="rounded-md border border-amber-700 p-3 text-sm text-amber-900 dark:border-amber-400 dark:text-amber-200"
-		>
-			{deletedElsewhere}
-		</p>
+		{@render notice(deletedElsewhere)}
 	{/if}
 
 	{#if actionFailure !== null}
