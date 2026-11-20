@@ -4,6 +4,9 @@
 /** A function that hands the user a file, so tests can stand in for the browser's download. */
 export type SaveFile = (fileName: string, mimeType: string, text: string) => void;
 
+/** How long the Blob's address stays valid after the click, in milliseconds. */
+const REVOKE_DELAY_MS = 10_000;
+
 /**
  * Starts a download of some text, by clicking a link to a Blob that holds it.
  *
@@ -17,6 +20,9 @@ export const downloadTextFile: SaveFile = (fileName, mimeType, text) => {
 	link.href = url;
 	link.download = fileName;
 	link.click();
-	// The browser has started the download by now, so the Blob can go.
-	URL.revokeObjectURL(url);
+	// Firefox and Safari read the Blob after `click()` returns, so it goes on a later turn of the
+	// event loop, once they have started the download.
+	setTimeout((): void => {
+		URL.revokeObjectURL(url);
+	}, REVOKE_DELAY_MS);
 };
