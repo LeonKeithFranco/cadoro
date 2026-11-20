@@ -735,6 +735,17 @@ describe.each(backends)('$name', ({ create }) => {
 			expect(await storage.getWorkPeriods()).toEqual([firstWorkPeriod]);
 		});
 
+		it('does not add runs or work periods to the activity log', async () => {
+			const storage = create(atNow);
+
+			await storage.saveRunInProgress(savedRunInProgress, null, {
+				run: runInProgress,
+				workPeriods: [firstWorkPeriod]
+			});
+
+			expect(await storage.getLogEntries()).toEqual([]);
+		});
+
 		it('rejects a work period whose id is already saved, and saves nothing from that call', async () => {
 			const storage = create();
 			await storage.saveRunInProgress(savedRunInProgress, null, {
