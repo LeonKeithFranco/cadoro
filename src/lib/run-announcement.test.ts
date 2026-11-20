@@ -2,10 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createRun, finish, next, play, viewRun, type RunState } from './run';
 import { announcementFor } from './run-announcement';
 import { minutes, seconds } from './testing/durations';
-import { routineWith } from './testing/routines';
-
-/** A routine of one 25-minute block at 20%, repeating forever, so Next always starts a 5-minute break. */
-const foreverRoutine = routineWith({ id: 'forever', title: 'Forever', rounds: 'infinite' });
+import { foreverRoutine } from './testing/routines';
 
 /**
  * Works out what's announced for a run at a moment.

@@ -5,7 +5,7 @@ import { DEFAULT_SETTINGS } from './settings';
 import { SettingsSession } from './settings.svelte';
 import { InMemoryStorage } from './storage/in-memory-storage';
 import { minutes } from './testing/durations';
-import { routineWith } from './testing/routines';
+import { foreverRoutine } from './testing/routines';
 import { storageHolding } from './testing/storage';
 import { testSessionOptions } from './testing/timer-session';
 import { TimerSession } from './timer.svelte';
@@ -15,9 +15,6 @@ import {
 	type ScreenLock,
 	type WakeLockApi
 } from './wake-lock.svelte';
-
-/** A 25-minute block at 20%, repeating forever, so Next starts a break and Finish ends the run. */
-const foreverRoutine = routineWith({ id: 'forever', title: 'Forever', rounds: 'infinite' });
 
 /** The fake clock's current moment, in milliseconds since 1970, which each test moves by hand. */
 let nowMs = 0;
