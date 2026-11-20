@@ -32,7 +32,7 @@
 	} from './button-classes';
 	import ConfirmDialog from './ConfirmDialog.svelte';
 	import FormField from './FormField.svelte';
-	import { ERROR_TEXT } from './form-classes';
+	import { CHOICE_COLOURS, ERROR_TEXT } from './form-classes';
 
 	/** The props the routine form takes. */
 	type Props = {
@@ -148,7 +148,7 @@
 					checked={draft.rounds === 'infinite'}
 					onchange={(event: Event & { currentTarget: HTMLInputElement }): void =>
 						change({ ...draft, rounds: event.currentTarget.checked ? 'infinite' : 1 })}
-					class="rounded border-zinc-500 text-rose-700 dark:border-zinc-500 dark:bg-zinc-900"
+					class={CHOICE_COLOURS}
 				/>
 				Repeat forever
 			</label>
