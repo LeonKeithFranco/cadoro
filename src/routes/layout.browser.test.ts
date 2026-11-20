@@ -7,6 +7,7 @@ import { runInProgressWith, savedRunInProgress } from '#lib/testing/run-in-progr
 import { oneRoundRoutine, routineWith } from '#lib/testing/routines.ts';
 import { firstWorkPeriod, runInProgress, runWith } from '#lib/testing/run-records.ts';
 import type { RoutineUsageKeeper } from '#lib/routine-usage.svelte.ts';
+import type { RunChimes } from '#lib/run-chimes.svelte.ts';
 
 /** The name of the database the layout's `load` opens, which these tests empty before each test. */
 const APP_DATABASE_NAME = 'cadoro';
@@ -20,6 +21,8 @@ type LoadedApp = {
 	timerSession: TimerSession;
 	/** The runs and work periods the picker sorts by, read again on request. */
 	routineUsage: RoutineUsageKeeper;
+	/** The app's chimes, whose timer a test clears once it ends. */
+	chimes: RunChimes;
 };
 
 /**
@@ -37,8 +40,15 @@ async function freshLoad(): Promise<() => Promise<LoadedApp>> {
 	const layout = (await import(
 		/* @vite-ignore */ `./+layout.ts?fresh=${importCount}`
 	)) as typeof import('./+layout.ts');
-	return async () => (await layout.load({} as Parameters<typeof layout.load>[0])) as LoadedApp;
+	return async () => {
+		const app = (await layout.load({} as Parameters<typeof layout.load>[0])) as LoadedApp;
+		chimesOfLoadedApps.push(app.chimes);
+		return app;
+	};
 }
+
+/** The chimes of every app a test loaded, which are destroyed once the test ends. */
+const chimesOfLoadedApps: RunChimes[] = [];
 
 /**
  * Saves a finished work period in the app's database, as if work was done in an earlier visit,
@@ -70,8 +80,12 @@ describe('the root layout’s load', () => {
 		persist = vi.spyOn(navigator.storage, 'persist').mockResolvedValue(true);
 	});
 
-	// Puts back the browser's own storage manager, and takes away the log the app chose for errors.
+	// Closes the apps the test loaded, so no chimes timer keeps running, puts back the browser's own
+	// storage manager, and takes away the log the app chose for errors.
 	afterEach(() => {
+		for (const chimes of chimesOfLoadedApps.splice(0)) {
+			chimes.destroy();
+		}
 		vi.restoreAllMocks();
 		useErrorLog(null);
 	});

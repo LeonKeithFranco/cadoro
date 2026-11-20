@@ -101,6 +101,9 @@ export class RunChimes {
 	 */
 	#giveUpTurn: (() => void) | null = null;
 
+	/** Stops the effects, the visibility listener and the check's timer, which `destroy` calls. */
+	#stopFollowing: () => void = (): void => {};
+
 	/**
 	 * Starts following the run and the settings, silent until {@link RunChimes.unlock} is called.
 	 *
@@ -130,8 +133,8 @@ export class RunChimes {
 			clock
 		});
 
-		// The root keeps the effects running outside any component, for as long as the app is open.
-		$effect.root(() => {
+		// The root keeps the effects running outside any component, until `destroy` stops them.
+		const stopEffects = $effect.root(() => {
 			// Each setting is derived on its own, so changing another setting, such as the theme,
 			// doesn't reschedule the chime.
 			const volume = $derived(settings.settings.volume);
@@ -155,18 +158,36 @@ export class RunChimes {
 		// The audio clock may have stood still while the page was out of sight, such as while a
 		// laptop slept, so the chime is placed again from the wall clock once it shows. A tab that
 		// isn't sounding has nothing placed, so the player does nothing there.
-		document.addEventListener('visibilitychange', () => {
+		const catchUpWhenVisible = (): void => {
 			if (document.visibilityState === 'visible') {
 				void this.#player.catchUp();
 			}
-		});
+		};
+		document.addEventListener('visibilitychange', catchUpWhenVisible);
 
 		// After a laptop sleeps, a background tab may hear neither the audio running again nor the
 		// page showing, so the check also runs on a timer of its own. It lives here, not in a
 		// screen, so it runs on every screen. It only checks a chime is in place and never counts time.
-		setInterval(() => {
+		const catchUpInterval = setInterval(() => {
 			void this.#player.catchUp();
 		}, CATCH_UP_INTERVAL_MS);
+
+		this.#stopFollowing = (): void => {
+			stopEffects();
+			document.removeEventListener('visibilitychange', catchUpWhenVisible);
+			clearInterval(catchUpInterval);
+		};
+	}
+
+	/**
+	 * Stops following the run and the settings, clears the check's timer, and gives up this tab's
+	 * turn to sound, so nothing is left running. The app calls it for none of its chimes, since
+	 * they last as long as the page, so it's for a tab that's disposed of, such as in a test.
+	 * Calling it again does nothing more.
+	 */
+	destroy(): void {
+		this.#stopFollowing();
+		this.#letTurnGo();
 	}
 
 	/** Whether this tab has its turn to sound the chimes, so no other tab does. */

@@ -101,8 +101,12 @@ function openTab(
 			'/chimes/bell-ding-3.mp3': 'bell-ding-3'
 		})
 	});
+	chimesOfOpenTabs.push(chimes);
 	return { timer, settings: settingsSession, chimes, audio, contextsMade: (): number => contexts };
 }
+
+/** The chimes of every tab a test opened, which are destroyed once the test ends. */
+const chimesOfOpenTabs: RunChimes[] = [];
 
 /**
  * Waits for every effect, chime load and lock request already started to finish, so a test can
@@ -141,10 +145,38 @@ beforeEach(() => {
 	lockName = `cadoro-chimes-test-${testCount}`;
 });
 
-// Puts back what a test spied on, and takes away the log a test chose for errors.
+// Closes the tabs the test opened, so none keeps its timer running, puts back what a test spied
+// on, and takes away the log a test chose for errors.
 afterEach(() => {
+	for (const chimes of chimesOfOpenTabs.splice(0)) {
+		chimes.destroy();
+	}
 	useErrorLog(null);
 	vi.restoreAllMocks();
+});
+
+describe('destroying the chimes', () => {
+	it('clears the catch-up interval, so no timer is left running', () => {
+		const started = vi.spyOn(globalThis, 'setInterval');
+		const cleared = vi.spyOn(globalThis, 'clearInterval');
+		const tab = openTab(storageHolding([foreverRoutine]));
+		const intervalId = started.mock.results.at(-1)?.value as unknown;
+
+		tab.chimes.destroy();
+
+		expect(cleared).toHaveBeenCalledWith(intervalId);
+	});
+
+	it('stops following the run, and lets go of the turn to sound', async () => {
+		const tab = openTab(storageHolding([foreverRoutine]));
+		tab.timer.play();
+		await expect.poll(() => tab.chimes.isSounding).toBe(true);
+
+		tab.chimes.destroy();
+
+		await expect.poll(() => tab.chimes.isSounding).toBe(false);
+		expect(tab.chimes.scheduled).toEqual([]);
+	});
 });
 
 describe('scheduling the run’s chimes', () => {
