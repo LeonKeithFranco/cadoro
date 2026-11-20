@@ -17,6 +17,7 @@
 	import type { SaveFile } from '../file-download';
 	import type { CadoroStorage } from '../storage/storage';
 	import { BUTTON_SHAPE, SECONDARY_BUTTON_COLOURS } from './button-classes';
+	import { LABEL_TEXT } from './form-classes';
 	import ConfirmDialog from './ConfirmDialog.svelte';
 
 	/** The props the card takes. */
@@ -171,9 +172,7 @@
 	</div>
 
 	<div class="mt-4">
-		<label for={fileInputId} class="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-			Import a backup
-		</label>
+		<label for={fileInputId} class={LABEL_TEXT}> Import a backup </label>
 		<p id="{fileInputId}-hint" class="text-sm text-zinc-600 dark:text-zinc-400">
 			Replaces all the data here with a JSON backup's, once you confirm.
 		</p>

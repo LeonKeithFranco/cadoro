@@ -12,6 +12,7 @@
 	import type { RangePreset } from '../stats-range';
 	import { viewStats } from '../stats-view';
 	import DailyChart from './DailyChart.svelte';
+	import { INPUT_COLOURS, LABEL_TEXT } from './form-classes';
 	import ScreenHeading from './ScreenHeading.svelte';
 	import TotalsTable from './TotalsTable.svelte';
 
@@ -80,11 +81,8 @@
 {:else}
 	<div class="mt-4 grid gap-4">
 		<label class="block">
-			<span class="text-sm font-medium text-zinc-700 dark:text-zinc-300">Routine</span>
-			<select
-				bind:value={filterValue}
-				class="mt-1 block w-full rounded-md border-zinc-500 bg-white text-zinc-900 dark:border-zinc-500 dark:bg-zinc-900 dark:text-zinc-100"
-			>
+			<span class={LABEL_TEXT}>Routine</span>
+			<select bind:value={filterValue} class={['mt-1 block w-full', INPUT_COLOURS]}>
 				<option value={ALL_ROUTINES}>All routines</option>
 				{#each routines as routine (routine.id)}
 					<option value={routine.id}

@@ -29,6 +29,7 @@
 	import type { CadoroStorage } from '../storage/storage';
 	import { BUTTON_SHAPE, SECONDARY_BUTTON_COLOURS } from './button-classes';
 	import DataSection from './DataSection.svelte';
+	import { CHOICE_COLOURS, INPUT_COLOURS, LABEL_TEXT } from './form-classes';
 	import ScreenHeading from './ScreenHeading.svelte';
 
 	/** The props the Settings screen takes. */
@@ -102,13 +103,6 @@
 
 	/** The id of the volume slider, which its label and written value point to. */
 	const volumeId = `${idPrefix}-volume`;
-
-	/** The colours of the drop-downs, in light and dark. */
-	const inputColours =
-		'rounded-md border-zinc-500 bg-white text-zinc-900 dark:border-zinc-500 dark:bg-zinc-900 dark:text-zinc-100';
-	/** The colours of the radio buttons and the checkbox, whose ticks are rose. */
-	const choiceColours =
-		'border-zinc-500 bg-white text-rose-700 checked:bg-rose-700 focus:ring-rose-700 dark:border-zinc-500 dark:bg-zinc-900 dark:text-rose-400 dark:checked:bg-rose-400 dark:focus:ring-rose-400';
 </script>
 
 <ScreenHeading title="Settings" />
@@ -121,7 +115,7 @@
 	>
 		<h2 id="appearance-heading" class="font-semibold md:text-lg">Appearance</h2>
 		<fieldset class="mt-3">
-			<legend class="text-sm font-medium text-zinc-700 dark:text-zinc-300">Theme</legend>
+			<legend class={LABEL_TEXT}>Theme</legend>
 			<div class="mt-2 flex flex-wrap gap-x-6 gap-y-2">
 				{#each THEMES as theme (theme.value)}
 					<label class="flex items-center gap-2">
@@ -131,7 +125,7 @@
 							value={theme.value}
 							checked={settings.theme === theme.value}
 							onchange={(): void => void settingsSession.save({ theme: theme.value })}
-							class={choiceColours}
+							class={CHOICE_COLOURS}
 						/>
 						{theme.label}
 					</label>
@@ -163,13 +157,8 @@
 
 			<div>
 				<div class="flex items-baseline justify-between gap-4">
-					<label for={volumeId} class="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-						Volume
-					</label>
-					<output
-						for={volumeId}
-						class="text-sm font-medium text-zinc-700 tabular-nums dark:text-zinc-300"
-					>
+					<label for={volumeId} class={LABEL_TEXT}>Volume</label>
+					<output for={volumeId} class={[LABEL_TEXT, 'tabular-nums']}>
 						{shownVolume}%
 					</output>
 				</div>
@@ -202,7 +191,7 @@
 				disabled={!isWakeLockSupported}
 				onchange={(event): void =>
 					void settingsSession.save({ keepScreenAwake: event.currentTarget.checked })}
-				class={[choiceColours, 'disabled:opacity-60']}
+				class={[CHOICE_COLOURS, 'disabled:opacity-60']}
 			/>
 			Keep the screen awake during a run
 		</label>
@@ -263,7 +252,7 @@
 	choose: (chime: string) => Promise<void>
 )}
 	<div>
-		<label for={id} class="text-sm font-medium text-zinc-700 dark:text-zinc-300">{label}</label>
+		<label for={id} class={LABEL_TEXT}>{label}</label>
 		<p id="{id}-hint" class="text-sm text-zinc-600 dark:text-zinc-400">{hint}</p>
 		<div class="mt-1 flex gap-2">
 			<!-- A chime the app no longer has is shown as the default one, which is what plays. -->
@@ -271,7 +260,7 @@
 				{id}
 				aria-describedby="{id}-hint"
 				bind:value={(): string => chimeIdFor(chosen), (chime: string): void => void choose(chime)}
-				class={['block min-w-0 flex-1', inputColours]}
+				class={['block min-w-0 flex-1', INPUT_COLOURS]}
 			>
 				{#each CHIME_IDS as chimeId (chimeId)}
 					<option value={chimeId}>{chimeName(chimeId)}</option>

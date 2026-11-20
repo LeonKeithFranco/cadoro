@@ -4,6 +4,8 @@
   The problem is also tied to the input for screen readers, so they read it with the field.
 -->
 <script lang="ts">
+	import { ERROR_TEXT, INPUT_COLOURS, LABEL_TEXT } from './form-classes';
+
 	/** The props a field takes. */
 	type Props = {
 		/** The field's label, which names the input. */
@@ -42,7 +44,7 @@
 
 <div>
 	<label class="block">
-		<span class="text-sm font-medium text-zinc-700 dark:text-zinc-300">{label}</span>
+		<span class={LABEL_TEXT}>{label}</span>
 		<input
 			bind:this={input}
 			{type}
@@ -52,16 +54,20 @@
 			aria-describedby={message === undefined ? undefined : messageId}
 			oninput={(event: Event & { currentTarget: HTMLInputElement }): void =>
 				oninput(event.currentTarget)}
-			class="mt-1 block w-full rounded-md border-zinc-500 bg-white text-zinc-900 disabled:cursor-not-allowed disabled:opacity-60 aria-invalid:border-rose-700 dark:border-zinc-500 dark:bg-zinc-900 dark:text-zinc-100 dark:aria-invalid:border-rose-400"
+			class={[
+				'mt-1 block w-full disabled:cursor-not-allowed disabled:opacity-60 aria-invalid:border-rose-700 dark:aria-invalid:border-rose-400',
+				INPUT_COLOURS
+			]}
 		/>
 	</label>
 	<!-- Outside the label, so the message isn't part of the input's name. -->
 	{#if message !== undefined}
 		<p
 			id={messageId}
-			class="mt-1 text-sm {problem === undefined
-				? 'text-zinc-600 dark:text-zinc-400'
-				: 'text-rose-700 dark:text-rose-400'}"
+			class={[
+				'mt-1 text-sm',
+				problem === undefined ? 'text-zinc-600 dark:text-zinc-400' : ERROR_TEXT
+			]}
 		>
 			{message}
 		</p>
