@@ -4,6 +4,7 @@ import {
 	formatRemaining,
 	fromUtcTimestamp,
 	minutesToMs,
+	roundUpToWholeSecondsMs,
 	toUtcTimestamp
 } from './time';
 
@@ -77,5 +78,23 @@ describe('formatRemaining', () => {
 		['stays m:ss once below an hour', 3_599_000, '59:59']
 	])('%s: %i ms shows as %s', (_rule, ms, shown) => {
 		expect(formatRemaining(ms)).toBe(shown);
+	});
+});
+
+describe('roundUpToWholeSecondsMs', () => {
+	it('leaves whole seconds as they are', () => {
+		expect(roundUpToWholeSecondsMs(3000)).toBe(3000);
+	});
+
+	it('rounds a fraction of a second up to the next second', () => {
+		expect(roundUpToWholeSecondsMs(2001)).toBe(3000);
+	});
+
+	it('rounds 2:59.4 up to 3:00', () => {
+		expect(roundUpToWholeSecondsMs(179_400)).toBe(180_000);
+	});
+
+	it('keeps 0 as 0', () => {
+		expect(roundUpToWholeSecondsMs(0)).toBe(0);
 	});
 });

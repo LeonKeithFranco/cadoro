@@ -74,8 +74,23 @@ export function formatElapsed(ms: number): string {
  * @returns The time as `m:ss` under an hour, such as `4:59`, or `h:mm:ss` from an hour.
  */
 export function formatRemaining(ms: number): string {
-	const wholeSeconds = Math.ceil(ms / MS_PER_SECOND);
+	const wholeSeconds = roundUpToWholeSecondsMs(ms) / MS_PER_SECOND;
 	return formatSeconds(wholeSeconds);
+}
+
+/**
+ * Rounds a length of time up to a whole number of seconds.
+ *
+ * @remarks
+ * This is the rounding of a countdown: it's what {@link formatRemaining} shows, so a length
+ * rounded with it is exactly the time the timer displayed.
+ *
+ * @param ms - The time, in milliseconds.
+ * @returns The time rounded up to the next whole second, in whole seconds, as milliseconds. A
+ * time that is already whole seconds is unchanged.
+ */
+export function roundUpToWholeSecondsMs(ms: number): number {
+	return Math.ceil(ms / MS_PER_SECOND) * MS_PER_SECOND;
 }
 
 /**
