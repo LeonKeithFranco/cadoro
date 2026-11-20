@@ -187,6 +187,77 @@ describe('the Stats page when the work period in progress ends', () => {
 	});
 });
 
+/**
+ * Makes the run in progress of a break that follows the first work period, as another tab's Next
+ * saves it.
+ *
+ * @param revision - The run's revision.
+ * @returns The run in progress, in its break.
+ */
+function inBreak(revision: string): StoredRunInProgress {
+	return runInProgressWith({
+		record: startedRecord,
+		run: {
+			status: 'break',
+			endedPeriods: [],
+			position: { round: 0, block: 0, cycle: 0 },
+			nextWorkPosition: { round: 0, block: 0, cycle: 1 },
+			earnedMs: 4 * MINUTE,
+			remainingMs: 4 * MINUTE,
+			runningSince: new Date(START).toISOString()
+		},
+		revision
+	});
+}
+
+/** The 20-minute work period that ends as the run moves on to its break. */
+const endedPeriod = workPeriodWith({
+	id: 'ended-period',
+	segments: [
+		{ start: new Date(START - 20 * MINUTE).toISOString(), end: new Date(START).toISOString() }
+	],
+	workedMs: 20 * MINUTE
+});
+
+describe('the Stats page when reads finish out of order or fail', () => {
+	it('shows the newest read, even when an older one resolves after it', async () => {
+		const storage = new InMemoryStorage();
+		await renderStats(storage, countingSince(20));
+		await expect.poll(figure('All time')).toBe('20:00');
+		const { promise: slowOldRead, resolve: finishOldRead } = Promise.withResolvers<WorkPeriod[]>();
+		vi.spyOn(storage, 'getWorkPeriods')
+			.mockImplementationOnce(() => slowOldRead)
+			.mockImplementationOnce(() => Promise.resolve([endedPeriod]));
+
+		// Two changes in a row, each read again, the first read slower than the second.
+		await storage.saveRunInProgress(inBreak('revision-2'), 'revision-1');
+		await storage.saveRunInProgress(inBreak('revision-3'), 'revision-2');
+		await vi.advanceTimersByTimeAsync(100);
+		expect(figure('All time')()).toBe('20:00');
+		finishOldRead([]);
+		await vi.advanceTimersByTimeAsync(100);
+
+		expect(figure('All time')()).toBe('20:00');
+	});
+
+	it('keeps the run it shows after a failed read, so the next heartbeat can’t drop the ended period’s work', async () => {
+		const storage = new InMemoryStorage();
+		await renderStats(storage, countingSince(20));
+		await expect.poll(figure('All time')).toBe('20:00');
+		vi.spyOn(storage, 'getWorkPeriods').mockRejectedValueOnce(new Error('unreadable'));
+
+		await storage.saveRunInProgress(inBreak('revision-2'), 'revision-1', {
+			run: null,
+			workPeriods: [endedPeriod]
+		});
+		await vi.advanceTimersByTimeAsync(100);
+		await storage.saveHeartbeat('revision-2', new Date(START + MINUTE).toISOString());
+		await vi.advanceTimersByTimeAsync(100);
+
+		expect(figure('All time')()).toBe('20:00');
+	});
+});
+
 describe('the Stats page following the run in progress', () => {
 	it('does not read the work periods again on a heartbeat, which saves no work', async () => {
 		const storage = new InMemoryStorage();
