@@ -5,7 +5,7 @@
   data card (exports, backup, import and the activity log's link), and the app's version. A change is saved as it's made, and shows in every open tab.
 -->
 <script module lang="ts">
-	import type { Theme } from '../settings';
+	import { VOLUME_MAX, VOLUME_MIN, type Theme } from '../settings';
 
 	/** The themes to choose from, with the words each shows. */
 	const THEMES: readonly { readonly value: Theme; readonly label: string }[] = [
@@ -176,8 +176,8 @@
 				<input
 					id={volumeId}
 					type="range"
-					min="0"
-					max="100"
+					min={VOLUME_MIN}
+					max={VOLUME_MAX}
 					step="1"
 					value={shownVolume}
 					oninput={(event): void => {
