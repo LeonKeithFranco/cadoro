@@ -8,6 +8,7 @@ import { recordPress, workPeriodsOldestFirst, type Run, type RunRecords } from '
 import { createRun, finish, next, pause, play, type RunState } from './run';
 import { minutes, seconds } from './testing/durations';
 import { numberedIds } from './testing/ids';
+import { at } from './testing/moments';
 import { firstWorkPeriod, workPeriodWith } from './testing/run-records';
 import { oneRoundRoutine, routineWith } from './testing/routines';
 
@@ -19,16 +20,6 @@ const nothing: RunRecords = { run: null, workPeriods: [] };
 
 /** Classic's one block, repeating forever, so Next always starts a break. */
 const foreverRoutine = routineWith({ rounds: 'infinite' });
-
-/**
- * Turns a time of day on a synthetic day into the engine's milliseconds.
- *
- * @param time - The time in UTC, such as `09:30:00.250`.
- * @returns The moment, in milliseconds since 1970 (UTC).
- */
-function at(time: string): number {
-	return Date.parse(`2026-11-19T${time}Z`);
-}
 
 /**
  * Starts a run of a routine that presses buttons one after another, as the timer session does,

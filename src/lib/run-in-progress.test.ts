@@ -11,22 +11,13 @@ import {
 } from './run-in-progress';
 import { createRun, finish, next, pause, play, type RunState } from './run';
 import { minutes } from './testing/durations';
+import { at } from './testing/moments';
 import { savedRunInProgress } from './testing/run-in-progress';
 import { runInProgress } from './testing/run-records';
 import { routineWith } from './testing/routines';
 
 /** One 25-minute block at 20%, repeating forever, so Next always starts a 5-minute break. */
 const foreverRoutine = routineWith({ rounds: 'infinite' });
-
-/**
- * Turns a time of day on a synthetic day into the engine's milliseconds.
- *
- * @param time - The time in UTC, such as `09:30:00.250`.
- * @returns The moment, in milliseconds since 1970 (UTC).
- */
-function at(time: string): number {
-	return Date.parse(`2026-11-19T${time}Z`);
-}
 
 /**
  * Narrows a run from the engine to one Play has started, failing the test if it hasn't.
