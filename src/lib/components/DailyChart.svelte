@@ -55,14 +55,15 @@
 <Card title="Daily work time">
 	<!-- The presets keep their own widths and wrap onto a second row where the card is too narrow,
 	     rather than squeezing their names, which don't fit five to a row on a phone. On phones
-	     they're 44px tall to touch, and from `md` they're the shorter desktop size. -->
+	     they're 44px tall to touch and start three to a row and grow to fill it, so no row ends in a gap. From `md`
+	     they're the shorter desktop size at their own widths. -->
 	<div role="group" aria-label="Range" class="mt-3 flex flex-wrap gap-2">
 		{#each RANGE_PRESETS as option (option)}
 			<button
 				type="button"
 				aria-pressed={option === preset}
 				onclick={(): void => onpreset(option)}
-				class="min-h-11 rounded-lg px-3 text-sm font-medium whitespace-nowrap md:min-h-0 md:py-1.5 md:text-base {option ===
+				class="min-h-11 grow basis-[calc((100%-1rem)/3)] rounded-lg px-3 text-sm font-medium whitespace-nowrap md:min-h-0 md:grow-0 md:basis-auto md:py-1.5 md:text-base {option ===
 				preset
 					? PRIMARY_BUTTON_COLOURS
 					: SECONDARY_BUTTON_COLOURS}"
