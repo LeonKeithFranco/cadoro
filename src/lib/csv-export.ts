@@ -32,6 +32,25 @@ function csvField(field: string): string {
 	return `"${field.replaceAll('"', '""')}"`;
 }
 
+/** What starts a cell that a spreadsheet may read as a formula: `=`, `+`, `-`, `@`, tab or CR. */
+const FORMULA_START = /^[=+\-@\t\r]/;
+
+/**
+ * Makes a title safe to open in a spreadsheet, which reads a cell that starts like a formula as
+ * one, so a title could run code or leak data (CSV injection).
+ *
+ * @remarks
+ * Follows OWASP's guidance: a single quote in front makes the spreadsheet show the cell as text.
+ * Only titles go through it, since the numbers and timestamps are the app's own.
+ *
+ * @param title - A routine or block title.
+ * @returns The title, with a single quote in front when it starts with `=`, `+`, `-`, `@`, a tab
+ * or a carriage return.
+ */
+function spreadsheetSafe(title: string): string {
+	return FORMULA_START.test(title) ? `'${title}` : title;
+}
+
 /**
  * Finds the title of the block a work period was a cycle of, as the routine has it now.
  *
@@ -58,8 +77,8 @@ function csvRow(period: WorkPeriod, routinesById: Map<string, Routine>): string[
 	const lastSegment = period.segments.at(-1);
 
 	return [
-		routine?.title ?? '',
-		blockTitle(routine, period.blockId),
+		spreadsheetSafe(routine?.title ?? ''),
+		spreadsheetSafe(blockTitle(routine, period.blockId)),
 		firstSegment?.start ?? '',
 		lastSegment?.end ?? '',
 		String(period.workedMs / MS_PER_SECOND),
@@ -74,7 +93,8 @@ function csvRow(period: WorkPeriod, routinesById: Map<string, Routine>): string[
  * The columns are in {@link CSV_COLUMNS}. Times are UTC timestamps such as
  * `2026-11-19T09:30:00.000Z`, `worked_seconds` is the time worked in seconds at full precision,
  * such as `1500.123`, and `target_minutes` is the block's target when the period ran. Routine and
- * block titles are those the routine has now, or empty when it or the block no longer exists.
+ * block titles are those the routine has now, or empty when it or the block no longer exists, and
+ * start with a single quote when they begin like a spreadsheet formula.
  * Records end with CRLF, as RFC 4180 says, and the rows are oldest first.
  *
  * @param routines - Every routine, deleted ones included, so each period finds its routine's title.
