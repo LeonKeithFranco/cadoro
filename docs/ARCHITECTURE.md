@@ -128,7 +128,7 @@ Beside the timer, `RunChimes` and `WakeLockKeeper` watch the session's run and t
 - Work time is kept to the millisecond. Only the earned break is rounded, once, to whole seconds, when the break starts.
 - Every link and asset address goes through SvelteKit's `resolve()` or `%sveltekit.assets%`, so the app works under a base path such as `/cadoro`.
 - Data goes only through `CadoroStorage`. Nothing else opens IndexedDB.
-- Storage refuses to edit or delete the routine of the run in progress, an ended run's included until Done, and to save a new run whose routine isn't saved (unless it holds no routines at all, as in tests), so what's stored always passes a backup's checks.
+- Storage refuses to edit or delete the routine of the run in progress, an ended run's included until Done, and to save a new run whose routine isn't saved (storage with no routines at all included), so what's stored always passes a backup's checks.
 - A change's run in progress, run and work periods are saved together or not at all, so a run is never saved as ended without its last work period, and a restored run never ends a work period that's already saved. Writes reach storage in the order they were made, so a late heartbeat can't bring back a run that Done forgot.
 - A press is saved only if the stored run is still the one it was made from: every change gets a unique revision, and the save checks it in the same transaction. A tab that's refused takes the stored run, and keeps nothing of its own.
 - A heartbeat writes only the time, never a whole run, so a stale tab's heartbeat can't undo another tab's press.

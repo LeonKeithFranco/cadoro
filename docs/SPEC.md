@@ -150,7 +150,7 @@ They can be edited and deleted like any other routine, and aren't created again 
   - On the Routines screen, its Edit and Delete are disabled, with a hint.
   - A routine already open for editing when its run starts can't be saved until the run ends, and a delete confirmed after that is ignored.
   - Storage enforces it too: saving or deleting the routine of the run in progress is refused, whatever screen or tab asks.
-- A run can't start on a routine that isn't saved, as when another tab imported a backup that replaced the routines before this tab heard of it. Storage refuses the new run, and the failure is logged, since a run of an unknown routine would make every later backup fail. Storage with no routines at all is never refused.
+- A run can't start on a routine that isn't saved, as when another tab imported a backup that replaced the routines before this tab heard of it. Storage refuses the new run, and the failure is logged, since a run of an unknown routine would make every later backup fail. That includes storage that holds no routines at all.
 
 ### The timer screen
 
