@@ -1,6 +1,6 @@
 // The seven orders the Routines screen and the Timer's picker can list routines in.
 
-import type { Routine } from './routine';
+import { compareCustomOrder, type Routine } from './routine';
 import type { Run, WorkPeriod } from './run-records';
 
 /** Every order routines can be listed in, which a backup's settings may hold. */
@@ -82,17 +82,6 @@ function workedMsByRoutine(workPeriods: WorkPeriod[]): Map<string, number> {
 }
 
 /**
- * Compares two routines by their place in the custom order.
- *
- * @param a - The first routine.
- * @param b - The second routine.
- * @returns Negative when `a` comes first, positive when `b` does.
- */
-function compareCustom(a: Routine, b: Routine): number {
-	return a.customPosition - b.customPosition;
-}
-
-/**
  * Makes the comparison for a sort order, before the custom order breaks its ties.
  *
  * @param sort - The order to compare by.
@@ -103,7 +92,7 @@ function compareCustom(a: Routine, b: Routine): number {
 function comparisonFor(sort: RoutineSort, usage: RoutineUsage): (a: Routine, b: Routine) => number {
 	switch (sort) {
 		case 'custom':
-			return compareCustom;
+			return compareCustomOrder;
 		case 'title-asc':
 			return (a, b) => compareText(a.title, b.title);
 		case 'title-desc':
@@ -151,5 +140,5 @@ export function sortRoutines(
 	usage: RoutineUsage
 ): Routine[] {
 	const compare = comparisonFor(sort, usage);
-	return routines.toSorted((a, b) => compare(a, b) || compareCustom(a, b));
+	return routines.toSorted((a, b) => compare(a, b) || compareCustomOrder(a, b));
 }

@@ -5,7 +5,7 @@ import type { BackupData } from '../backup-format';
 import { importLogEntry } from '../backup-log';
 import type { BackupSummary } from '../backup-summary';
 import { LOG_MAX_ENTRIES, withRepeatCounted, type LogEntry, type NewLogEntry } from '../log';
-import { pickableRoutines, type Routine } from '../routine';
+import { inCustomOrder, pickableRoutines, type Routine } from '../routine';
 import {
 	planCreate,
 	planDelete,
@@ -92,7 +92,7 @@ export class InMemoryStorage implements CadoroStorage {
 	}
 
 	async getAllRoutines(): Promise<Routine[]> {
-		return structuredClone(this.#routines.toSorted((a, b) => a.customPosition - b.customPosition));
+		return structuredClone(inCustomOrder(this.#routines));
 	}
 
 	// It takes no `onError`, since memory can always be read.

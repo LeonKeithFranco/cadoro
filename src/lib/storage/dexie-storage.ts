@@ -7,7 +7,7 @@ import { importLogEntry } from '../backup-log';
 import type { BackupSummary } from '../backup-summary';
 import { recordErrorIn } from '../error-log';
 import { LOG_MAX_ENTRIES, withRepeatCounted, type LogEntry, type NewLogEntry } from '../log';
-import { pickableRoutines, type Routine } from '../routine';
+import { inCustomOrder, pickableRoutines, type Routine } from '../routine';
 import {
 	planCreate,
 	planDelete,
@@ -252,7 +252,7 @@ export class DexieStorage implements CadoroStorage {
 
 	async getAllRoutines(): Promise<Routine[]> {
 		const routines = await this.#database.routines.toArray();
-		return routines.toSorted((a, b) => a.customPosition - b.customPosition);
+		return inCustomOrder(routines);
 	}
 
 	watchRoutines(
@@ -545,7 +545,7 @@ export class DexieStorage implements CadoroStorage {
 		// One read transaction over the four tables, so a backup never mixes data from before and
 		// after another tab's save.
 		return this.#database.transaction('r', [routines, runs, workPeriods, settings], async () => ({
-			routines: (await routines.toArray()).toSorted((a, b) => a.customPosition - b.customPosition),
+			routines: inCustomOrder(await routines.toArray()),
 			runs: runsOldestFirst(await runs.toArray()),
 			workPeriods: workPeriodsOldestFirst(await workPeriods.toArray()),
 			settings: settingsFrom((await settings.get(SETTINGS_KEY)) ?? null)

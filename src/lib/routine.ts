@@ -50,14 +50,36 @@ export function withTrimmedTitles(routine: Routine): Routine {
 }
 
 /**
+ * Compares two routines by their place in the custom order.
+ *
+ * @param a - The first routine.
+ * @param b - The second routine.
+ * @returns Negative when `a` comes first, positive when `b` does, and 0 when they share a
+ * `customPosition`.
+ */
+export function compareCustomOrder(a: Routine, b: Routine): number {
+	return a.customPosition - b.customPosition;
+}
+
+/**
+ * Lists routines in custom order.
+ *
+ * @param routines - The routines in any order.
+ * @returns A new list, lowest `customPosition` first. Routines that share a position keep their
+ * order from `routines`.
+ */
+export function inCustomOrder(routines: Routine[]): Routine[] {
+	return routines.toSorted(compareCustomOrder);
+}
+
+/**
  * Picks out the routines the user can choose from, in the order they're listed.
  *
  * @param routines - Routines in any order, deleted ones included.
  * @returns A new list of the routines not deleted, lowest `customPosition` first.
  */
 export function pickableRoutines(routines: Routine[]): Routine[] {
-	const notDeleted = routines.filter((routine) => routine.deletedAt === null);
-	return notDeleted.toSorted((a, b) => a.customPosition - b.customPosition);
+	return inCustomOrder(routines.filter((routine) => routine.deletedAt === null));
 }
 
 /**

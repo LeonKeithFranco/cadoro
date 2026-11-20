@@ -66,11 +66,17 @@
 	import Plus from '@lucide/svelte/icons/plus';
 	import { dragHandleZone, type DndEvent } from 'svelte-dnd-action';
 	import { onMount, untrack } from 'svelte';
-	import { newRoutine, canDeleteRoutine, withTrimmedTitles, type Routine } from '../routine';
+	import {
+		newRoutine,
+		canDeleteRoutine,
+		inCustomOrder,
+		withTrimmedTitles,
+		type Routine
+	} from '../routine';
 	import { recordError } from '../error-log';
 	import { editButtonId, headingId } from '../routine-card-ids';
 	import { duplicateRoutine } from '../routine-duplication';
-	import { moveRoutineDown, moveRoutineUp } from '../routine-order';
+	import { moveDown, moveUp } from '../list-order';
 	import { sortRoutines, type RoutineUsage } from '../routine-sort';
 	import type { SettingsSession } from '../settings.svelte';
 	import type { CadoroStorage } from '../storage/storage';
@@ -537,8 +543,8 @@
 		ondelete={(): void => {
 			routineToDelete = routine;
 		}}
-		onmoveup={(): void => void reorder(moveRoutineUp(routines, routine.id))}
-		onmovedown={(): void => void reorder(moveRoutineDown(routines, routine.id))}
+		onmoveup={(): void => void reorder(moveUp(inCustomOrder(routines), routine.id))}
+		onmovedown={(): void => void reorder(moveDown(inCustomOrder(routines), routine.id))}
 	/>
 {/snippet}
 
