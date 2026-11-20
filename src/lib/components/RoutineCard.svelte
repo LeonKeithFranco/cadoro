@@ -13,6 +13,7 @@
 	import Trash from '@lucide/svelte/icons/trash';
 	import { dragHandle } from 'svelte-dnd-action';
 	import { outOfTabOrder } from '../out-of-tab-order';
+	import { editButtonId } from '../routine-card-ids';
 	import type { Routine } from '../routine';
 	import { COMPACT_BUTTON_SHAPE, SECONDARY_BUTTON_COLOURS } from './button-colours';
 
@@ -97,6 +98,7 @@
 	<div class="mt-3 flex flex-wrap items-center gap-2">
 		<button
 			type="button"
+			id={editButtonId(routine.id)}
 			disabled={isRunning}
 			onclick={onedit}
 			class="{COMPACT_BUTTON_SHAPE} {SECONDARY_BUTTON_COLOURS}"

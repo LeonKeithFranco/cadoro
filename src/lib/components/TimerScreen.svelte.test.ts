@@ -429,6 +429,17 @@ describe('running a routine from the Timer screen', () => {
 		expect(vi.getTimerCount()).toBe(0);
 	});
 
+	it('puts the keyboard focus on Play once the summary is closed with Done', async () => {
+		render(TimerScreen, { session: createSession() });
+		await page.getByRole('button', { name: 'Play' }).click();
+		elapse(minutes(7));
+		await finishRun();
+
+		await page.getByRole('button', { name: 'Done' }).click();
+
+		await expect.element(page.getByRole('button', { name: 'Play' })).toHaveFocus();
+	});
+
 	it('pauses the run when the screen is left, so the time away is not counted', async () => {
 		const session = createSession();
 		const screen = render(TimerScreen, { session });

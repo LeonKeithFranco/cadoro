@@ -17,6 +17,9 @@
 	 */
 	const SCREEN_ROUTES: RouteId[] = ['/', '/routines', '/stats', '/settings'];
 
+	/** The `id` of the "New routine" button, which the keyboard focus returns to. */
+	const NEW_ROUTINE_BUTTON_ID = 'new-routine';
+
 	/** An order the list can be sorted in, with its name in the drop-down. */
 	type SortOption = {
 		/** The sort, as `Settings` remembers it. */
@@ -73,6 +76,7 @@
 	import { onMount, untrack } from 'svelte';
 	import { newRoutine, canDeleteRoutine, withTrimmedTitles, type Routine } from '../routine';
 	import { recordError } from '../error-log';
+	import { editButtonId } from '../routine-card-ids';
 	import { duplicateRoutine } from '../routine-duplication';
 	import { moveRoutineDown, moveRoutineUp } from '../routine-order';
 	import { sortRoutines, type RoutineUsage } from '../routine-sort';
@@ -155,6 +159,21 @@
 
 	/** Whether the list has drag handles: in custom order, while no routine is being edited. */
 	let hasDragHandles = $derived(isInCustomOrder && editing === null);
+
+	/** The `id` of the element that should take the keyboard focus once it's on the page, or `null`. */
+	let idToFocus = $state<string | null>(null);
+
+	// Runs after each change to the page, and again when the routines change, so it finds an
+	// element that only shows once storage reports its routine.
+	$effect(() => {
+		// Read here so the effect runs again when the list changes, not only when the target does.
+		void sorted;
+		const element = idToFocus === null ? null : document.getElementById(idToFocus);
+		if (element !== null) {
+			element.focus();
+			idToFocus = null;
+		}
+	});
 
 	onMount(() => {
 		const stop = storage.watchRoutines(
@@ -264,6 +283,33 @@
 			: undefined;
 	}
 
+	/**
+	 * Moves the keyboard focus to an element once the page shows what the last change did.
+	 *
+	 * @remarks
+	 * A button that's pressed to open a form or to delete a routine is removed with the thing it
+	 * belonged to, which would leave the focus on the page's body, so the screen puts it on the
+	 * control that comes next for the user.
+	 *
+	 * It waits for the element to be on the page, since a routine that's just been created shows
+	 * only once storage reports it.
+	 *
+	 * @param id - The `id` of the element to focus.
+	 */
+	function focusOnceShown(id: string): void {
+		idToFocus = id;
+	}
+
+	/**
+	 * Closes the form without saving, as Cancel does, and puts the focus back where it started.
+	 *
+	 * @param current - The edit being closed.
+	 */
+	function cancelEditing(current: Editing): void {
+		editing = null;
+		focusOnceShown(current.isNew ? NEW_ROUTINE_BUTTON_ID : editButtonId(current.original.id));
+	}
+
 	/** Opens a new routine for editing at the top of the list. */
 	function startNewRoutine(): void {
 		discardingChanges(() => {
@@ -300,6 +346,8 @@
 				await storage.saveRoutine(trimmed);
 			}
 			editing = null;
+			// The routine's card, which a new routine gets as it's saved, is where the user was.
+			focusOnceShown(editButtonId(current.draft.id));
 		} catch (error) {
 			reportFailure('Saving the routine', error);
 			// Built from the form as it is now, not as it was when Save was pressed, so a change from
@@ -334,8 +382,12 @@
 		}
 
 		actionFailure = null;
+		// The card that takes the deleted one's place, or the one above it when it was the last.
+		const position = sorted.findIndex((candidate) => candidate.id === routine.id);
+		const neighbour = sorted[position + 1] ?? sorted[position - 1];
 		try {
 			await storage.deleteRoutine(routine.id);
+			focusOnceShown(neighbour === undefined ? NEW_ROUTINE_BUTTON_ID : editButtonId(neighbour.id));
 		} catch (error) {
 			reportFailure('Deleting the routine', error);
 			actionFailure = 'The routine could not be deleted. Try again.';
@@ -407,6 +459,7 @@
 	</label>
 	<button
 		type="button"
+		id={NEW_ROUTINE_BUTTON_ID}
 		onclick={startNewRoutine}
 		class="{COMPACT_BUTTON_SHAPE} {PRIMARY_BUTTON_COLOURS}"
 	>
@@ -436,9 +489,7 @@
 				editing = { ...current, draft, saveError: undefined };
 			}}
 			onsave={(): void => void save()}
-			oncancel={(): void => {
-				editing = null;
-			}}
+			oncancel={(): void => cancelEditing(current)}
 		/>
 	</div>
 {/snippet}

@@ -680,6 +680,91 @@ describe('duplicating a routine', () => {
 	});
 });
 
+describe('the keyboard focus', () => {
+	/** The Title field of the open form. */
+	const titleField = (): Locator => page.getByRole('textbox', { name: 'Title', exact: true });
+
+	it('moves into the form’s Title field when a routine is opened for editing', async () => {
+		await openScreen();
+
+		await openForEditing('Bravo');
+
+		await expect.element(titleField()).toHaveFocus();
+	});
+
+	it('moves into the Title field when New routine is pressed', async () => {
+		await openScreen();
+
+		await page.getByRole('button', { name: 'New routine' }).click();
+
+		await expect.element(titleField()).toHaveFocus();
+	});
+
+	it('returns to the routine’s Edit button when its form is cancelled', async () => {
+		await openScreen();
+		await openForEditing('Bravo');
+
+		await page.getByRole('button', { name: 'Cancel' }).click();
+
+		await expect.element(cardOf('Bravo').getByRole('button', { name: 'Edit' })).toHaveFocus();
+	});
+
+	it('returns to New routine when a new routine’s form is cancelled', async () => {
+		await openScreen();
+		await page.getByRole('button', { name: 'New routine' }).click();
+
+		await page.getByRole('button', { name: 'Cancel' }).click();
+
+		await expect.element(page.getByRole('button', { name: 'New routine' })).toHaveFocus();
+	});
+
+	it('returns to the routine’s Edit button when its changes are saved', async () => {
+		await openScreen();
+		await openForEditing('Bravo');
+		await typeTitle('Bravo renamed');
+
+		await page.getByRole('button', { name: 'Save' }).click();
+
+		await expect
+			.element(cardOf('Bravo renamed').getByRole('button', { name: 'Edit' }))
+			.toHaveFocus();
+	});
+
+	it('goes to the new routine’s Edit button when it is saved', async () => {
+		await openScreen();
+		await page.getByRole('button', { name: 'New routine' }).click();
+		await typeTitle('Deep work');
+
+		await page.getByRole('button', { name: 'Save' }).click();
+
+		await expect.element(cardOf('Deep work').getByRole('button', { name: 'Edit' })).toHaveFocus();
+	});
+
+	it('goes to the Edit button of the routine that takes a deleted one’s place', async () => {
+		await openScreen();
+		await cardOf('Bravo').getByRole('button', { name: 'Delete' }).click();
+
+		await page
+			.getByRole('dialog', { name: 'Delete Bravo?' })
+			.getByRole('button', { name: 'Delete' })
+			.click();
+
+		await expect.element(cardOf('Charlie').getByRole('button', { name: 'Edit' })).toHaveFocus();
+	});
+
+	it('goes to the Edit button of the routine above when the last one is deleted', async () => {
+		await openScreen();
+		await cardOf('Charlie').getByRole('button', { name: 'Delete' }).click();
+
+		await page
+			.getByRole('dialog', { name: 'Delete Charlie?' })
+			.getByRole('button', { name: 'Delete' })
+			.click();
+
+		await expect.element(cardOf('Bravo').getByRole('button', { name: 'Edit' })).toHaveFocus();
+	});
+});
+
 describe('deleting a routine', () => {
 	it('asks first, and deletes the routine once confirmed', async () => {
 		const { storage } = await openScreen();

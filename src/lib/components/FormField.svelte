@@ -18,11 +18,22 @@
 		hint?: string | undefined;
 		/** Whether the input can't be changed. */
 		disabled?: boolean;
+		/** The input element once it's on the page, for a parent that moves the focus to it. */
+		input?: HTMLInputElement | undefined;
 		/** Called as the user types, with the input, whose `value` and `valueAsNumber` are new. */
 		oninput: (input: HTMLInputElement) => void;
 	};
 
-	let { label, type, value, problem, hint, disabled = false, oninput }: Props = $props();
+	let {
+		label,
+		type,
+		value,
+		problem,
+		hint,
+		disabled = false,
+		input = $bindable(),
+		oninput
+	}: Props = $props();
 
 	const messageId = $props.id();
 
@@ -33,6 +44,7 @@
 	<label class="block">
 		<span class="text-sm font-medium text-zinc-700 dark:text-zinc-300">{label}</span>
 		<input
+			bind:this={input}
 			{type}
 			value={typeof value === 'number' && Number.isNaN(value) ? '' : value}
 			{disabled}
