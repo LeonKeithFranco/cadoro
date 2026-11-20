@@ -2,27 +2,90 @@
 
 A self-hostable timer for focused work, built as a SvelteKit PWA. Routines are made of blocks; work counts up past its target, and each break is earned as a percentage of the time worked. Data stays in the browser, and there's no backend.
 
-**Status:** in development. The app runs routines, installs as an app and works offline, at **[leonkeithfranco.github.io/cadoro](https://leonkeithfranco.github.io/cadoro/)**. [`docs/PROGRESS.md`](docs/PROGRESS.md) has what it does so far and what's next.
+Use it at **[leonkeithfranco.github.io/cadoro](https://leonkeithfranco.github.io/cadoro/)**, or [host your own copy](#self-hosting). [`docs/SPEC.md`](docs/SPEC.md) says exactly what the app does.
 
-## Backing up your data
+## Installing
 
-Everything stays in your browser, so back it up from Settings, in its Data card. **Export work periods (CSV)** downloads every work period as a spreadsheet, and **Back up (JSON)** downloads your routines, runs, work periods and settings as one file. **Import a backup** reads such a file, shows what it holds and, once you confirm, replaces all your data with it, including a run in progress. A file that isn't a valid backup is turned away, and nothing changes. The activity log, a page linked from the card, lists changes and errors and can be downloaded too.
+Open the site in a browser. To install it as an app:
 
-## Docs
+- **Desktop (Chrome, Edge):** click the install icon in the address bar, or use the browser menu's "Install Cadoro".
+- **Android (Chrome):** the menu's "Install app" or "Add to Home screen".
+- **iPhone (Safari):** Share, then "Add to Home Screen". Safari offers no install button.
 
-- [`docs/SPEC.md`](docs/SPEC.md): what the app does
-- [`docs/PLAN.md`](docs/PLAN.md): the stack and the milestones
-- [`docs/PROGRESS.md`](docs/PROGRESS.md): where things stand and what's next
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): how the code fits together
-- [`docs/decisions/`](docs/decisions/): every decision, with its reasons, one file per milestone
+It works offline after the first load. When a new version is ready, a card offers to reload, and it never reloads by itself during a run.
 
-## Stack
+## Using it
 
-SvelteKit with `adapter-static`, Svelte 5, strict TypeScript, Tailwind CSS 4, Vitest with browser mode, and Playwright.
+- **Routines:** a routine is a list of up to 20 blocks, each with a work target in minutes, a break percentage and a number of cycles. It repeats a set number of rounds, or forever. The Routines screen creates, edits, duplicates, deletes and reorders them, and sorts the list. Two starter routines are there on the first launch.
+- **The timer:** pick a routine on the Timer screen and press Play. Work counts up from 0:00 and keeps counting past its target, turning amber as overtime, with a chime at the target. Next ends the work period and starts its break, Pause stops the clock, and Finish ends the run, with a summary. Switching to another screen pauses the run, and a reload restores it paused at its last moment.
+- **Breaks earned:** a break is the block's percentage of the time you actually worked, so longer work earns a longer break. It counts down, chimes at 0:00, and waits for Play.
+- **Several tabs:** every tab shows the same run, and each work period is recorded once.
+- **Stats:** today, a daily chart over a chosen range, weekly and monthly totals, all-time totals per routine, streaks, time against target and targets reached, for every routine or one.
+- **Settings:** the theme, a chime for each alert with a preview, the volume, keeping the screen awake during a run, the persistent storage status, the data tools and the app's version.
+- **Backup and import:** the Data card in Settings has **Export work periods (CSV)**, which downloads every work period as a spreadsheet, and **Back up (JSON)**, which downloads your routines, runs, work periods and settings as one file. **Import a backup** shows what a file holds and, once you confirm, replaces all your data with it, including a run in progress. A file that isn't a valid backup is turned away and nothing changes.
+- **The activity log:** a page linked from the Data card, listing routine changes, imports and errors, newest first, which can be downloaded too. It never leaves the device.
+
+## Your data
+
+- Everything stays in your browser, in its IndexedDB. There's no account and no server that sees it.
+- Phone and desktop hold separate data. The JSON backup is the only way to move it.
+- Clearing site data, uninstalling the app or changing devices deletes it. The app asks the browser for persistent storage once work is saved, which keeps the browser from clearing it when space is low, but it doesn't protect against you clearing it. Back up.
+- Data belongs to the browser and the exact site address, so a copy at a different address starts empty.
+- Chimes can't be relied on while the phone is locked or the app is closed, since a static app can't run on a schedule without a server. Keep the app open, with the screen awake.
+
+## Self-hosting
+
+Cadoro is static files, so any web server can serve them.
+
+1. Build it for the root of a site, with `BASE_PATH` unset (see [Development](#development) for Node):
+
+   ```sh
+   npm ci
+   npm run build
+   ```
+
+2. Serve the `build/` folder. The server must answer every address that isn't a file with `index.html`, so reloading a screen's address, such as `/settings`, still works. Off `localhost`, it needs HTTPS, or the service worker won't run and the app can't be installed.
+
+   With Caddy, a `Caddyfile` such as:
+
+   ```caddyfile
+   example.com {
+   	root * /srv/cadoro
+   	try_files {path} /index.html
+   	file_server
+   }
+   ```
+
+   With nginx:
+
+   ```nginx
+   location / {
+   	root /srv/cadoro;
+   	try_files $uri /index.html;
+   }
+   ```
+
+   Or with Podman, serving over plain HTTP on port 8080, for `localhost` or behind your own HTTPS proxy. Put this in a `Caddyfile`:
+
+   ```caddyfile
+   :80 {
+   	root * /srv
+   	try_files {path} /index.html
+   	file_server
+   }
+   ```
+
+   then run:
+
+   ```sh
+   podman run --rm -p 8080:80 -v ./build:/srv:ro,Z -v ./Caddyfile:/etc/caddy/Caddyfile:ro,Z docker.io/library/caddy:2
+   ```
+
+To serve from a folder instead, build with `BASE_PATH=/folder` and serve it there.
 
 ## Development
 
-Needs the Node version in [`.nvmrc`](.nvmrc).
+Needs the Node version in [`.nvmrc`](.nvmrc), which is Node 22.
 
 ```sh
 npm ci                            # install the exact versions in the lockfile
