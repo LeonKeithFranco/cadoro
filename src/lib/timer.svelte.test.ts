@@ -1,26 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { requireDefined } from './defined';
 import { useErrorLog } from './error-log';
-import { createStarterRoutines, type Routine } from './routine';
+import type { Routine } from './routine';
 import type { StoredRunInProgress } from './run-in-progress';
 import type { RunRecords } from './run-records';
 import { InMemoryStorage } from './storage/in-memory-storage';
 import type { CadoroStorage } from './storage/storage';
 import { minutes, seconds } from './testing/durations';
 import { numberedIds } from './testing/ids';
-import { foreverRoutine, oneRoundRoutine, routineWith } from './testing/routines';
+import {
+	classic,
+	classicWithLongBreak,
+	foreverRoutine,
+	oneRoundRoutine,
+	routineWith,
+	starterRoutines as routines
+} from './testing/routines';
 import { storageHolding } from './testing/storage';
 import { restartRevisions, testSessionOptions } from './testing/timer-session';
 import { TimerSession, type AppOpening, type TimerSessionOptions } from './timer.svelte';
-
-/** The starter routines, Classic then Classic with long break, with predictable ids. */
-const routines = createStarterRoutines(new Date(0), numberedIds());
-
-/** The first starter routine, Classic. */
-const classic = requireDefined(routines[0], 'the Classic routine');
-
-/** The second starter routine, Classic with long break. */
-const classicWithLongBreak = requireDefined(routines[1], 'the Classic with long break routine');
 
 /**
  * Orders routines by title, Z to A, as a picker sorted that way does.

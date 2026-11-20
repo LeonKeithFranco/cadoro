@@ -1,19 +1,8 @@
 import { page } from 'vitest/browser';
 import { describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
-import { requireDefined } from '../defined';
-import { createStarterRoutines } from '../routine';
-import { numberedIds } from '../testing/ids';
+import { classic, classicWithLongBreak, starterRoutines as routines } from '../testing/routines';
 import RoutinePicker from './RoutinePicker.svelte';
-
-/** The starter routines, Classic then Classic with long break, with predictable ids. */
-const routines = createStarterRoutines(new Date(0), numberedIds());
-
-/** The first starter routine, Classic. */
-const classic = requireDefined(routines[0], 'the Classic routine');
-
-/** The second starter routine, Classic with long break. */
-const classicWithLongBreak = requireDefined(routines[1], 'the Classic with long break routine');
 
 describe('the routine picker', () => {
 	it('lists the routines in their order', async () => {
