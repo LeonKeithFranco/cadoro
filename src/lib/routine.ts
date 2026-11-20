@@ -64,6 +64,17 @@ export function compareCustomOrder(a: Routine, b: Routine): number {
 }
 
 /**
+ * Compares two routine titles for ordering, ignoring case and accents so "apple" sits with "Apple".
+ *
+ * @param a - The first title.
+ * @param b - The second title.
+ * @returns Negative when `a` comes first, positive when `b` does, 0 when they match.
+ */
+export function compareTitles(a: string, b: string): number {
+	return a.localeCompare(b, 'en', { sensitivity: 'base' });
+}
+
+/**
  * Lists routines in custom order.
  *
  * @param routines - The routines in any order.

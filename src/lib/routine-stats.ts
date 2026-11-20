@@ -1,7 +1,6 @@
 // Stats per routine: the routine filter and the all-time totals.
 
-import type { Routine } from './routine';
-import { compareTitles } from './routine-sort';
+import { compareTitles, type Routine } from './routine';
 import type { WorkPeriod } from './run-records';
 import { totalWorkedMs } from './work-totals';
 
