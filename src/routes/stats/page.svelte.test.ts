@@ -5,6 +5,7 @@ import { DEFAULT_SETTINGS } from '#lib/settings.ts';
 import { InMemoryStorage } from '#lib/storage/in-memory-storage.ts';
 import type { CadoroStorage } from '#lib/storage/storage.ts';
 import { minutes } from '#lib/testing/durations.ts';
+import { recordedErrors } from '#lib/testing/error-log.ts';
 import { oneRoundRoutine } from '#lib/testing/routines.ts';
 import { runInProgressWith } from '#lib/testing/run-in-progress.ts';
 import { runInProgress as startedRecord } from '#lib/testing/run-records.ts';
@@ -278,6 +279,25 @@ describe('the Stats page following the run in progress', () => {
 			message: 'Could not read the run in progress for Stats.',
 			details: { message: 'unfollowable' }
 		});
+	});
+
+	it('records in the activity log that the routines could not be followed', async () => {
+		const storage = new InMemoryStorage();
+		useErrorLog(storage);
+		// Through the interface, whose `watchRoutines` takes the `onError` that in-memory storage
+		// never calls.
+		vi.spyOn(storage as CadoroStorage, 'watchRoutines').mockImplementation(
+			(_onChange, onError): (() => void) => {
+				onError(new Error('unfollowable routines'));
+				return (): void => undefined;
+			}
+		);
+
+		await renderStats(storage, null);
+
+		await expect
+			.poll(() => recordedErrors(storage))
+			.toEqual([['Could not read the routines for Stats.', 'unfollowable routines']]);
 	});
 });
 
