@@ -1,7 +1,7 @@
 // Working out what each change to the routines saves and logs, shared by every storage backend,
 // so they all keep the same rules and write the same log entries.
 
-import type { NewLogEntry } from './log';
+import { changeEntry, type NewLogEntry } from './log';
 import { canDeleteRoutine, pickableRoutines, type Routine } from './routine';
 import { insertRoutine } from './routine-order';
 
@@ -85,12 +85,11 @@ export function planCreate(routines: Routine[], routine: Routine, now: Date): Ro
 	const created = placed.find((candidate) => candidate.id === routine.id) ?? routine;
 	return {
 		writes: changedOrNew(routines, placed),
-		entry: {
-			timestamp: now.toISOString(),
-			type: 'change',
-			message: `Created routine "${routine.title}"`,
-			details: { action: 'create', routineId: routine.id, routine: created }
-		}
+		entry: changeEntry(now, `Created routine "${routine.title}"`, {
+			action: 'create',
+			routineId: routine.id,
+			routine: created
+		})
 	};
 }
 
@@ -122,12 +121,12 @@ export function planDuplicate(
 	const placedCopy = created.writes.find((candidate) => candidate.id === copy.id) ?? copy;
 	return {
 		writes: created.writes,
-		entry: {
-			timestamp: now.toISOString(),
-			type: 'change',
-			message: `Duplicated routine "${original.title}" as "${copy.title}"`,
-			details: { action: 'duplicate', routineId: copy.id, originalId, routine: placedCopy }
-		}
+		entry: changeEntry(now, `Duplicated routine "${original.title}" as "${copy.title}"`, {
+			action: 'duplicate',
+			routineId: copy.id,
+			originalId,
+			routine: placedCopy
+		})
 	};
 }
 
@@ -158,17 +157,12 @@ export function planSave(
 	const result: Routine = { ...saved, ...contentOf(edited) };
 	return {
 		writes: [result],
-		entry: {
-			timestamp: now.toISOString(),
-			type: 'change',
-			message: `Edited routine "${result.title}"`,
-			details: {
-				action: 'edit',
-				routineId: saved.id,
-				old: contentOf(saved),
-				new: contentOf(result)
-			}
-		}
+		entry: changeEntry(now, `Edited routine "${result.title}"`, {
+			action: 'edit',
+			routineId: saved.id,
+			old: contentOf(saved),
+			new: contentOf(result)
+		})
 	};
 }
 
@@ -199,12 +193,11 @@ export function planDelete(
 
 	return {
 		writes: [{ ...routine, deletedAt: now.toISOString() }],
-		entry: {
-			timestamp: now.toISOString(),
-			type: 'change',
-			message: `Deleted routine "${routine.title}"`,
-			details: { action: 'delete', routineId: id, routine }
-		}
+		entry: changeEntry(now, `Deleted routine "${routine.title}"`, {
+			action: 'delete',
+			routineId: id,
+			routine
+		})
 	};
 }
 
@@ -245,12 +238,11 @@ export function planReorder(
 
 	return {
 		writes,
-		entry: {
-			timestamp: now.toISOString(),
-			type: 'change',
-			message: 'Reordered routines',
-			details: { action: 'reorder', old: oldIds, new: orderedIds }
-		}
+		entry: changeEntry(now, 'Reordered routines', {
+			action: 'reorder',
+			old: oldIds,
+			new: orderedIds
+		})
 	};
 }
 

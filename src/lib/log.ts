@@ -28,6 +28,22 @@ export type LogEntry = NewLogEntry & {
 };
 
 /**
+ * Makes the entry for a change to the user's data.
+ *
+ * @param now - The moment of the change.
+ * @param message - A sentence saying what changed.
+ * @param details - What the message leaves out.
+ * @returns A `change` entry stamped with `now`.
+ */
+export function changeEntry(
+	now: Date,
+	message: string,
+	details: Record<string, unknown>
+): NewLogEntry {
+	return { timestamp: now.toISOString(), type: 'change', message, details };
+}
+
+/**
  * Counts an error in the entry before it, when it repeats that entry.
  *
  * @remarks
