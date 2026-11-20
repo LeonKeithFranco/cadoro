@@ -149,17 +149,13 @@ export function recordPress(press: ButtonPress, newId: () => string): RunRecords
  * A tab that hasn't yet heard of an import in another tab can press Play on a routine the import
  * replaced. Saving that run would leave a record that every later backup is rejected for.
  *
- * Storage that holds no routine at all is never refused, since the app always has one saved, so
- * a run saved to empty storage, as in the tests of storage and of the session, has none to be
- * stale against.
- *
  * @param routineIds - The id of every routine saved, deleted ones included, since a backup holds
  * those too.
  * @param run - The run about to be saved as new.
- * @throws {@link Error} When storage holds routines and none has the run's `routineId`.
+ * @throws {@link Error} When none of the saved routines has the run's `routineId`.
  */
 export function requireRoutineOfNewRun(routineIds: ReadonlySet<string>, run: Run): void {
-	if (routineIds.size > 0 && !routineIds.has(run.routineId)) {
+	if (!routineIds.has(run.routineId)) {
 		throw new Error(
 			`Can't save run ${run.id}: the routine "${run.routineId}" isn't saved, as after an import in another tab.`
 		);

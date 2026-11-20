@@ -5,13 +5,17 @@ import { render } from 'vitest-browser-svelte';
 import '../../routes/layout.css';
 import { requireDefined } from '../defined';
 import { createStarterRoutines, type Routine } from '../routine';
-import { InMemoryStorage } from '../storage/in-memory-storage';
+import type { InMemoryStorage } from '../storage/in-memory-storage';
 import { minutes, seconds } from '../testing/durations';
 import { numberedIds } from '../testing/ids';
 import { oneRoundRoutine } from '../testing/routines';
 import { shownTotals } from '../testing/run-summary';
+import { storageHolding } from '../testing/storage';
 import { TimerSession } from '../timer.svelte';
 import TimerScreen from './TimerScreen.svelte';
+
+/** The starter routines with predictable ids, which a session picks from unless a test says. */
+const STARTER_ROUTINES = createStarterRoutines(new Date(0), numberedIds());
 
 /** The fake clock's current moment, in milliseconds since 1970, which each test moves by hand. */
 let nowMs = 0;
@@ -33,8 +37,8 @@ let newRevision = numberedIds('revision');
  * @returns A new session, with the first routine chosen and its run ready.
  */
 function createSession(
-	routines: readonly Routine[] = createStarterRoutines(new Date(0), numberedIds()),
-	storage: InMemoryStorage = new InMemoryStorage(),
+	routines: readonly Routine[] = STARTER_ROUTINES,
+	storage: InMemoryStorage = storageHolding(routines),
 	newId: () => string = numberedIds()
 ): TimerSession {
 	return new TimerSession(routines, {
@@ -444,9 +448,9 @@ describe('running a routine from the Timer screen', () => {
 
 	it('pauses on leaving without counting it as a button press, so the chimes stay locked', async () => {
 		const onPress = vi.fn();
-		const session = new TimerSession(createStarterRoutines(new Date(0), numberedIds()), {
+		const session = new TimerSession(STARTER_ROUTINES, {
 			clock: (): number => nowMs,
-			storage: new InMemoryStorage(),
+			storage: storageHolding(STARTER_ROUTINES),
 			newId: numberedIds(),
 			newRevision,
 			onWorkSaved: vi.fn(),
@@ -465,7 +469,7 @@ describe('running a routine from the Timer screen', () => {
 
 describe('saving the run as the page goes away', () => {
 	it('saves a heartbeat as the page is hidden, so a restored run counts the work until then', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageHolding(STARTER_ROUTINES);
 		render(TimerScreen, { session: createSession(undefined, storage) });
 		await page.getByRole('button', { name: 'Play' }).click();
 		nowMs = seconds(30);
@@ -478,7 +482,7 @@ describe('saving the run as the page goes away', () => {
 	});
 
 	it('saves a heartbeat as the page is closed or reloaded', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageHolding(STARTER_ROUTINES);
 		render(TimerScreen, { session: createSession(undefined, storage) });
 		await page.getByRole('button', { name: 'Play' }).click();
 		nowMs = seconds(30);
@@ -491,7 +495,7 @@ describe('saving the run as the page goes away', () => {
 	});
 
 	it('saves nothing as the page becomes visible again', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageHolding(STARTER_ROUTINES);
 		const saveSpy = vi.spyOn(storage, 'saveRunInProgress');
 		const heartbeatSpy = vi.spyOn(storage, 'saveHeartbeat');
 		render(TimerScreen, { session: createSession(undefined, storage) });
@@ -514,7 +518,7 @@ describe('saving the run as the page goes away', () => {
 
 describe('following the run from another tab', () => {
 	it('shows a press made in another tab, and counts on from it', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageHolding(STARTER_ROUTINES);
 		const session = createSession(undefined, storage);
 		const otherTab = createSession(undefined, storage, numberedIds('other'));
 		render(TimerScreen, { session });
@@ -530,7 +534,7 @@ describe('following the run from another tab', () => {
 	});
 
 	it('drops the Finish question when another tab ends the run, showing its summary', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageHolding(STARTER_ROUTINES);
 		const session = createSession(undefined, storage);
 		const otherTab = createSession(undefined, storage, numberedIds('other'));
 		render(TimerScreen, { session });
@@ -548,7 +552,7 @@ describe('following the run from another tab', () => {
 	});
 
 	it('doesn’t ask about Finish again in the next run after another tab ended the last one', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageHolding(STARTER_ROUTINES);
 		const session = createSession(undefined, storage);
 		const otherTab = createSession(undefined, storage, numberedIds('other'));
 		render(TimerScreen, { session });

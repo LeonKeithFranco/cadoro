@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { InMemoryStorage } from '#lib/storage/in-memory-storage.ts';
-import { routineWith } from '#lib/testing/routines.ts';
+import { oneRoundRoutine, routineWith } from '#lib/testing/routines.ts';
 import { savedRunInProgress } from '#lib/testing/run-in-progress.ts';
 import { runWith, workPeriodWith } from '#lib/testing/run-records.ts';
+import { storageHolding } from '#lib/testing/storage.ts';
 import { load } from './+page';
 
 /**
@@ -41,7 +42,7 @@ describe('the Stats page load', () => {
 	});
 
 	it('returns the run in progress, so its work so far can count', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageHolding([oneRoundRoutine]);
 		await storage.saveRunInProgress(savedRunInProgress, null, {
 			run: runWith({ id: 'run-1' }),
 			workPeriods: []

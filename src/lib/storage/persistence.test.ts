@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { useErrorLog } from '../error-log';
+import { oneRoundRoutine } from '../testing/routines';
 import { savedRunInProgress } from '../testing/run-in-progress';
 import { firstWorkPeriod, runInProgress } from '../testing/run-records';
+import { storageHolding } from '../testing/storage';
 import { InMemoryStorage } from './in-memory-storage';
 import {
 	askToPersistIfWorkSaved,
@@ -105,7 +107,7 @@ describe('askToPersistOnce', () => {
 
 describe('askToPersistIfWorkSaved', () => {
 	it('asks when a work period is saved, as on a launch after the first work', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageHolding([oneRoundRoutine]);
 		await storage.saveRunInProgress(savedRunInProgress, null, {
 			run: runInProgress,
 			workPeriods: [firstWorkPeriod]
@@ -118,7 +120,7 @@ describe('askToPersistIfWorkSaved', () => {
 	});
 
 	it('does not ask on an empty first visit, or while only a run is saved', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageHolding([oneRoundRoutine]);
 		const askToPersist = vi.fn(async () => {});
 
 		await askToPersistIfWorkSaved(storage, askToPersist);

@@ -3,11 +3,12 @@ import { useErrorLog } from './error-log';
 import { RunChimes } from './run-chimes.svelte';
 import { DEFAULT_SETTINGS, type Settings } from './settings';
 import { SettingsSession } from './settings.svelte';
-import { InMemoryStorage } from './storage/in-memory-storage';
+import type { InMemoryStorage } from './storage/in-memory-storage';
 import { FakeAudioContext, fakeFiles, type FakeSound } from './testing/audio';
 import { minutes, seconds } from './testing/durations';
 import { numberedIds } from './testing/ids';
 import { routineWith } from './testing/routines';
+import { storageHolding } from './testing/storage';
 import { TimerSession } from './timer.svelte';
 
 /** A 25-minute block at 20%, repeating forever, so Next always starts a 5-minute break. */
@@ -148,7 +149,7 @@ afterEach(() => {
 
 describe('scheduling the run’s chimes', () => {
 	it('stays silent, making no audio, until a button is pressed', async () => {
-		const tab = openTab(new InMemoryStorage());
+		const tab = openTab(storageHolding([foreverRoutine]));
 
 		await afterPendingWork();
 
@@ -158,7 +159,7 @@ describe('scheduling the run’s chimes', () => {
 	});
 
 	it('unlocks the audio on Play and schedules the target chime for when work reaches it', async () => {
-		const tab = openTab(new InMemoryStorage());
+		const tab = openTab(storageHolding([foreverRoutine]));
 
 		tab.timer.play();
 
@@ -171,7 +172,7 @@ describe('scheduling the run’s chimes', () => {
 	});
 
 	it('cancels the chime on Pause, and schedules it again from the work left on Play', async () => {
-		const tab = openTab(new InMemoryStorage());
+		const tab = openTab(storageHolding([foreverRoutine]));
 		tab.timer.play();
 		await expect.poll(() => tab.chimes.scheduled).toHaveLength(1);
 		const [firstSource] = tab.audio.sources;
@@ -191,7 +192,7 @@ describe('scheduling the run’s chimes', () => {
 	});
 
 	it('schedules the break chime for 0:00 when Next starts the break', async () => {
-		const tab = openTab(new InMemoryStorage());
+		const tab = openTab(storageHolding([foreverRoutine]));
 		tab.timer.play();
 
 		nowMs = minutes(25);
@@ -204,7 +205,7 @@ describe('scheduling the run’s chimes', () => {
 	});
 
 	it('schedules nothing more once Finish ends the run', async () => {
-		const tab = openTab(new InMemoryStorage());
+		const tab = openTab(storageHolding([foreverRoutine]));
 		tab.timer.play();
 		await expect.poll(() => tab.chimes.scheduled).toHaveLength(1);
 
@@ -215,7 +216,7 @@ describe('scheduling the run’s chimes', () => {
 	});
 
 	it('never reschedules on a tick while the audio clock keeps time', async () => {
-		const tab = openTab(new InMemoryStorage());
+		const tab = openTab(storageHolding([foreverRoutine]));
 		tab.timer.play();
 		await expect.poll(() => tab.chimes.scheduled).toHaveLength(1);
 
@@ -234,7 +235,7 @@ describe('scheduling the run’s chimes', () => {
 
 describe('the chimes and volume from Settings', () => {
 	it('plays the chime chosen for each alert', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageHolding([foreverRoutine]);
 		await storage.saveSettings({ targetChime: 'bell-ding-2', breakChime: 'bell-ding-3' });
 		const tab = openTab(storage, { settings: await storage.getSettings() });
 		tab.timer.play();
@@ -251,7 +252,7 @@ describe('the chimes and volume from Settings', () => {
 	});
 
 	it('moves the scheduled chime to a new choice, even one saved in another tab', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageHolding([foreverRoutine]);
 		const tab = openTab(storage);
 		const otherTabSettings = new SettingsSession(storage, DEFAULT_SETTINGS);
 		tab.timer.play();
@@ -272,7 +273,7 @@ describe('the chimes and volume from Settings', () => {
 	});
 
 	it('leaves the scheduled chime alone when a setting it doesn’t use changes', async () => {
-		const tab = openTab(new InMemoryStorage());
+		const tab = openTab(storageHolding([foreverRoutine]));
 		tab.timer.play();
 		await expect.poll(() => tab.chimes.scheduled).toHaveLength(1);
 
@@ -283,7 +284,7 @@ describe('the chimes and volume from Settings', () => {
 	});
 
 	it('plays at the volume from Settings, as a gain from 0 to 1, and follows a change', async () => {
-		const tab = openTab(new InMemoryStorage());
+		const tab = openTab(storageHolding([foreverRoutine]));
 		tab.timer.play();
 		await expect.poll(() => tab.chimes.scheduled).toHaveLength(1);
 		const [gain] = tab.audio.gains;
@@ -298,7 +299,7 @@ describe('the chimes and volume from Settings', () => {
 
 describe('previewing a chime', () => {
 	it('plays the chime at once without a run, and without taking the turn to sound', async () => {
-		const tab = openTab(new InMemoryStorage());
+		const tab = openTab(storageHolding([foreverRoutine]));
 
 		await tab.chimes.preview('bell-ding-2');
 
@@ -310,7 +311,7 @@ describe('previewing a chime', () => {
 	});
 
 	it('plays the default chime for an id the app doesn’t have', async () => {
-		const tab = openTab(new InMemoryStorage());
+		const tab = openTab(storageHolding([foreverRoutine]));
 
 		await tab.chimes.preview('a-removed-chime');
 
@@ -318,7 +319,7 @@ describe('previewing a chime', () => {
 	});
 
 	it('leaves the run’s scheduled chime in place', async () => {
-		const tab = openTab(new InMemoryStorage());
+		const tab = openTab(storageHolding([foreverRoutine]));
 		tab.timer.play();
 		await expect.poll(() => tab.chimes.scheduled).toHaveLength(1);
 
@@ -331,7 +332,7 @@ describe('previewing a chime', () => {
 
 describe('when the audio clock stood still', () => {
 	it('places the chime again from the wall clock as the page shows again', async () => {
-		const tab = openTab(new InMemoryStorage());
+		const tab = openTab(storageHolding([foreverRoutine]));
 		tab.timer.play();
 		await expect.poll(() => tab.chimes.scheduled).toHaveLength(1);
 
@@ -346,7 +347,7 @@ describe('when the audio clock stood still', () => {
 	});
 
 	it('drops a chime within a second when the wall clock jumped past it with no event, whatever screen is open', async () => {
-		const tab = openTab(new InMemoryStorage());
+		const tab = openTab(storageHolding([foreverRoutine]));
 		tab.timer.play();
 		await expect.poll(() => tab.chimes.scheduled).toHaveLength(1);
 
@@ -360,7 +361,7 @@ describe('when the audio clock stood still', () => {
 	});
 
 	it('places the chime again within a second when the audio clock fell behind with no event, whatever screen is open', async () => {
-		const tab = openTab(new InMemoryStorage());
+		const tab = openTab(storageHolding([foreverRoutine]));
 		tab.timer.play();
 		await expect.poll(() => tab.chimes.scheduled).toHaveLength(1);
 
@@ -373,7 +374,7 @@ describe('when the audio clock stood still', () => {
 	});
 
 	it('leaves the chime as it is when the page is hidden', async () => {
-		const tab = openTab(new InMemoryStorage());
+		const tab = openTab(storageHolding([foreverRoutine]));
 		tab.timer.play();
 		await expect.poll(() => tab.chimes.scheduled).toHaveLength(1);
 		vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
@@ -389,7 +390,7 @@ describe('when the audio clock stood still', () => {
 
 describe('one tab sounding', () => {
 	it('sounds each chime in the first tab a button was pressed in, and not in the others', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageHolding([foreverRoutine]);
 		const firstTab = openTab(storage);
 		const secondTab = openTab(storage);
 
@@ -409,7 +410,7 @@ describe('one tab sounding', () => {
 	});
 
 	it('reschedules in the sounding tab when another tab changes the run', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageHolding([foreverRoutine]);
 		const soundingTab = openTab(storage);
 		const otherTab = openTab(storage);
 		soundingTab.timer.play();
@@ -427,7 +428,7 @@ describe('one tab sounding', () => {
 	});
 
 	it('never sounds in a tab no button was pressed in, even when it follows the run', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageHolding([foreverRoutine]);
 		const pressedTab = openTab(storage);
 		const followingTab = openTab(storage);
 
@@ -441,7 +442,7 @@ describe('one tab sounding', () => {
 
 	it('takes the turn once the sounding tab lets it go, with the chime still ahead', async () => {
 		const releaseLock = await holdLockElsewhere();
-		const tab = openTab(new InMemoryStorage());
+		const tab = openTab(storageHolding([foreverRoutine]));
 		tab.timer.play();
 		await afterPendingWork();
 		expect(tab.chimes.isSounding).toBe(false);
@@ -459,7 +460,7 @@ describe('one tab sounding', () => {
 
 	it('never takes the turn when its audio can’t be made, leaving it to a tab that can play', async () => {
 		vi.spyOn(console, 'error').mockImplementation(() => {});
-		const storage = new InMemoryStorage();
+		const storage = storageHolding([foreverRoutine]);
 		const silentTab = openTab(storage, { hasNoAudio: true });
 		const playingTab = openTab(storage);
 
@@ -475,7 +476,7 @@ describe('one tab sounding', () => {
 
 	it('never takes the turn when its audio can’t resume, and asks once it can', async () => {
 		vi.spyOn(console, 'error').mockImplementation(() => {});
-		const tab = openTab(new InMemoryStorage());
+		const tab = openTab(storageHolding([foreverRoutine]));
 		tab.audio.resumeError = new Error('Not allowed to start');
 
 		tab.timer.play();
@@ -492,7 +493,7 @@ describe('one tab sounding', () => {
 
 	it('lets the turn go when its audio later fails, so the next tab sounds', async () => {
 		vi.spyOn(console, 'error').mockImplementation(() => {});
-		const storage = new InMemoryStorage();
+		const storage = storageHolding([foreverRoutine]);
 		const firstTab = openTab(storage);
 		const secondTab = openTab(storage);
 		firstTab.timer.play();
@@ -519,7 +520,7 @@ describe('one tab sounding', () => {
 	it('leaves the queue when its audio fails while it waits, so it never takes the turn', async () => {
 		vi.spyOn(console, 'error').mockImplementation(() => {});
 		const releaseLock = await holdLockElsewhere();
-		const tab = openTab(new InMemoryStorage());
+		const tab = openTab(storageHolding([foreverRoutine]));
 		tab.timer.play();
 		await expect
 			.poll(async () => (await navigator.locks.query()).pending)
@@ -538,7 +539,7 @@ describe('one tab sounding', () => {
 
 	it('asks for its turn once, however many buttons are pressed', async () => {
 		const requestSpy = vi.spyOn(navigator.locks, 'request');
-		const tab = openTab(new InMemoryStorage());
+		const tab = openTab(storageHolding([foreverRoutine]));
 
 		tab.timer.play();
 		tab.timer.pause();
@@ -550,7 +551,7 @@ describe('one tab sounding', () => {
 	});
 
 	it('sounds in every pressed tab without the Web Locks API, since tabs can’t take turns', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageHolding([foreverRoutine]);
 		const firstTab = openTab(storage, { hasNoLocks: true });
 		const secondTab = openTab(storage, { hasNoLocks: true });
 
@@ -567,7 +568,7 @@ describe('one tab sounding', () => {
 	});
 
 	it('records a refused lock in the activity log and sounds anyway', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageHolding([foreverRoutine]);
 		useErrorLog(storage);
 		// The browser refuses lock names that start with a hyphen, which the spec reserves.
 		const tab = openTab(storage, { name: '-refused' });

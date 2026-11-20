@@ -4,7 +4,9 @@ import { RoutineUsageKeeper } from './routine-usage.svelte';
 import { InMemoryStorage } from './storage/in-memory-storage';
 import type { CadoroStorage } from './storage/storage';
 import { runInProgressWith } from './testing/run-in-progress';
+import { oneRoundRoutine } from './testing/routines';
 import { firstWorkPeriod, runWith } from './testing/run-records';
+import { storageHolding } from './testing/storage';
 
 // Takes away the log a test chose for errors.
 afterEach(() => {
@@ -24,7 +26,7 @@ describe('RoutineUsageKeeper', () => {
 	});
 
 	it('reads the runs and work periods saved since, so everything sorting by usage sees one fresh copy', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageHolding([oneRoundRoutine]);
 		const keeper = new RoutineUsageKeeper(storage, { runs: [], workPeriods: [] });
 		await storage.saveRunInProgress(runInProgressWith({}), null, {
 			run: runWith({}),
