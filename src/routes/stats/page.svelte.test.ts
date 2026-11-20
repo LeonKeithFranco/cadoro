@@ -11,6 +11,7 @@ import { runInProgress as startedRecord } from '#lib/testing/run-records.ts';
 import type { StoredRunInProgress } from '#lib/run-in-progress.ts';
 import type { WorkPeriod } from '#lib/run-records.ts';
 import { workPeriodWith } from '#lib/testing/run-records.ts';
+import { figure } from '#lib/testing/stats-figures.ts';
 import type { PageProps } from './$types';
 import StatsPage from './+page.svelte';
 
@@ -74,19 +75,6 @@ async function renderStats(
 		runInProgress
 	} as unknown as PageProps['data'];
 	render(StatsPage, { data, params: {} });
-}
-
-/**
- * Reads the value of one of the headline figures.
- *
- * @param label - The figure's label, such as `All time`.
- * @returns A function that reads its text, for `expect.poll`.
- */
-function figure(label: string): () => string | undefined {
-	return () =>
-		[...document.querySelectorAll('dt')]
-			.find((term) => term.textContent === label)
-			?.nextElementSibling?.textContent?.trim();
 }
 
 describe('the Stats page and the run in progress', () => {
