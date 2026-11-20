@@ -11,3 +11,13 @@
 export function utc(timestamp: string): number {
 	return Date.parse(timestamp);
 }
+
+/**
+ * Turns a time of day on a synthetic day into the engine's milliseconds.
+ *
+ * @param time - The time in UTC, such as `09:30:00.250`.
+ * @returns The moment, in milliseconds since 1970 (UTC).
+ */
+export function at(time: string): number {
+	return Date.parse(`2026-11-19T${time}Z`);
+}
