@@ -625,3 +625,72 @@ describe('blockAt', () => {
 		);
 	});
 });
+
+/**
+ * Freezes a value and everything inside it, so any later change to it throws.
+ *
+ * @typeParam T - The kind of value, such as a run.
+ * @param value - The value to freeze, such as a run.
+ * @returns The same value, frozen.
+ */
+function deepFreeze<T>(value: T): T {
+	if (typeof value === 'object' && value !== null && !Object.isFrozen(value)) {
+		Object.freeze(value);
+		Object.values(value).forEach(deepFreeze);
+	}
+	return value;
+}
+
+describe('the buttons never change the run they are given', () => {
+	const routine = plan(2, 1);
+	const started = 1_000_000;
+
+	/**
+	 * Makes a run that has been working for 10 minutes, frozen, so no button can change it.
+	 *
+	 * @returns A running work period.
+	 */
+	const makeWorking = (): RunState => deepFreeze(play(createRun(routine), started));
+	/**
+	 * Makes a frozen run on the break that follows 10 minutes of work.
+	 *
+	 * @returns A running break.
+	 */
+	const makeBreak = (): RunState => deepFreeze(next(makeWorking(), started + minutes(10)));
+	/** Each kind of run, made fresh and frozen for every test, with the moment its buttons are pressed. */
+	const states: [string, () => RunState, number][] = [
+		['a ready run', (): RunState => deepFreeze(createRun(routine)), started + minutes(20)],
+		['a running work period', makeWorking, started + minutes(20)],
+		[
+			'a paused work period',
+			(): RunState => deepFreeze(pause(makeWorking(), started + minutes(5))),
+			started + minutes(20)
+		],
+		['a running break', makeBreak, started + minutes(11)],
+		[
+			'a paused break',
+			(): RunState => deepFreeze(pause(makeBreak(), started + minutes(11))),
+			started + minutes(20)
+		],
+		['a break that is over', makeBreak, started + hours(5)],
+		[
+			'an ended run',
+			(): RunState => deepFreeze(finish(makeWorking(), started + minutes(10))),
+			started + minutes(20)
+		]
+	];
+	const buttons = { play, pause, next, finish };
+
+	for (const [stateName, makeState, now] of states) {
+		for (const [buttonName, button] of Object.entries(buttons)) {
+			it(`${buttonName} leaves ${stateName} as it was`, () => {
+				const frozen = makeState();
+				const before = structuredClone(frozen);
+
+				button(frozen, now);
+
+				expect(frozen).toEqual(before);
+			});
+		}
+	}
+});
