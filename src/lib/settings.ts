@@ -2,13 +2,19 @@
 // storage or the page.
 
 import { DEFAULT_CHIME } from './chimes';
+import type { RoutineSort } from './routine-sort';
 
-/** How the Routines screen orders the routines. */
-export type RoutineSort =
-	'custom' | 'title-asc' | 'title-desc' | 'last-used' | 'most-work' | 'newest' | 'oldest';
+/** Every theme the app has, which a backup's settings may hold. */
+export const THEMES = ['system', 'light', 'dark'] as const;
 
 /** Which colours the app uses: a fixed theme, or the device's own choice. */
-export type Theme = 'system' | 'light' | 'dark';
+export type Theme = (typeof THEMES)[number];
+
+/** The fewest percent of volume. */
+export const VOLUME_MIN = 0;
+
+/** The most percent of volume. */
+export const VOLUME_MAX = 100;
 
 /** The user's settings, the spec's `Settings` type. */
 export type Settings = {

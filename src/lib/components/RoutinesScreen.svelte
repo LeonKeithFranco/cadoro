@@ -9,7 +9,7 @@
 -->
 <script module lang="ts">
 	import type { RouteId } from '$app/types';
-	import type { RoutineSort } from '../settings';
+	import { ROUTINE_SORTS, type RoutineSort } from '../routine-sort';
 
 	/**
 	 * The screens the user can leave for, which is the only place leaving can be asked about and
@@ -20,24 +20,16 @@
 	/** The `id` of the "New routine" button, which the keyboard focus returns to. */
 	const NEW_ROUTINE_BUTTON_ID = 'new-routine';
 
-	/** An order the list can be sorted in, with its name in the drop-down. */
-	type SortOption = {
-		/** The sort, as `Settings` remembers it. */
-		value: RoutineSort;
-		/** What the drop-down calls it. */
-		label: string;
+	/** What the drop-down calls each order. Its options follow the order of `ROUTINE_SORTS`. */
+	const SORT_LABELS: Record<RoutineSort, string> = {
+		custom: 'Custom order',
+		'title-asc': 'Title (A–Z)',
+		'title-desc': 'Title (Z–A)',
+		'last-used': 'Last used',
+		'most-work': 'Most work time',
+		newest: 'Newest',
+		oldest: 'Oldest'
 	};
-
-	/** The seven orders, in the order the drop-down lists them. */
-	const SORT_OPTIONS: SortOption[] = [
-		{ value: 'custom', label: 'Custom order' },
-		{ value: 'title-asc', label: 'Title (A–Z)' },
-		{ value: 'title-desc', label: 'Title (Z–A)' },
-		{ value: 'last-used', label: 'Last used' },
-		{ value: 'most-work', label: 'Most work time' },
-		{ value: 'newest', label: 'Newest' },
-		{ value: 'oldest', label: 'Oldest' }
-	];
 
 	/** The routine being edited, and the routine as it was before the edit. */
 	type Editing = {
@@ -473,9 +465,9 @@
 	 * @param value - The chosen option's value.
 	 */
 	function chooseSort(value: string): void {
-		const option = SORT_OPTIONS.find((candidate) => candidate.value === value);
-		if (option !== undefined) {
-			void settingsSession.save({ routineSort: option.value });
+		const chosen = ROUTINE_SORTS.find((candidate) => candidate === value);
+		if (chosen !== undefined) {
+			void settingsSession.save({ routineSort: chosen });
 		}
 	}
 </script>
@@ -489,8 +481,8 @@
 			bind:value={(): string => sort, chooseSort}
 			class="mt-1 block rounded-md border-zinc-500 bg-white text-zinc-900 dark:border-zinc-500 dark:bg-zinc-900 dark:text-zinc-100"
 		>
-			{#each SORT_OPTIONS as option (option.value)}
-				<option value={option.value}>{option.label}</option>
+			{#each ROUTINE_SORTS as routineSort (routineSort)}
+				<option value={routineSort}>{SORT_LABELS[routineSort]}</option>
 			{/each}
 		</select>
 	</label>

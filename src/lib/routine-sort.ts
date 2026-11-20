@@ -3,9 +3,19 @@
 import type { Routine } from './routine';
 import type { Run, WorkPeriod } from './run-records';
 
+/** Every order routines can be listed in, which a backup's settings may hold. */
+export const ROUTINE_SORTS = [
+	'custom',
+	'title-asc',
+	'title-desc',
+	'last-used',
+	'most-work',
+	'newest',
+	'oldest'
+] as const;
+
 /** How routines are ordered: the spec's `RoutineSort`. */
-export type RoutineSort =
-	'custom' | 'title-asc' | 'title-desc' | 'last-used' | 'most-work' | 'newest' | 'oldest';
+export type RoutineSort = (typeof ROUTINE_SORTS)[number];
 
 /** The records that "last used" and "most work" are worked out from. */
 export type RoutineUsage = {
