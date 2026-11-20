@@ -205,10 +205,17 @@ describe('the Data card', () => {
 			expect(page.getByRole('dialog').query()).toBeNull();
 		});
 
-		it('had a run in progress to replace before the import', async () => {
+		it('forgets the run in progress that was there before the import, once confirmed', async () => {
 			const { storage } = await renderCard();
-
 			expect(await storage.getRunInProgress()).not.toBeNull();
+			await chooseFile(validBackupText());
+
+			await page.getByRole('dialog').getByRole('button', { name: 'Import' }).click();
+
+			await expect
+				.element(page.getByRole('status'))
+				.toHaveTextContent('Imported 2 routines, 1 run and 1 work period.');
+			expect(await storage.getRunInProgress()).toBeNull();
 		});
 
 		it('changes nothing when Cancel is pressed, and closes the dialog', async () => {
