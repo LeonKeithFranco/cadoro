@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { useErrorLog } from '#lib/error-log.ts';
+import { DEFAULT_SETTINGS } from '#lib/settings.ts';
 import { InMemoryStorage } from '#lib/storage/in-memory-storage.ts';
 import { oneRoundRoutine } from '#lib/testing/routines.ts';
 import { runInProgressWith } from '#lib/testing/run-in-progress.ts';
@@ -182,6 +183,81 @@ describe('the Stats page when the work period in progress ends', () => {
 			details: { message: 'unreadable' }
 		});
 		expect(figure('All time')()).toBe('20:00');
+	});
+});
+
+describe('the Stats page when another tab imports a backup', () => {
+	/**
+	 * Makes a work period that ended at the fake clock's start.
+	 *
+	 * @param id - The work period's id.
+	 * @param minutes - How many minutes it lasted.
+	 * @returns The work period.
+	 */
+	function workPeriodOfMinutes(id: string, minutes: number): WorkPeriod {
+		return workPeriodWith({
+			id,
+			runId: 'imported-run',
+			routineId: oneRoundRoutine.id,
+			segments: [
+				{
+					start: new Date(START - minutes * MINUTE).toISOString(),
+					end: new Date(START).toISOString()
+				}
+			],
+			workedMs: minutes * MINUTE
+		});
+	}
+
+	/**
+	 * Imports a backup holding one ten-minute work period into the storage, as another tab would.
+	 *
+	 * @param storage - The storage the page follows.
+	 */
+	async function importTenMinutes(storage: InMemoryStorage): Promise<void> {
+		await storage.replaceAllData(
+			{
+				routines: [oneRoundRoutine],
+				runs: [{ ...startedRecord, id: 'imported-run', routineId: oneRoundRoutine.id }],
+				workPeriods: [workPeriodOfMinutes('imported-period', 10)],
+				settings: DEFAULT_SETTINGS
+			},
+			{
+				formatVersion: 1,
+				exportedAt: new Date(START).toISOString(),
+				routineCount: 1,
+				runCount: 1,
+				workPeriodCount: 1,
+				firstRunAt: startedRecord.startedAt,
+				lastRunAt: startedRecord.startedAt
+			}
+		);
+	}
+
+	it('shows the imported work with no run in progress, as the figures follow storage', async () => {
+		const storage = new InMemoryStorage();
+		await renderStats(storage, null, [workPeriodOfMinutes('old-period', 5)]);
+		await expect.poll(figure('All time')).toBe('5:00');
+
+		await importTenMinutes(storage);
+		await vi.advanceTimersByTimeAsync(100);
+
+		await expect.poll(figure('All time')).toBe('10:00');
+	});
+
+	it('records a failed read of the imported data and keeps what it shows', async () => {
+		const storage = new InMemoryStorage();
+		useErrorLog(storage);
+		await renderStats(storage, null, [workPeriodOfMinutes('old-period', 5)]);
+		vi.spyOn(storage, 'getWorkPeriods').mockRejectedValue(new Error('unreadable'));
+
+		await importTenMinutes(storage);
+		await vi.advanceTimersByTimeAsync(100);
+
+		await expect
+			.poll(async () => (await storage.getLogEntries()).map((entry) => entry.message))
+			.toContain('Could not read the work periods for Stats.');
+		expect(figure('All time')()).toBe('5:00');
 	});
 });
 
