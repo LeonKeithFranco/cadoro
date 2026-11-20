@@ -14,6 +14,7 @@
 	import { LOG_MAX_ENTRIES, type LogEntry } from '../log';
 	import type { CadoroStorage } from '../storage/storage';
 	import { SECONDARY_BUTTON_COLOURS } from './button-classes';
+	import { ERROR_TEXT, LINK_TEXT } from './form-classes';
 	import ScreenHeading from './ScreenHeading.svelte';
 
 	/** The props the log page takes. */
@@ -71,10 +72,7 @@
 <ScreenHeading title="Activity log" />
 
 <p class="mt-2">
-	<a
-		href={resolve('/settings')}
-		class="inline-flex items-center gap-1 font-medium text-rose-700 underline underline-offset-2 dark:text-rose-300"
-	>
+	<a href={resolve('/settings')} class={['inline-flex items-center gap-1', LINK_TEXT]}>
 		<span aria-hidden="true">←</span>
 		Back to Settings
 	</a>
@@ -102,7 +100,7 @@
 	</p>
 
 	{#if failure !== null}
-		<p role="alert" class="mt-3 text-rose-700 dark:text-rose-300">{failure}</p>
+		<p role="alert" class={['mt-3', ERROR_TEXT]}>{failure}</p>
 	{:else if entries === null}
 		<p class="mt-3 text-zinc-600 dark:text-zinc-400">Reading the log…</p>
 	{:else if entries.length === 0}
@@ -123,7 +121,7 @@
 							class={[
 								'rounded-full border px-2 text-xs font-medium',
 								entry.type === 'error'
-									? 'border-rose-700 text-rose-700 dark:border-rose-300 dark:text-rose-300'
+									? ['border-rose-700 dark:border-rose-400', ERROR_TEXT]
 									: 'border-zinc-500 text-zinc-700 dark:border-zinc-500 dark:text-zinc-300'
 							]}
 						>

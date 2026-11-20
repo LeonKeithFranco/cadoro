@@ -17,7 +17,7 @@
 	import type { SaveFile } from '../file-download';
 	import type { CadoroStorage } from '../storage/storage';
 	import { BUTTON_SHAPE, SECONDARY_BUTTON_COLOURS } from './button-classes';
-	import { LABEL_TEXT } from './form-classes';
+	import { ERROR_TEXT, LABEL_TEXT, LINK_TEXT } from './form-classes';
 	import ConfirmDialog from './ConfirmDialog.svelte';
 
 	/** The props the card takes. */
@@ -191,9 +191,7 @@
 			role={notice.kind === 'failure' ? 'alert' : 'status'}
 			class={[
 				'mt-3 text-sm',
-				notice.kind === 'failure'
-					? 'text-rose-700 dark:text-rose-300'
-					: 'text-zinc-700 dark:text-zinc-300'
+				notice.kind === 'failure' ? ERROR_TEXT : 'text-zinc-700 dark:text-zinc-300'
 			]}
 		>
 			{notice.text}
@@ -201,12 +199,7 @@
 	{/if}
 
 	<p class="mt-4">
-		<a
-			href={resolve('/settings/log')}
-			class="font-medium text-rose-700 underline underline-offset-2 dark:text-rose-300"
-		>
-			Activity log
-		</a>
+		<a href={resolve('/settings/log')} class={LINK_TEXT}> Activity log </a>
 	</p>
 </section>
 

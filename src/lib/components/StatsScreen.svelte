@@ -12,7 +12,7 @@
 	import type { RangePreset } from '../stats-range';
 	import { viewStats } from '../stats-view';
 	import DailyChart from './DailyChart.svelte';
-	import { INPUT_COLOURS, LABEL_TEXT } from './form-classes';
+	import { INPUT_COLOURS, LABEL_TEXT, LINK_TEXT } from './form-classes';
 	import ScreenHeading from './ScreenHeading.svelte';
 	import TotalsTable from './TotalsTable.svelte';
 
@@ -75,7 +75,7 @@
 {#if !view.hasWork}
 	<p class="mt-2 text-zinc-600 dark:text-zinc-400">
 		No work yet. Run a routine on the
-		<a href={resolve('/')} class="font-medium text-rose-700 underline dark:text-rose-400">Timer</a>
+		<a href={resolve('/')} class={LINK_TEXT}>Timer</a>
 		and your stats will appear here.
 	</p>
 {:else}
