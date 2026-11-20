@@ -2,7 +2,13 @@ import './testing/time-zone';
 import { describe, expect, it } from 'vitest';
 import type { DaySlice } from './day-slices';
 import { hours, minutes } from './testing/durations';
-import { dailyTotals, monthlyTotals, weeklyTotals, workedToday } from './work-totals';
+import {
+	dailyTotals,
+	monthlyTotals,
+	totalWorkedMs,
+	weeklyTotals,
+	workedToday
+} from './work-totals';
 
 /**
  * Reads a UTC timestamp as milliseconds, so each test writes its moments as readable literals.
@@ -24,6 +30,18 @@ function utc(timestamp: string): number {
 function slice(dayStart: string, workedMs: number): DaySlice {
 	return { dayStart: utc(dayStart), workedMs };
 }
+
+describe('totalWorkedMs', () => {
+	it('adds up the work of every item', () => {
+		expect(
+			totalWorkedMs([{ workedMs: minutes(25) }, { workedMs: minutes(5) }, { workedMs: hours(1) }])
+		).toBe(minutes(90));
+	});
+
+	it('gives 0 for no items', () => {
+		expect(totalWorkedMs([])).toBe(0);
+	});
+});
 
 describe('dailyTotals', () => {
 	const range = { firstDay: utc('2026-11-18T05:00:00Z'), lastDay: utc('2026-11-20T05:00:00Z') };

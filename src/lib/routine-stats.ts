@@ -2,6 +2,7 @@
 
 import type { Routine } from './routine';
 import type { WorkPeriod } from './run-records';
+import { totalWorkedMs } from './work-totals';
 
 /** The total work time of one routine. */
 export type RoutineTotal = {
@@ -63,16 +64,13 @@ export function filterByRoutine(workPeriods: WorkPeriod[], routineId: string | n
  * title to show it under.
  */
 export function allTimeTotals(workPeriods: WorkPeriod[], routines: Routine[]): AllTimeTotals {
-	const workedMs = workPeriods.reduce((total, period) => total + period.workedMs, 0);
+	const workedMs = totalWorkedMs(workPeriods);
 	const perRoutine = routines
 		.map((routine) => ({
 			routineId: routine.id,
 			title: routine.title,
 			deleted: routine.deletedAt !== null,
-			workedMs: filterByRoutine(workPeriods, routine.id).reduce(
-				(total, period) => total + period.workedMs,
-				0
-			)
+			workedMs: totalWorkedMs(filterByRoutine(workPeriods, routine.id))
 		}))
 		.filter((total) => total.workedMs > 0)
 		.sort(
