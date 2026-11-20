@@ -8,6 +8,7 @@
 	import StatsScreen from '#lib/components/StatsScreen.svelte';
 	import type { StoredRunInProgress } from '#lib/run-in-progress.ts';
 	import { nextLocalDay, startOfLocalDay } from '#lib/day-slices.ts';
+	import { recordError } from '#lib/error-log.ts';
 	import type { Routine } from '#lib/routine.ts';
 	import type { WorkPeriod } from '#lib/run-records.ts';
 	import { MS_PER_SECOND } from '#lib/time.ts';
@@ -64,14 +65,14 @@
 						now = Date.now();
 					})
 					.catch((error: unknown) => {
-						console.error('Could not read the work periods for Stats.', error);
+						void recordError('Could not read the work periods for Stats.', error);
 					})
 					.finally(() => {
 						reading -= 1;
 					});
 			},
 			(error) => {
-				console.error('Could not read the run in progress for Stats.', error);
+				void recordError('Could not read the run in progress for Stats.', error);
 			}
 		);
 		return (): void => {

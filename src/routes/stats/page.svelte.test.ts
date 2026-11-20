@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
+import { useErrorLog } from '#lib/error-log.ts';
 import { InMemoryStorage } from '#lib/storage/in-memory-storage.ts';
 import { oneRoundRoutine } from '#lib/testing/routines.ts';
 import { runInProgressWith } from '#lib/testing/run-in-progress.ts';
@@ -26,6 +27,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+	useErrorLog(null);
 	vi.useRealTimers();
 });
 
@@ -159,12 +161,12 @@ describe('the Stats page when the work period in progress ends', () => {
 		expect(figure('Targets reached')()).toBe('0%');
 	});
 
-	it('keeps what it shows when reading the work periods fails', async () => {
+	it('keeps what it shows when reading the work periods fails, and records the failure in the activity log', async () => {
 		const storage = new InMemoryStorage();
+		useErrorLog(storage);
 		await renderStats(storage, countingSince(20));
 		await expect.poll(figure('All time')).toBe('20:00');
 		vi.spyOn(storage, 'getWorkPeriods').mockRejectedValue(new Error('unreadable'));
-		const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
 		await storage.saveRunInProgress(
 			runInProgressWith({ record: startedRecord, revision: 'revision-2' }),
@@ -173,7 +175,12 @@ describe('the Stats page when the work period in progress ends', () => {
 		);
 		await vi.advanceTimersByTimeAsync(100);
 
-		expect(logged).toHaveBeenCalled();
+		await expect.poll(() => storage.getLogEntries()).toHaveLength(1);
+		expect((await storage.getLogEntries())[0]).toMatchObject({
+			type: 'error',
+			message: 'Could not read the work periods for Stats.',
+			details: { message: 'unreadable' }
+		});
 		expect(figure('All time')()).toBe('20:00');
 	});
 });
