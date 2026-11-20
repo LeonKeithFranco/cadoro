@@ -121,6 +121,45 @@ describe('workPeriodsToCsv', () => {
 		expect(workPeriodsToCsv([routine], [firstWorkPeriod])).toContain('One round,"Focus, hard",');
 	});
 
+	it.each(['=1+1', '+1', '-1', '@SUM(A1)', '\tTabbed'])(
+		'starts a routine title that begins like a formula, %j, with a single quote',
+		(title) => {
+			const routine = routineWith({ title });
+
+			expect(workPeriodsToCsv([routine], [firstWorkPeriod])).toContain(`\r\n'${title},Focus,`);
+		}
+	);
+
+	it('starts a title that begins with a carriage return with a single quote, inside quotes', () => {
+		const routine = routineWith({ title: '\rLine' });
+
+		expect(workPeriodsToCsv([routine], [firstWorkPeriod])).toContain('\r\n"\'\rLine",Focus,');
+	});
+
+	it('starts a block title that begins like a formula with a single quote', () => {
+		const routine = routineWith({
+			blocks: [
+				{
+					id: 'one-round-focus',
+					title: '=HYPERLINK("x")',
+					targetMinutes: 25,
+					breakPercent: 20,
+					cycles: 1
+				}
+			]
+		});
+
+		expect(workPeriodsToCsv([routine], [firstWorkPeriod])).toContain(
+			'One round,"\'=HYPERLINK(""x"")",'
+		);
+	});
+
+	it('leaves the numbers and timestamps as they are', () => {
+		const row = workPeriodsToCsv([oneRoundRoutine], [firstWorkPeriod]).split('\r\n')[1];
+
+		expect(row).not.toContain("'");
+	});
+
 	it('leaves a plain title unquoted', () => {
 		expect(workPeriodsToCsv([oneRoundRoutine], [firstWorkPeriod])).not.toContain('"');
 	});
