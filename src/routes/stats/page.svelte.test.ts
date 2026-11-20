@@ -3,6 +3,7 @@ import { render } from 'vitest-browser-svelte';
 import { useErrorLog } from '#lib/error-log.ts';
 import { DEFAULT_SETTINGS } from '#lib/settings.ts';
 import { InMemoryStorage } from '#lib/storage/in-memory-storage.ts';
+import type { CadoroStorage } from '#lib/storage/storage.ts';
 import { oneRoundRoutine } from '#lib/testing/routines.ts';
 import { runInProgressWith } from '#lib/testing/run-in-progress.ts';
 import { runInProgress as startedRecord } from '#lib/testing/run-records.ts';
@@ -183,6 +184,42 @@ describe('the Stats page when the work period in progress ends', () => {
 			details: { message: 'unreadable' }
 		});
 		expect(figure('All time')()).toBe('20:00');
+	});
+});
+
+describe('the Stats page following the run in progress', () => {
+	it('does not read the work periods again on a heartbeat, which saves no work', async () => {
+		const storage = new InMemoryStorage();
+		await renderStats(storage, countingSince(20));
+		await expect.poll(figure('All time')).toBe('20:00');
+		const getWorkPeriods = vi.spyOn(storage, 'getWorkPeriods');
+
+		await storage.saveHeartbeat('revision-1', new Date(START + MINUTE).toISOString());
+		await vi.advanceTimersByTimeAsync(100);
+
+		expect(getWorkPeriods).not.toHaveBeenCalled();
+	});
+
+	it('records in the activity log that the run in progress could not be followed', async () => {
+		const storage = new InMemoryStorage();
+		useErrorLog(storage);
+		// Through the interface, whose `watchRunInProgress` takes the `onError` that in-memory storage
+		// never calls.
+		vi.spyOn(storage as CadoroStorage, 'watchRunInProgress').mockImplementation(
+			(_onChange, onError): (() => void) => {
+				onError(new Error('unfollowable'));
+				return (): void => undefined;
+			}
+		);
+
+		await renderStats(storage, null);
+
+		await expect.poll(() => storage.getLogEntries()).toHaveLength(1);
+		expect((await storage.getLogEntries())[0]).toMatchObject({
+			type: 'error',
+			message: 'Could not read the run in progress for Stats.',
+			details: { message: 'unfollowable' }
+		});
 	});
 });
 
