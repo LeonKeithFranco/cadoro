@@ -3,7 +3,8 @@ import { useErrorLog } from '#lib/error-log.ts';
 import { joinOpenTabs } from '#lib/open-tabs.ts';
 import { loadRoutines } from '#lib/routine-loading.ts';
 import { RunChimes } from '#lib/run-chimes.svelte.ts';
-import { sortRoutines, type RoutineUsage } from '#lib/routine-sort.ts';
+import { sortRoutines } from '#lib/routine-sort.ts';
+import { RoutineUsageKeeper } from '#lib/routine-usage.svelte.ts';
 import { SettingsSession } from '#lib/settings.svelte.ts';
 import { DexieStorage } from '#lib/storage/dexie-storage.ts';
 import type { CadoroStorage } from '#lib/storage/storage.ts';
@@ -41,6 +42,8 @@ type AppSessions = {
 	chimes: RunChimes;
 	/** The app's storage, which the Routines screen edits routines through. */
 	storage: CadoroStorage;
+	/** The runs and work periods the Timer's picker and the session's fallback routine sort by. */
+	routineUsage: RoutineUsageKeeper;
 };
 
 /**
@@ -94,21 +97,27 @@ async function openApp(): Promise<AppSessions> {
 	]);
 	const clock = (): number => Date.now();
 	const settingsSession = new SettingsSession(storage, settings);
-	// The runs as the app opened, which the "last used" and "most work" sorts read, so the session's
-	// first routine is the picker's first, whatever sort is chosen. Runs made since then aren't in it.
-	const usage: RoutineUsage = { runs, workPeriods };
+	// The runs the "last used" and "most work" sorts read, read again whenever they may have changed
+	// and shared with the Timer's picker, so the session's fallback routine is the picker's first,
+	// whatever sort is chosen.
+	const routineUsage = new RoutineUsageKeeper(storage, { runs, workPeriods });
 	const options: TimerSessionOptions = {
-		pickerOrder: (list) => sortRoutines([...list], settingsSession.settings.routineSort, usage),
+		pickerOrder: (list) =>
+			sortRoutines([...list], settingsSession.settings.routineSort, routineUsage.usage),
 		clock,
 		storage,
 		newId,
 		newRevision: newId,
-		onWorkSaved: () => void askToPersist(),
+		onWorkSaved: () => {
+			void askToPersist();
+			void routineUsage.reload();
+		},
 		onPress: () => {
 			chimes.unlock();
 		},
 		onRunStarted: (routineId) => {
 			void settingsSession.save({ lastRoutineId: routineId });
+			void routineUsage.reload();
 		}
 	};
 	const timerSession = new TimerSession(routines, options, {
@@ -130,7 +139,7 @@ async function openApp(): Promise<AppSessions> {
 		wakeLock,
 		page: document
 	});
-	return { timerSession, settingsSession, wakeLockKeeper, chimes, storage };
+	return { timerSession, settingsSession, wakeLockKeeper, chimes, storage, routineUsage };
 }
 
 /**

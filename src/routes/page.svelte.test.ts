@@ -4,6 +4,7 @@ import { render } from 'vitest-browser-svelte';
 import { useErrorLog } from '#lib/error-log.ts';
 import { createStarterRoutines, type Routine } from '#lib/routine.ts';
 import { DEFAULT_SETTINGS, type Settings } from '#lib/settings.ts';
+import { RoutineUsageKeeper } from '#lib/routine-usage.svelte.ts';
 import { SettingsSession } from '#lib/settings.svelte.ts';
 import { InMemoryStorage } from '#lib/storage/in-memory-storage.ts';
 import type { CadoroStorage } from '#lib/storage/storage.ts';
@@ -46,7 +47,8 @@ function pageData(
 		{ saved: null, isAnotherTabOpen: false }
 	);
 	const settingsSession = new SettingsSession(storage, { ...DEFAULT_SETTINGS, ...settings });
-	return { timerSession, settingsSession, storage } as unknown as PageProps['data'];
+	const routineUsage = new RoutineUsageKeeper(storage, { runs: [], workPeriods: [] });
+	return { timerSession, settingsSession, storage, routineUsage } as unknown as PageProps['data'];
 }
 
 /**
