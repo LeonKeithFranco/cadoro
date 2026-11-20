@@ -9,6 +9,7 @@
 	import { RANGE_PRESETS, type RangePreset } from '../stats-range';
 	import type { DayBar } from '../stats-view';
 	import { PRIMARY_BUTTON_COLOURS, SECONDARY_BUTTON_COLOURS } from './button-classes';
+	import Card from './Card.svelte';
 
 	/** The props the daily chart takes. */
 	type Props = {
@@ -49,17 +50,9 @@
 	function formatDay(day: string): string {
 		return labelOfDay.get(day) ?? day;
 	}
-
-	/** An id for the heading that names the figure, unique on the page. */
-	const headingId = $props.id();
 </script>
 
-<section
-	aria-labelledby={headingId}
-	class="rounded-xl border border-zinc-500 bg-white p-4 md:p-6 dark:border-zinc-500 dark:bg-zinc-900"
->
-	<h2 id={headingId} class="font-semibold md:text-lg">Daily work time</h2>
-
+<Card title="Daily work time">
 	<!-- Five equal columns on phones, so the presets share one row instead of leaving "All" alone
 	     on the next. From `md` they sit side by side at their own widths. -->
 	<div role="group" aria-label="Range" class="mt-3 grid grid-cols-5 gap-2 md:flex md:flex-wrap">
@@ -124,4 +117,4 @@
 			The minutes worked each day in the chosen range, which the table above also gives.
 		</figcaption>
 	</figure>
-</section>
+</Card>

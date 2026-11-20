@@ -6,6 +6,7 @@
 -->
 <script module lang="ts">
 	import type { BlockView, TimerBoxView } from '../block-view';
+	import { CARD_CLASSES } from './card-classes';
 
 	/** How a box is coloured: not in use, in use, or in use past its target. */
 	type BoxTone = 'idle' | 'active' | 'overtime';
@@ -73,10 +74,7 @@
 </script>
 
 <!-- Named by its title, so each card is a region a screen reader can jump to. -->
-<section
-	aria-labelledby={titleId}
-	class="rounded-xl border border-zinc-500 bg-white p-4 md:p-6 dark:border-zinc-500 dark:bg-zinc-900"
->
+<section aria-labelledby={titleId} class={CARD_CLASSES}>
 	<!-- The cycle counter sits across from the title, as a box's target sits across from its
 	     label. -->
 	<div class="flex items-baseline justify-between gap-4">

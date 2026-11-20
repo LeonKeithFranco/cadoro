@@ -18,6 +18,7 @@
 	import type { CadoroStorage } from '../storage/storage';
 	import { BUTTON_SHAPE, SECONDARY_BUTTON_COLOURS } from './button-classes';
 	import { ERROR_TEXT, LABEL_TEXT, LINK_TEXT } from './form-classes';
+	import Card from './Card.svelte';
 	import ConfirmDialog from './ConfirmDialog.svelte';
 
 	/** The props the card takes. */
@@ -154,11 +155,7 @@
 	}
 </script>
 
-<section
-	aria-labelledby="data-heading"
-	class="rounded-xl border border-zinc-500 bg-white p-4 md:p-6 dark:border-zinc-500 dark:bg-zinc-900"
->
-	<h2 id="data-heading" class="font-semibold md:text-lg">Data</h2>
+<Card title="Data">
 	<p class="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
 		Cadoro keeps its data in this browser only. A backup is the way to move it to another device, or
 		to keep a copy.
@@ -201,7 +198,7 @@
 	<p class="mt-4">
 		<a href={resolve('/settings/log')} class={LINK_TEXT}> Activity log </a>
 	</p>
-</section>
+</Card>
 
 {#if pendingImport !== null}
 	<ConfirmDialog

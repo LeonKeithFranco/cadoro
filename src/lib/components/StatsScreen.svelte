@@ -104,25 +104,10 @@
 		<DailyChart bars={view.days} {preset} onpreset={choosePreset} />
 
 		<div class="grid items-start gap-4 md:grid-cols-2">
-			<TotalsTable
-				heading="Weekly totals"
-				nameColumn="Week"
-				rows={view.weeks}
-				emptyMessage="No work yet."
-			/>
-			<TotalsTable
-				heading="Monthly totals"
-				nameColumn="Month"
-				rows={view.months}
-				emptyMessage="No work yet."
-			/>
+			<TotalsTable heading="Weekly totals" nameColumn="Week" rows={view.weeks} />
+			<TotalsTable heading="Monthly totals" nameColumn="Month" rows={view.months} />
 		</div>
 
-		<TotalsTable
-			heading="All time per routine"
-			nameColumn="Routine"
-			rows={view.routineTotals}
-			emptyMessage="No work yet."
-		/>
+		<TotalsTable heading="All time per routine" nameColumn="Routine" rows={view.routineTotals} />
 	</div>
 {/if}

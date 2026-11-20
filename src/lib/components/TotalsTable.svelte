@@ -5,6 +5,7 @@
 -->
 <script lang="ts">
 	import type { TotalRow } from '../stats-view';
+	import Card from './Card.svelte';
 
 	/** The props the totals table takes. */
 	type Props = {
@@ -14,21 +15,14 @@
 		nameColumn: string;
 		/** The rows to show, in order. */
 		rows: TotalRow[];
-		/** What to say instead of the table when there are no rows. */
-		emptyMessage: string;
+		/** What to say instead of the table when there are no rows. Defaults to "No work yet." */
+		emptyMessage?: string;
 	};
 
-	let { heading, nameColumn, rows, emptyMessage }: Props = $props();
-
-	/** An id for the heading that this table's label points at, unique on the page. */
-	const headingId = $props.id();
+	let { heading, nameColumn, rows, emptyMessage = 'No work yet.' }: Props = $props();
 </script>
 
-<section
-	aria-labelledby={headingId}
-	class="rounded-xl border border-zinc-500 bg-white p-4 md:p-6 dark:border-zinc-500 dark:bg-zinc-900"
->
-	<h2 id={headingId} class="font-semibold md:text-lg">{heading}</h2>
+<Card title={heading}>
 	{#if rows.length === 0}
 		<p class="mt-2 text-zinc-600 dark:text-zinc-400">{emptyMessage}</p>
 	{:else}
@@ -49,4 +43,4 @@
 			</tbody>
 		</table>
 	{/if}
-</section>
+</Card>
