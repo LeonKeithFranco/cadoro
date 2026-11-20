@@ -32,7 +32,8 @@ export type DueChime = {
  * never from `now`, so asking every second gives the same answer as asking once. `now` only
  * decides whether the moment is still ahead: a chime whose moment has come is left out, so work
  * already in overtime, or a break already over, never chimes again after a restore or a change in
- * another tab. That makes a break that earned 0 seconds silent, since it's over as it starts.
+ * another tab. That makes a break of 0 seconds silent, since it's over as it starts. A break
+ * that earned 0 seconds but carries a bank isn't, since it lasts as long as the bank.
  *
  * @param run - The run.
  * @param now - The current moment, in milliseconds since 1970 (UTC).
