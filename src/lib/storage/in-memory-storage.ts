@@ -112,11 +112,13 @@ export class InMemoryStorage implements CadoroStorage {
 	}
 
 	async saveRoutine(routine: Routine): Promise<void> {
-		this.#apply(planSave(this.#routines, structuredClone(routine), this.#now()));
+		const runningRoutineId = this.#runInProgress?.record.routineId ?? null;
+		this.#apply(planSave(this.#routines, structuredClone(routine), this.#now(), runningRoutineId));
 	}
 
 	async deleteRoutine(id: string): Promise<boolean> {
-		const change = planDelete(this.#routines, id, this.#now());
+		const runningRoutineId = this.#runInProgress?.record.routineId ?? null;
+		const change = planDelete(this.#routines, id, this.#now(), runningRoutineId);
 		if (change === null) {
 			return false;
 		}

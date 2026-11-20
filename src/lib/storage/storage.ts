@@ -103,9 +103,13 @@ export interface CadoroStorage {
 	 * before another tab reordered the routines can't undo the reorder. The log entry holds the old
 	 * and new title, rounds and blocks.
 	 *
+	 * A routine the run in progress is of can't be edited, so a run, ended or not, keeps the
+	 * routine it started with until Done forgets it.
+	 *
 	 * @param routine - The routine as edited, with the id of the routine to change.
-	 * @throws Rejects with an {@link Error} when no routine that isn't deleted has that id, or with
-	 * the backend's own error when the data can't be saved, and then nothing is saved.
+	 * @throws Rejects with an {@link Error} when no routine that isn't deleted has that id, or when
+	 * it's the routine of the run in progress, or with the backend's own error when the data can't
+	 * be saved, and then nothing is saved.
 	 */
 	saveRoutine(routine: Routine): Promise<void>;
 
@@ -114,13 +118,15 @@ export interface CadoroStorage {
 	 *
 	 * @remarks
 	 * The routine is kept, so Stats still has its name. It never deletes the last routine left, so
-	 * there's always one to run.
+	 * there's always one to run. Nor does it delete the routine of the run in progress, ended or
+	 * not, since a restored run needs its routine.
 	 *
 	 * @param id - The id of the routine to delete.
 	 * @returns `true` if the routine was deleted, or `false` if it's the only routine not deleted
 	 * and nothing changed.
-	 * @throws Rejects with an {@link Error} when no routine that isn't deleted has that id, or with
-	 * the backend's own error when the data can't be saved.
+	 * @throws Rejects with an {@link Error} when no routine that isn't deleted has that id, or when
+	 * it's the routine of the run in progress, or with the backend's own error when the data can't
+	 * be saved.
 	 */
 	deleteRoutine(id: string): Promise<boolean>;
 
