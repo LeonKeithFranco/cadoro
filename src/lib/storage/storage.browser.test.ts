@@ -1427,7 +1427,7 @@ describe.each(backends)('$name', ({ create }) => {
 			expect((await storage.getRoutines()).map((routine) => routine.id)).toEqual(['x']);
 		});
 
-		it('replaces settings the backup holds with every setting, not merging the old ones', async () => {
+		it('replaces the old settings with the imported ones, not merging them', async () => {
 			const storage = await storageWithOldData();
 
 			await storage.replaceAllData(imported, summary);

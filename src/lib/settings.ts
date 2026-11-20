@@ -66,6 +66,25 @@ export function settingsWithChanges(
 }
 
 /**
+ * Works out the settings row to save for a full set of settings, such as an import's: only the
+ * settings that differ from today's defaults.
+ *
+ * @remarks
+ * Storage keeps only changed settings, so a default that a later version changes still reaches
+ * users who never touched that setting. A setting the backup holds at today's default counts as
+ * untouched.
+ *
+ * @param settings - Every setting.
+ * @returns The row holding only the settings that aren't at their default.
+ */
+export function settingsDifferingFromDefaults(settings: Settings): Partial<Settings> {
+	const differing = Object.entries(settings).filter(
+		([name, value]) => value !== DEFAULT_SETTINGS[name as keyof Settings]
+	);
+	return Object.fromEntries(differing);
+}
+
+/**
  * Drops the fields of a settings row that are `undefined`.
  *
  * @param row - A settings row.

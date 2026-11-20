@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SETTINGS, settingsFrom, settingsWithChanges } from './settings';
+import {
+	DEFAULT_SETTINGS,
+	settingsDifferingFromDefaults,
+	settingsFrom,
+	settingsWithChanges
+} from './settings';
 
 describe('settingsWithChanges', () => {
 	it('puts the changes on top of the saved row, keeping the rest of it', () => {
@@ -23,6 +28,24 @@ describe('settingsWithChanges', () => {
 		expect(settingsWithChanges(null, { keepScreenAwake: false, lastRoutineId: null })).toEqual({
 			keepScreenAwake: false,
 			lastRoutineId: null
+		});
+	});
+});
+
+describe('settingsDifferingFromDefaults', () => {
+	it('returns only the settings that differ from their defaults', () => {
+		expect(
+			settingsDifferingFromDefaults({ ...DEFAULT_SETTINGS, theme: 'light', keepScreenAwake: false })
+		).toEqual({ theme: 'light', keepScreenAwake: false });
+	});
+
+	it('returns nothing for the defaults', () => {
+		expect(settingsDifferingFromDefaults(DEFAULT_SETTINGS)).toEqual({});
+	});
+
+	it('keeps a null that differs from a default', () => {
+		expect(settingsDifferingFromDefaults({ ...DEFAULT_SETTINGS, lastRoutineId: 'a' })).toEqual({
+			lastRoutineId: 'a'
 		});
 	});
 });

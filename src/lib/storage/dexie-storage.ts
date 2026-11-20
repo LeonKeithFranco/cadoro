@@ -30,7 +30,12 @@ import {
 	type RunRecords,
 	type WorkPeriod
 } from '../run-records';
-import { settingsFrom, settingsWithChanges, type Settings } from '../settings';
+import {
+	settingsDifferingFromDefaults,
+	settingsFrom,
+	settingsWithChanges,
+	type Settings
+} from '../settings';
 import type { CadoroStorage, StorageOptions } from './storage';
 import { writeThemeMirror } from './theme-mirror';
 
@@ -510,7 +515,7 @@ export class DexieStorage implements CadoroStorage {
 				await routines.bulkAdd(data.routines);
 				await runs.bulkAdd(data.runs);
 				await workPeriods.bulkAdd(data.workPeriods);
-				await settings.put(data.settings, SETTINGS_KEY);
+				await settings.put(settingsDifferingFromDefaults(data.settings), SETTINGS_KEY);
 			}
 		);
 		// After the replace, so a failed one leaves the mirror as it was.
