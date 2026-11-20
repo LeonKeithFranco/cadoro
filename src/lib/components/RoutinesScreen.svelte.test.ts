@@ -1,5 +1,5 @@
 import { beforeNavigate, goto, type BeforeNavigate } from '$app/navigation';
-import { page, type Locator } from 'vitest/browser';
+import { page, userEvent, type Locator } from 'vitest/browser';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { requireDefined } from '../defined';
@@ -169,6 +169,24 @@ async function typeTitle(title: string): Promise<void> {
 	await page.getByRole('textbox', { name: 'Title', exact: true }).fill(title);
 }
 
+/**
+ * Presses Tab through the page from its start, noting what each press lands on.
+ *
+ * @param presses - How many times to press Tab.
+ * @returns What each focused element is called, by its label, or by its text when it has none,
+ * in the order Tab reached them.
+ */
+async function tabStops(presses: number): Promise<string[]> {
+	(document.activeElement as HTMLElement | null)?.blur();
+	const stops: string[] = [];
+	for (let press = 0; press < presses; press += 1) {
+		await userEvent.tab();
+		const focused = document.activeElement;
+		stops.push(focused?.getAttribute('aria-label') ?? focused?.textContent?.trim() ?? '');
+	}
+	return stops;
+}
+
 beforeEach(() => {
 	vi.mocked(beforeNavigate).mockClear();
 	vi.mocked(goto).mockClear();
@@ -287,6 +305,18 @@ describe('moving routines', () => {
 			.element(cardOf('Charlie').getByRole('button', { name: 'Move down' }))
 			.toBeDisabled();
 		await expect.element(cardOf('Bravo').getByRole('button', { name: 'Move up' })).toBeEnabled();
+	});
+
+	it('keeps the drag handles, the list and its items out of the Tab order, since the buttons move by keyboard', async () => {
+		await openScreen();
+
+		const stops = await tabStops(24);
+
+		expect(stops).toContain('Move down');
+		expect(stops.filter((stop) => stop.startsWith('Drag'))).toEqual([]);
+		expect(
+			stops.filter((stop) => ['Routines', 'Alpha', 'Bravo', 'Charlie'].includes(stop))
+		).toEqual([]);
 	});
 });
 
@@ -912,6 +942,17 @@ describe('editing blocks', () => {
 
 		await expect.element(blockGroup(1).getByRole('button', { name: 'Drag block 1' })).toBeVisible();
 		await expect.element(blockGroup(2).getByRole('button', { name: 'Drag block 2' })).toBeVisible();
+	});
+
+	it('keeps the block drag handles out of the Tab order, since Move up and Move down move by keyboard', async () => {
+		await openScreen();
+		await openForEditing('Alpha');
+
+		const stops = await tabStops(60);
+
+		expect(stops).toContain('Move down');
+		expect(stops.filter((stop) => stop.startsWith('Drag'))).toEqual([]);
+		expect(stops).not.toContain('Blocks');
 	});
 
 	it('asks before deleting a block, and removes it once confirmed', async () => {
