@@ -17,16 +17,6 @@ import { routineWith } from './testing/routines';
 /** The moment every test creates the routines at. */
 const now = new Date('2026-01-05T09:00:00.000Z');
 
-/**
- * Makes an id generator that counts up, so tests can predict every id.
- *
- * @returns A generator giving `id-1`, then `id-2`, and so on.
- */
-function countingIds(): () => string {
-	let count = 0;
-	return (): string => `id-${++count}`;
-}
-
 describe('pickableRoutines', () => {
 	it('lists the routines lowest custom position first', () => {
 		const routines = [
@@ -65,7 +55,7 @@ describe('pickableRoutines', () => {
 
 describe('createStarterRoutines', () => {
 	it('creates Classic, then Classic with long break, in that custom order', () => {
-		const routines = createStarterRoutines(now, countingIds());
+		const routines = createStarterRoutines(now, numberedIds());
 
 		expect(routines.map((routine) => [routine.title, routine.customPosition])).toEqual([
 			['Classic', 0],
@@ -74,7 +64,7 @@ describe('createStarterRoutines', () => {
 	});
 
 	it('gives Classic one block of 25 minutes at 20% for 1 cycle, repeating forever', () => {
-		const [classic] = createStarterRoutines(now, countingIds());
+		const [classic] = createStarterRoutines(now, numberedIds());
 
 		expect(classic).toMatchObject({
 			rounds: 'infinite',
@@ -83,7 +73,7 @@ describe('createStarterRoutines', () => {
 	});
 
 	it('gives Classic with long break three cycles at 20%, then one at 60%, repeating forever', () => {
-		const [, withLongBreak] = createStarterRoutines(now, countingIds());
+		const [, withLongBreak] = createStarterRoutines(now, numberedIds());
 
 		expect(withLongBreak).toMatchObject({
 			rounds: 'infinite',
@@ -95,7 +85,7 @@ describe('createStarterRoutines', () => {
 	});
 
 	it('takes a different id from the generator for every routine and block', () => {
-		const routines = createStarterRoutines(now, countingIds());
+		const routines = createStarterRoutines(now, numberedIds());
 		const ids = routines.flatMap((routine) => [
 			routine.id,
 			...routine.blocks.map((block) => block.id)
@@ -105,7 +95,7 @@ describe('createStarterRoutines', () => {
 	});
 
 	it('stamps every routine with the given time in UTC, and none as deleted', () => {
-		const routines = createStarterRoutines(now, countingIds());
+		const routines = createStarterRoutines(now, numberedIds());
 
 		for (const routine of routines) {
 			expect(routine.createdAt).toBe('2026-01-05T09:00:00.000Z');
@@ -114,11 +104,11 @@ describe('createStarterRoutines', () => {
 	});
 
 	it('creates new blocks every time, so changing one set leaves the next untouched', () => {
-		const first = createStarterRoutines(now, countingIds());
+		const first = createStarterRoutines(now, numberedIds());
 		const firstBlock = requireDefined(first[0]?.blocks[0], "the first routine's first block");
 		firstBlock.targetMinutes = 50;
 
-		const second = createStarterRoutines(now, countingIds());
+		const second = createStarterRoutines(now, numberedIds());
 
 		expect(second[0]?.blocks[0]?.targetMinutes).toBe(25);
 	});
