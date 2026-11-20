@@ -230,11 +230,7 @@
 				{/if}
 			</p>
 			{#if isPersistent === false}
-				<button
-					type="button"
-					onclick={askAgain}
-					class={[BUTTON_SHAPE, SECONDARY_BUTTON_COLOURS]}
-				>
+				<button type="button" onclick={askAgain} class={[BUTTON_SHAPE, SECONDARY_BUTTON_COLOURS]}>
 					Ask again
 				</button>
 			{/if}
