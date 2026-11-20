@@ -76,7 +76,7 @@
 	import { onMount, untrack } from 'svelte';
 	import { newRoutine, canDeleteRoutine, withTrimmedTitles, type Routine } from '../routine';
 	import { recordError } from '../error-log';
-	import { editButtonId } from '../routine-card-ids';
+	import { editButtonId, headingId } from '../routine-card-ids';
 	import { duplicateRoutine } from '../routine-duplication';
 	import { moveRoutineDown, moveRoutineUp } from '../routine-order';
 	import { sortRoutines, type RoutineUsage } from '../routine-sort';
@@ -160,19 +160,29 @@
 	/** Whether the list has drag handles: in custom order, while no routine is being edited. */
 	let hasDragHandles = $derived(isInCustomOrder && editing === null);
 
-	/** The `id` of the element that should take the keyboard focus once it's on the page, or `null`. */
-	let idToFocus = $state<string | null>(null);
+	/**
+	 * The `id` of the element that should take the keyboard focus once it's on the page, with the
+	 * `id` of the one that takes it when the first is disabled, or `null` when none is waiting.
+	 */
+	let focusTarget = $state<{ id: string; fallbackId: string } | null>(null);
 
 	// Runs after each change to the page, and again when the routines change, so it finds an
 	// element that only shows once storage reports its routine.
 	$effect(() => {
 		// Read here so the effect runs again when the list changes, not only when the target does.
 		void sorted;
-		const element = idToFocus === null ? null : document.getElementById(idToFocus);
-		if (element !== null) {
-			element.focus();
-			idToFocus = null;
+		if (focusTarget === null) {
+			return;
 		}
+		const element = document.getElementById(focusTarget.id);
+		if (element === null) {
+			return;
+		}
+		// A disabled button can't take the focus, which would then drop to the page's body.
+		const isDisabled = element instanceof HTMLButtonElement && element.disabled;
+		const target = isDisabled ? document.getElementById(focusTarget.fallbackId) : element;
+		target?.focus();
+		focusTarget = null;
 	});
 
 	onMount(() => {
@@ -295,9 +305,21 @@
 	 * only once storage reports it.
 	 *
 	 * @param id - The `id` of the element to focus.
+	 * @param fallbackId - The `id` of the element to focus instead when the first is a disabled
+	 * button, such as the Edit button of a routine that's running.
 	 */
-	function focusOnceShown(id: string): void {
-		idToFocus = id;
+	function focusOnceShown(id: string, fallbackId: string): void {
+		focusTarget = { id, fallbackId };
+	}
+
+	/**
+	 * Moves the keyboard focus to a routine's Edit button, or to its heading when a run of the
+	 * routine has disabled the button.
+	 *
+	 * @param routineId - The routine's id.
+	 */
+	function focusEditButtonOnceShown(routineId: string): void {
+		focusOnceShown(editButtonId(routineId), headingId(routineId));
 	}
 
 	/**
@@ -307,7 +329,11 @@
 	 */
 	function cancelEditing(current: Editing): void {
 		editing = null;
-		focusOnceShown(current.isNew ? NEW_ROUTINE_BUTTON_ID : editButtonId(current.original.id));
+		if (current.isNew) {
+			focusOnceShown(NEW_ROUTINE_BUTTON_ID, NEW_ROUTINE_BUTTON_ID);
+		} else {
+			focusEditButtonOnceShown(current.original.id);
+		}
 	}
 
 	/** Opens a new routine for editing at the top of the list. */
@@ -347,7 +373,7 @@
 			}
 			editing = null;
 			// The routine's card, which a new routine gets as it's saved, is where the user was.
-			focusOnceShown(editButtonId(current.draft.id));
+			focusEditButtonOnceShown(current.draft.id);
 		} catch (error) {
 			reportFailure('Saving the routine', error);
 			// Built from the form as it is now, not as it was when Save was pressed, so a change from
@@ -387,7 +413,11 @@
 		const neighbour = sorted[position + 1] ?? sorted[position - 1];
 		try {
 			await storage.deleteRoutine(routine.id);
-			focusOnceShown(neighbour === undefined ? NEW_ROUTINE_BUTTON_ID : editButtonId(neighbour.id));
+			if (neighbour === undefined) {
+				focusOnceShown(NEW_ROUTINE_BUTTON_ID, NEW_ROUTINE_BUTTON_ID);
+			} else {
+				focusEditButtonOnceShown(neighbour.id);
+			}
 		} catch (error) {
 			reportFailure('Deleting the routine', error);
 			actionFailure = 'The routine could not be deleted. Try again.';

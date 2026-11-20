@@ -763,6 +763,29 @@ describe('the keyboard focus', () => {
 
 		await expect.element(cardOf('Bravo').getByRole('button', { name: 'Edit' })).toHaveFocus();
 	});
+
+	it('goes to the heading of a running neighbour, whose Edit button is disabled', async () => {
+		const [alpha, bravo] = threeRoutines();
+		await openScreen([alpha as Routine, bravo as Routine], {}, [], 'alpha');
+		await cardOf('Bravo').getByRole('button', { name: 'Delete' }).click();
+
+		await page
+			.getByRole('dialog', { name: 'Delete Bravo?' })
+			.getByRole('button', { name: 'Delete' })
+			.click();
+
+		await expect.element(cardOf('Alpha').getByRole('heading', { name: 'Alpha' })).toHaveFocus();
+	});
+
+	it('goes to the heading of the routine whose locked form is cancelled', async () => {
+		const { rerender } = await openScreen();
+		await openForEditing('Bravo');
+		await rerender({ runningRoutineId: 'bravo' });
+
+		await page.getByRole('button', { name: 'Cancel' }).click();
+
+		await expect.element(cardOf('Bravo').getByRole('heading', { name: 'Bravo' })).toHaveFocus();
+	});
 });
 
 describe('deleting a routine', () => {

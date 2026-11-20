@@ -13,7 +13,7 @@
 	import Trash from '@lucide/svelte/icons/trash';
 	import { dragHandle } from 'svelte-dnd-action';
 	import { outOfTabOrder } from '../out-of-tab-order';
-	import { editButtonId } from '../routine-card-ids';
+	import { editButtonId, headingId } from '../routine-card-ids';
 	import type { Routine } from '../routine';
 	import { COMPACT_BUTTON_SHAPE, SECONDARY_BUTTON_COLOURS } from './button-colours';
 
@@ -87,7 +87,14 @@
 			</div>
 		{/if}
 		<div class="min-w-0 flex-1">
-			<h2 class="font-semibold wrap-break-word md:text-lg">{routine.title}</h2>
+			<!-- Focusable from script only, so the screen can put the focus here when Edit is disabled. -->
+			<h2
+				id={headingId(routine.id)}
+				tabindex="-1"
+				class="font-semibold wrap-break-word focus-visible:outline-2 focus-visible:outline-rose-700 md:text-lg dark:focus-visible:outline-rose-400"
+			>
+				{routine.title}
+			</h2>
 			<p class="text-sm text-zinc-600 md:text-base dark:text-zinc-400">
 				{rounds} · {blockCount}
 				{blockCount === 1 ? 'block' : 'blocks'}
