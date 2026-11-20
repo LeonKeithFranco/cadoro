@@ -777,6 +777,45 @@ describe('the keyboard focus', () => {
 		await expect.element(cardOf('Alpha').getByRole('heading', { name: 'Alpha' })).toHaveFocus();
 	});
 
+	it('stays in a new form that was opened before the saved routine showed', async () => {
+		const storage: CadoroStorage = new InMemoryStorage({ now: (): Date => new Date(NOW) });
+		await storage.addRoutinesIfNone(threeRoutines());
+		const reportsNotYetDelivered: (() => void)[] = [];
+		let isHoldingReports = false;
+		const watchRoutines = storage.watchRoutines.bind(storage);
+		vi.spyOn(storage, 'watchRoutines').mockImplementation((onChange, onError) =>
+			watchRoutines((changed) => {
+				if (isHoldingReports) {
+					reportsNotYetDelivered.push(() => onChange(changed));
+				} else {
+					onChange(changed);
+				}
+			}, onError)
+		);
+		render(RoutinesScreen, {
+			storage,
+			settingsSession: new SettingsSession(storage, settingsFrom({})),
+			initialRoutines: threeRoutines(),
+			runningRoutineId: null,
+			newId: numberedIds('new'),
+			now: () => new Date(NOW)
+		});
+		await page.getByRole('button', { name: 'New routine' }).click();
+		await typeTitle('Deep work');
+		isHoldingReports = true;
+		await page.getByRole('button', { name: 'Save' }).click();
+		await expect.poll(async () => (await storage.getRoutines()).length).toBe(4);
+		await page.getByRole('button', { name: 'New routine' }).click();
+
+		isHoldingReports = false;
+		for (const deliver of reportsNotYetDelivered) {
+			deliver();
+		}
+
+		await expect.poll(listedTitles).toContain('Deep work');
+		await expect.element(page.getByRole('textbox', { name: 'Title', exact: true })).toHaveFocus();
+	});
+
 	it('goes to the heading of the routine whose locked form is cancelled', async () => {
 		const { rerender } = await openScreen();
 		await openForEditing('Bravo');

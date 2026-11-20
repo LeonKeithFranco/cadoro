@@ -174,6 +174,11 @@
 		if (focusTarget === null) {
 			return;
 		}
+		// The user has moved on to a form, so taking the focus back would pull them out of it.
+		if (document.activeElement?.closest('form')) {
+			focusTarget = null;
+			return;
+		}
 		const element = document.getElementById(focusTarget.id);
 		if (element === null) {
 			return;
@@ -340,6 +345,7 @@
 	function startNewRoutine(): void {
 		discardingChanges(() => {
 			deletedElsewhere = null;
+			focusTarget = null;
 			const created = newRoutine(now(), newId);
 			editing = { original: created, draft: created, isNew: true };
 		});
@@ -353,6 +359,7 @@
 	function startEditing(routine: Routine): void {
 		discardingChanges(() => {
 			deletedElsewhere = null;
+			focusTarget = null;
 			editing = { original: routine, draft: routine, isNew: false };
 		});
 	}
