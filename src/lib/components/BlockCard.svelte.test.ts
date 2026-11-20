@@ -2,6 +2,8 @@ import { page } from 'vitest/browser';
 import { describe, expect, it } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import type { BlockView, TimerBoxView } from '../block-view';
+// The app's styles, since the bar's size comes from its classes.
+import '../../routes/layout.css';
 import BlockCard from './BlockCard.svelte';
 
 /** A work box counting up, halfway to its target. */
@@ -41,6 +43,17 @@ function focusBlock(changes: Partial<Pick<BlockView, 'cycle' | 'work' | 'break'>
 		break: breakEarnedBox,
 		...changes
 	};
+}
+
+/**
+ * Measures how much of a bar's track its fill covers, from their rendered sizes.
+ *
+ * @param fill - The bar's fill.
+ * @param track - The bar's track, whose inner width the fill is a share of. Its border is left out.
+ * @returns The fill's width as a fraction of the track's inner width, from 0 to 1.
+ */
+function filledShare(fill: Element, track: Element): number {
+	return fill.getBoundingClientRect().width / track.clientWidth;
 }
 
 describe('a block card', () => {
@@ -118,8 +131,10 @@ describe('a block card', () => {
 
 		const workFill = page.getByRole('group', { name: 'Work' }).getByTestId('progress-fill');
 		const breakFill = page.getByRole('group', { name: 'Break' }).getByTestId('progress-fill');
-		await expect.element(workFill).toHaveAttribute('style', 'width: 50%;');
-		await expect.element(breakFill).toHaveAttribute('style', 'width: 60%;');
+		const workTrack = page.getByRole('progressbar', { name: 'Work' });
+		const breakTrack = page.getByRole('progressbar', { name: 'Break' });
+		expect(filledShare(workFill.element(), workTrack.element())).toBeCloseTo(0.5, 2);
+		expect(filledShare(breakFill.element(), breakTrack.element())).toBeCloseTo(0.6, 2);
 	});
 
 	it("gives each box's bar a progressbar role, named by the box, with its value as a percentage", async () => {
