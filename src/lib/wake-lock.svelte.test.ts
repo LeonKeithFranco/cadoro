@@ -8,6 +8,7 @@ import { minutes } from './testing/durations';
 import { foreverRoutine } from './testing/routines';
 import { storageHolding } from './testing/storage';
 import { testSessionOptions } from './testing/timer-session';
+import { afterPendingWork } from './testing/waiting';
 import { TimerSession } from './timer.svelte';
 import {
 	WakeLockKeeper,
@@ -155,18 +156,6 @@ function setUp({ isSupported = true }: { isSupported?: boolean } = {}): Setup {
 		page
 	});
 	return { wakeLock, page, timer, settings, keeper };
-}
-
-/**
- * Waits for every effect and request already started to finish, so a test can check that
- * something didn't happen.
- *
- * @returns A promise that settles after a few of the browser's tasks.
- */
-async function afterPendingWork(): Promise<void> {
-	await new Promise<void>((resolve) => {
-		setTimeout(resolve, 50);
-	});
 }
 
 // Starts each test at the fake clock's 0.
