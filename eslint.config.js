@@ -87,7 +87,17 @@ const PURE_MODULES = [
 	'src/lib/work-totals.ts',
 	'src/lib/backup-*.ts',
 	'src/lib/csv-export.ts',
-	'src/lib/chime-schedule.ts'
+	'src/lib/chime-schedule.ts',
+	'src/lib/run-announcement.ts',
+	'src/lib/time.ts',
+	'src/lib/percent.ts',
+	'src/lib/list-order.ts',
+	'src/lib/screens.ts',
+	'src/lib/theme.ts',
+	'src/lib/export-files.ts',
+	'src/lib/log.ts',
+	'src/lib/defined.ts',
+	'src/lib/plural.ts'
 ];
 
 /**
