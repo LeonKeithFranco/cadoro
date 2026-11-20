@@ -66,6 +66,7 @@
 	import Plus from '@lucide/svelte/icons/plus';
 	import { dragHandleZone, type DndEvent } from 'svelte-dnd-action';
 	import { onMount, untrack } from 'svelte';
+	import { dragZoneOptions } from '../drag-zone';
 	import {
 		newRoutine,
 		canDeleteRoutine,
@@ -568,16 +569,7 @@
 	     open, and the open routine's blocks have the only zone then. -->
 	{#if hasDragHandles}
 		<ul
-			use:dragHandleZone={{
-				items: draggedRoutines ?? sorted,
-				flipDurationMs: 0,
-				dropTargetStyle: {},
-				// Move up and Move down move a routine by keyboard, so the list and its items aren't
-				// Tab stops, which the library makes of them by default. The handles are kept out of
-				// the order in `RoutineCard`.
-				zoneTabIndex: -1,
-				zoneItemTabIndex: -1
-			}}
+			use:dragHandleZone={dragZoneOptions(draggedRoutines ?? sorted)}
 			onconsider={considerRoutines}
 			onfinalize={dropRoutines}
 			aria-label="Routines"
