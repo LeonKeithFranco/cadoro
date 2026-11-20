@@ -244,7 +244,7 @@ Branch `feat/backup-and-log`, 0.10.0. SPEC: Export and import, Activity log, Set
 
 ### Before 9. Test coverage audit
 
-Branch `test/coverage-audit`, from `main` once milestone 8 is merged. It's 0.10.1 if a bug fix changes the app, and otherwise merged without a bump. The user added this step on 2026-11-19.
+Done, on branch `test/coverage-audit`, from `main` once milestone 8 was merged. It found bugs, but they were fixed inside milestone 9's pull request, so it shipped inside 1.0.0 with no version of its own. The user added this step on 2026-11-19.
 
 1. **Install.** `@vitest/coverage-v8` at the installed Vitest's version, one install prompt.
 2. **Coverage report (Sonnet).** A one-off local `--coverage` run across both Vitest projects, with no threshold and nothing in CI or the Taskfile, listing the uncovered lines and branches. It finds gaps; it isn't a goal.
@@ -260,8 +260,9 @@ Branch `docs/release-1-0`, 1.0.0 (`LEVEL=major`).
 2. **Accessibility and polish pass (Sonnet).** Keyboard use of every screen, focus order in dialogs, contrast at the levels ARCHITECTURE states, both themes, phone and desktop.
 3. **README (Sonnet).** Practical: what the app is, installing and using it, the data limitations from the spec, self-hosting, development, tasks, releasing, credits. No build story.
 4. **Self-host check.** Build with no base path, serve the files from a plain static server with a fallback page, and follow only the README.
-5. **Node.** Move `.nvmrc` and `@types/node` from Node 22 to the current LTS in its own commit. If it breaks CI in a way that isn't a quick fix, revert it and leave the item open.
-6. Final summary: every decision taken during the run, and one device checklist covering all milestones.
+5. Final summary: every decision taken during the run, and one device checklist covering all milestones.
+
+The step to move `.nvmrc` and `@types/node` to a newer Node LTS was dropped: Fedora's `nodejs` package is 22 and CI follows `.nvmrc`, so moving would test a Node the machine doesn't run. Node 22 is supported until April 2027, so the item stays open in `docs/PROGRESS.md` until Fedora ships a newer one. Nothing else is left to do before 1.0.
 
 ## Phase 4: Optional
 
