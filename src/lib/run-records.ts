@@ -128,9 +128,12 @@ export function recordPress(press: ButtonPress, newId: () => string): RunRecords
 
 	if (isEnd) {
 		const roundsReached = summarizeRun(after).roundsReached;
+		// The device's clock can move back, as the engine's segments allow for, and a run can't end
+		// before it started.
+		const endedAtMs = Math.max(now, fromUtcTimestamp(record.startedAt));
 		const endedRecord: Run = {
 			...record,
-			endedAt: toUtcTimestamp(now),
+			endedAt: toUtcTimestamp(endedAtMs),
 			outcome: after.outcome,
 			roundsReached
 		};

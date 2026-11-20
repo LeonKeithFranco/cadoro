@@ -1,4 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { createBackup, serializeBackup } from './backup-format';
+import { parseBackup } from './backup-parsing';
+import { requireDefined } from './defined';
+import { DEFAULT_SETTINGS } from './settings';
 import type { Routine } from './routine';
 import { recordPress, workPeriodsOldestFirst, type Run, type RunRecords } from './run-records';
 import { createRun, finish, next, pause, play, type RunState } from './run';
@@ -178,6 +182,43 @@ describe('recordPress', () => {
 				workedMs: minutes(25)
 			})
 		]);
+	});
+
+	it('ends the run no earlier than it started when the clock moved back before Finish', () => {
+		const press = runOf(foreverRoutine);
+		press(play, at('09:00:00.000'));
+
+		const records = press(finish, at('08:59:00.000'));
+
+		expect(records.run).toMatchObject({
+			startedAt: '2026-11-19T09:00:00.000Z',
+			endedAt: '2026-11-19T09:00:00.000Z'
+		});
+		expect(records.workPeriods).toEqual([
+			expect.objectContaining({
+				segments: [{ start: '2026-11-19T09:00:00.000Z', end: '2026-11-19T09:00:00.000Z' }],
+				workedMs: 0
+			})
+		]);
+	});
+
+	it('makes records that a backup of them reads back after the clock moved back before Finish', () => {
+		const press = runOf(foreverRoutine);
+		press(play, at('09:00:00.000'));
+		const records = press(finish, at('08:59:00.000'));
+		const backup = serializeBackup(
+			createBackup(
+				{
+					routines: [foreverRoutine],
+					runs: [requireDefined(records.run ?? undefined, 'the ended run')],
+					workPeriods: records.workPeriods,
+					settings: DEFAULT_SETTINGS
+				},
+				new Date(at('10:00:00.000'))
+			)
+		);
+
+		expect(parseBackup(backup)).toMatchObject({ ok: true });
 	});
 
 	it('records the block and target each work period ran with', () => {
