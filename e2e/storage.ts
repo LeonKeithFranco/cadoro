@@ -5,13 +5,61 @@ import type { Page } from '@playwright/test';
 import type { WorkPeriod } from '../src/lib/run-records';
 import type { Settings } from '../src/lib/settings';
 
+/** What to read from one table of the app's database. */
+type StoreRead =
+	/** Every row of the table, in IndexedDB's order, by key. */
+	| { kind: 'all' }
+	/** How many rows the table holds. */
+	| { kind: 'count' }
+	/** The row saved under one key, or `undefined` when there is none. */
+	| { kind: 'row'; key: string };
+
 /**
- * Reads every work period the app has saved in its IndexedDB database.
+ * Reads from one table of the app's IndexedDB database.
  *
  * @remarks
  * It runs in the page with IndexedDB's own API, since the test can't import the app's storage
  * into the browser. Opening the database without a version reads it as it is, without changing
  * its schema.
+ *
+ * @typeParam Result - What the read gives, which the caller states, since the page can't check
+ * it: an array of rows for `all`, a number for `count` and a row or `undefined` for `row`.
+ * @param page - A page of the app, whose database is read.
+ * @param tableName - The table to read, such as `workPeriods`.
+ * @param read - What to read from the table.
+ * @returns The result of the read.
+ * @throws Rejects with IndexedDB's error when the database or the table can't be read.
+ */
+async function readTable<Result>(page: Page, tableName: string, read: StoreRead): Promise<Result> {
+	return page.evaluate(
+		({ tableName: table, read: operation }) =>
+			new Promise<Result>((resolve, reject) => {
+				const opening = indexedDB.open('cadoro');
+				opening.onerror = (): void =>
+					reject(opening.error ?? new Error('Opening the database failed.'));
+				opening.onsuccess = (): void => {
+					const database = opening.result;
+					const store = database.transaction(table).objectStore(table);
+					const reading =
+						operation.kind === 'all'
+							? store.getAll()
+							: operation.kind === 'count'
+								? store.count()
+								: store.get(operation.key);
+					reading.onerror = (): void =>
+						reject(reading.error ?? new Error(`Reading the ${table} table failed.`));
+					reading.onsuccess = (): void => {
+						database.close();
+						resolve(reading.result as Result);
+					};
+				};
+			}),
+		{ tableName, read }
+	);
+}
+
+/**
+ * Reads every work period the app has saved in its IndexedDB database.
  *
  * @param page - A page of the app, whose database is read.
  * @returns The saved work periods, in IndexedDB's order, by id.
@@ -19,24 +67,7 @@ import type { Settings } from '../src/lib/settings';
  * read.
  */
 export async function savedWorkPeriods(page: Page): Promise<WorkPeriod[]> {
-	return page.evaluate(
-		() =>
-			new Promise<WorkPeriod[]>((resolve, reject) => {
-				const opening = indexedDB.open('cadoro');
-				opening.onerror = (): void =>
-					reject(opening.error ?? new Error('Opening the database failed.'));
-				opening.onsuccess = (): void => {
-					const database = opening.result;
-					const reading = database.transaction('workPeriods').objectStore('workPeriods').getAll();
-					reading.onerror = (): void =>
-						reject(reading.error ?? new Error('Reading the work periods failed.'));
-					reading.onsuccess = (): void => {
-						database.close();
-						resolve(reading.result);
-					};
-				};
-			})
-	);
+	return readTable<WorkPeriod[]>(page, 'workPeriods', { kind: 'all' });
 }
 
 /**
@@ -52,27 +83,8 @@ export async function savedWorkPeriods(page: Page): Promise<WorkPeriod[]> {
  * read.
  */
 export async function hasSavedRunInProgress(page: Page): Promise<boolean> {
-	return page.evaluate(
-		() =>
-			new Promise<boolean>((resolve, reject) => {
-				const opening = indexedDB.open('cadoro');
-				opening.onerror = (): void =>
-					reject(opening.error ?? new Error('Opening the database failed.'));
-				opening.onsuccess = (): void => {
-					const database = opening.result;
-					const counting = database
-						.transaction('runInProgress')
-						.objectStore('runInProgress')
-						.count();
-					counting.onerror = (): void =>
-						reject(counting.error ?? new Error('Reading the run in progress failed.'));
-					counting.onsuccess = (): void => {
-						database.close();
-						resolve(counting.result > 0);
-					};
-				};
-			})
-	);
+	const savedRuns = await readTable<number>(page, 'runInProgress', { kind: 'count' });
+	return savedRuns > 0;
 }
 
 /**
@@ -89,24 +101,10 @@ export async function hasSavedRunInProgress(page: Page): Promise<boolean> {
  * read.
  */
 export async function savedSettingsRow(page: Page): Promise<Partial<Settings> | undefined> {
-	return page.evaluate(
-		() =>
-			new Promise<Partial<Settings> | undefined>((resolve, reject) => {
-				const opening = indexedDB.open('cadoro');
-				opening.onerror = (): void =>
-					reject(opening.error ?? new Error('Opening the database failed.'));
-				opening.onsuccess = (): void => {
-					const database = opening.result;
-					const reading = database.transaction('settings').objectStore('settings').get('current');
-					reading.onerror = (): void =>
-						reject(reading.error ?? new Error('Reading the settings failed.'));
-					reading.onsuccess = (): void => {
-						database.close();
-						resolve(reading.result as Partial<Settings> | undefined);
-					};
-				};
-			})
-	);
+	return readTable<Partial<Settings> | undefined>(page, 'settings', {
+		kind: 'row',
+		key: 'current'
+	});
 }
 
 /**
