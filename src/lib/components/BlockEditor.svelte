@@ -3,7 +3,8 @@
   The form for one block of a routine being edited: its title, work target, break percentage and
   cycles, with its drag handle, Move up, Move down, Duplicate and Delete. It sits inside a
   drag-handle zone, which the routine form provides. A routine with one block can't change its
-  cycles, which stay 1, because its rounds repeat the block.
+  cycles, which stay 1, because its rounds repeat the block. While the target and the break
+  percentage are both valid, a hint under the break field previews the break earned at the target.
 -->
 <script lang="ts">
 	import ArrowDown from '@lucide/svelte/icons/arrow-down';
@@ -14,6 +15,7 @@
 	import { dragHandle } from 'svelte-dnd-action';
 	import { outOfTabOrder } from '../out-of-tab-order';
 	import type { Block } from '../routine';
+	import { describeBreakAtTarget } from '../routine-break-preview';
 	import type { BlockProblems } from '../routine-validation';
 	import { COMPACT_BUTTON_SHAPE, SECONDARY_BUTTON_COLOURS } from './button-colours';
 	import FormField from './FormField.svelte';
@@ -63,6 +65,11 @@
 		onmoveup,
 		onmovedown
 	}: Props = $props();
+
+	/** Whether the target and the break percentage are both valid, so the break can be previewed. */
+	let showsPreview = $derived(
+		problems.targetMinutes === undefined && problems.breakPercent === undefined
+	);
 </script>
 
 <fieldset class="rounded-lg border border-zinc-500 p-3 dark:border-zinc-500">
@@ -90,6 +97,7 @@
 			type="number"
 			value={block.breakPercent}
 			problem={problems.breakPercent}
+			hint={showsPreview ? describeBreakAtTarget(block) : undefined}
 			oninput={(input: HTMLInputElement): void =>
 				onchange({ ...block, breakPercent: input.valueAsNumber })}
 		/>
