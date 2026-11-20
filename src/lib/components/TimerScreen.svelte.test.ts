@@ -467,6 +467,39 @@ describe('running a routine from the Timer screen', () => {
 	});
 });
 
+describe('the Timer screen’s live region', () => {
+	it('is a polite status region, empty until something is worth announcing', async () => {
+		render(TimerScreen, { session: createSession() });
+
+		const status = page.getByRole('status');
+		await expect.element(status).toHaveAttribute('aria-live', 'polite');
+		expect(status.element().textContent).toBe('');
+		await page.getByRole('button', { name: 'Play' }).click();
+		elapse(minutes(3));
+		await expect.element(page.getByRole('group', { name: 'Work' })).toHaveTextContent('3:00');
+		expect(status.element().textContent).toBe('');
+	});
+
+	it('announces overtime, the break starting, the break being over and the run ending', async () => {
+		render(TimerScreen, { session: createSession() });
+		const status = page.getByRole('status');
+		await page.getByRole('button', { name: 'Play' }).click();
+
+		elapse(minutes(25));
+		await expect.element(status).toHaveTextContent('Overtime');
+
+		await page.getByRole('button', { name: 'Next' }).click();
+		await expect.element(status).toHaveTextContent('Break started');
+
+		elapse(minutes(5));
+		await expect.element(status).toHaveTextContent('Break over');
+
+		await page.getByRole('button', { name: 'Play' }).click();
+		await finishRun();
+		await expect.element(status).toHaveTextContent('Run ended');
+	});
+});
+
 describe('saving the run as the page goes away', () => {
 	it('saves a heartbeat as the page is hidden, so a restored run counts the work until then', async () => {
 		const storage = storageHolding(STARTER_ROUTINES);
