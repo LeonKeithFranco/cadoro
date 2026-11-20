@@ -779,6 +779,35 @@ describe.each(backends)('$name', ({ create }) => {
 			expect(await storage.getRuns()).toEqual([endedRun]);
 		});
 
+		it('refuses a new run whose routine isn’t saved, as after an import in another tab, and saves nothing', async () => {
+			const storage = create();
+			await storage.addRoutinesIfNone([routineWith({ id: 'imported' })]);
+
+			await expect(
+				storage.saveRunInProgress(savedRunInProgress, null, {
+					run: runWith({ routineId: 'replaced' }),
+					workPeriods: []
+				})
+			).rejects.toThrow('routine "replaced"');
+
+			expect(await storage.getRuns()).toEqual([]);
+			expect(await storage.getRunInProgress()).toBeNull();
+		});
+
+		it('accepts a new run of a routine that is deleted, since the backup still holds it', async () => {
+			const storage = create();
+			await storage.addRoutinesIfNone([
+				routineWith({ id: 'one-round', deletedAt: '2026-11-18T09:00:00.000Z' })
+			]);
+
+			const isSaved = await storage.saveRunInProgress(savedRunInProgress, null, {
+				run: runInProgress,
+				workPeriods: []
+			});
+
+			expect(isSaved).toBe(true);
+		});
+
 		it('adds work periods and leaves the run as it was when the run is null', async () => {
 			const storage = create();
 			await storage.saveRunInProgress(savedRunInProgress, null, {
@@ -1409,9 +1438,11 @@ describe.each(backends)('$name', ({ create }) => {
 			const storage = await storageWithAbc(create);
 			await storage.deleteRoutine('c');
 			await storage.saveSettings({ volume: 30 });
+			const runOfA = runWith({ routineId: 'a' });
+			const periodOfA = workPeriodWith({ routineId: 'a' });
 			await storage.saveRunInProgress(savedRunInProgress, null, {
-				run: runInProgress,
-				workPeriods: [firstWorkPeriod]
+				run: runOfA,
+				workPeriods: [periodOfA]
 			});
 
 			const data = await storage.readBackupData();
@@ -1419,8 +1450,8 @@ describe.each(backends)('$name', ({ create }) => {
 			expect(data.routines.map((routine) => `${routine.id}:${routine.deletedAt !== null}`)).toEqual(
 				['a:false', 'b:false', 'c:true']
 			);
-			expect(data.runs).toEqual([runInProgress]);
-			expect(data.workPeriods).toEqual([firstWorkPeriod]);
+			expect(data.runs).toEqual([runOfA]);
+			expect(data.workPeriods).toEqual([periodOfA]);
 			expect(data.settings).toEqual({ ...DEFAULT_SETTINGS, volume: 30 });
 		});
 
