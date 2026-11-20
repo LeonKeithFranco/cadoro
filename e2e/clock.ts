@@ -17,6 +17,14 @@ const PAUSE_AFTER_LOADING_MS = minutes(1);
 const NAVIGATION_WAIT_MS = 100;
 
 /**
+ * How long the paused clock runs to let the app notice a change saved to storage, in
+ * milliseconds. Dexie's live query waits on a timer before telling the app about a change, and
+ * the fake clock holds every timer back until it moves. It's under a second, so a run counting
+ * meanwhile shows no difference.
+ */
+const SETTLE_MS = 100;
+
+/**
  * Opens a page of the app on a fake clock, then stops the clock, so time only passes when the
  * test moves it on with `page.clock.fastForward()`.
  *
@@ -33,6 +41,19 @@ export async function openOnPausedClock(page: Page, path: string): Promise<void>
 	await page.clock.install({ time: LOADING_TIME_MS });
 	await page.goto(path);
 	await page.clock.pauseAt(LOADING_TIME_MS + PAUSE_AFTER_LOADING_MS);
+}
+
+/**
+ * Lets every tab of the browser context notice a change that was saved to storage, while the
+ * clock is paused.
+ *
+ * @remarks
+ * All the pages of a context share one fake clock, so running it once moves every tab.
+ *
+ * @param page - Any page of the context.
+ */
+export async function settle(page: Page): Promise<void> {
+	await page.clock.runFor(SETTLE_MS);
 }
 
 /**
