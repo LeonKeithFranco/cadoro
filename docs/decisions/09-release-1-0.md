@@ -101,3 +101,33 @@ Nothing here blocks the release. They need a real device, so they're listed rath
 ### Release
 
 - Released as a minor version, 1.1.0, since it adds a visible feature.
+
+## After 1.0: the banked break (`feat/banked-break`), 2026-11-20
+
+### Why
+
+- The user decided it after using the app. It replaces the old rule that Next during a break ends it early and loses the unused break, in [the spec and plan](00-spec-and-plan.md). Banking it was an open item, to revisit after using the app.
+
+### The rules
+
+- Next during a break, running, paused or just started, banks the time left, rounded up to whole seconds, exactly as the break timer showed it. A break that's already over banks 0.
+- The next break is the break earned plus the bank. Next part-way through it banks what's left again.
+- A break that reaches 0:00 has used up the bank. Time spent before Play after that is free and never counts against the bank.
+- The bank lasts the whole run, across cycles, blocks and rounds, and ends with the run, by Finish or when a finite routine's last work period ends. That last period has no break, so its bank is lost.
+- There's no cap.
+- The run summary and stats are unchanged, and breaks still aren't recorded.
+- Rejected: a button to take the bank when you choose, which is more to build and learn; adding the bank only after the earned break reaches 0:00; a bank kept per block, or one carried across runs; a late Play taking time from the bank, or allowing a debt; a cap; and an "Unused break" line in the run summary.
+
+### The display
+
+- The "Break earned" box shows one combined number, with no label for the bank. During work it shows the bank plus the break earned so far, so with 3:00 banked it reads 3:00 at the start, and 8:00 at a 25-minute target at 20%. During a break it counts down from the combined total, and its bar shows the time left out of that total.
+- Rejected: showing the bank separately, either as "5:00 + 3:00 banked" or as a line by the position label. The user chose the simplest display.
+
+### Rounding and storage
+
+- The bank is rounded up to whole seconds, so it's what the countdown showed and every break stays whole seconds. A bank kept to the millisecond would show one second less during work, since `formatElapsed` rounds down, than at the start of the break, since `formatRemaining` rounds up. The rounding is `roundUpToWholeSecondsMs` in `time.ts`, which `formatRemaining` uses too.
+- `BreakRun.earnedMs` kept its name and now holds the combined break, so stored break rows needed no migration. Only a stored working run gained `bankedMs`, which Dexie schema version 5's upgrade sets to 0.
+
+### Release
+
+- Released as 1.2.0, a minor version, since it's a behaviour change.
