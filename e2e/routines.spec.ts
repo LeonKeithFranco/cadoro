@@ -172,6 +172,56 @@ test('a routine is created, edited, reordered and deleted, and the changes are k
 	});
 });
 
+test('tabbing through the routines never leaves a control under the fixed tab bar', async ({
+	page
+}) => {
+	await page.goto('/routines');
+	await expect(routineList(page).getByRole('heading', { level: 2 })).toHaveCount(2);
+	// Short enough that the cards run under the tab bar and the page has to scroll. Only the
+	// phone's layout fixes the bar, so on the desktop's the check passes without finding one.
+	const viewport = page.viewportSize();
+	if (viewport === null) {
+		throw new Error('Expected the page to have a viewport.');
+	}
+	await page.setViewportSize({ width: viewport.width, height: 420 });
+
+	const controlCount = await page.locator('main button:not(:disabled)').count();
+	await test.step('each control Tab reaches is fully above the tab bar, even one that began half under it', async () => {
+		for (let index = 1; index < controlCount; index++) {
+			// Scrolls the page so the next control sits just inside the tab bar's strip, with the
+			// control before it focused, so Tab moves on to a control the browser already counts as
+			// on screen.
+			await page.evaluate((nextIndex) => {
+				const controls = [...document.querySelectorAll<HTMLElement>('main button:not(:disabled)')];
+				const bar = document.querySelector('nav');
+				const next = controls[nextIndex];
+				if (bar === null || next === undefined) {
+					return;
+				}
+				controls[nextIndex - 1]?.focus({ preventScroll: true });
+				const stripMiddle =
+					bar.getBoundingClientRect().top + bar.getBoundingClientRect().height / 2;
+				window.scrollBy(0, next.getBoundingClientRect().bottom - stripMiddle);
+			}, index);
+
+			await page.keyboard.press('Tab');
+
+			const isUnderTabBar = await page.evaluate(() => {
+				const bar = document.querySelector('nav');
+				const focused = document.activeElement;
+				if (bar === null || focused === null || bar.contains(focused)) {
+					return false;
+				}
+				if (getComputedStyle(bar).position !== 'fixed') {
+					return false;
+				}
+				return focused.getBoundingClientRect().bottom > bar.getBoundingClientRect().top;
+			});
+			expect(isUnderTabBar, `Control ${index + 1} of ${controlCount}`).toBe(false);
+		}
+	});
+});
+
 test('dragging a routine’s handle with the mouse moves it, and the order is kept', async ({
 	page
 }) => {
