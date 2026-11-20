@@ -15,7 +15,7 @@
 </script>
 
 <script lang="ts">
-	import { onDestroy } from 'svelte';
+	import { onDestroy, tick } from 'svelte';
 	import { viewBlock } from '../block-view';
 	import { announcementFor } from '../run-announcement';
 	import { sortRoutines, type RoutineSort, type RoutineUsage } from '../routine-sort';
@@ -102,6 +102,22 @@
 		isConfirmingFinish = false;
 	}
 
+	/** The Play and Pause button, which the focus returns to once the summary closes. */
+	let playButton: HTMLButtonElement | undefined = $state();
+
+	/**
+	 * Closes the run's summary by readying a new run, and puts the focus on Play.
+	 *
+	 * @remarks
+	 * The summary's dialog is removed as the run is readied, and the button that was focused
+	 * before it, Finish, is off for a ready run, so the focus would otherwise fall to the page's
+	 * body. Play is what the user presses next.
+	 */
+	function closeSummary(): void {
+		session.readyNewRun();
+		void tick().then(() => playButton?.focus());
+	}
+
 	/** Presses Play or Pause, whichever the button shows. */
 	function playOrPause(): void {
 		if (isRunning) {
@@ -170,6 +186,7 @@
 		class="sticky bottom-14 z-[5] -mx-4 bg-white px-4 pt-3 pb-6 md:bottom-0 md:pb-3 dark:bg-zinc-950"
 	>
 		<TimerControls
+			bind:playButton
 			{isRunning}
 			isInProgress={session.view.isInProgress}
 			onplaypause={playOrPause}
@@ -198,6 +215,6 @@
 	<RunSummary
 		routineTitle={session.routine.title}
 		summary={session.view.summary}
-		ondone={(): void => session.readyNewRun()}
+		ondone={closeSummary}
 	/>
 {/if}

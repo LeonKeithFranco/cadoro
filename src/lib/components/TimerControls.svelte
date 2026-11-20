@@ -22,9 +22,18 @@
 		onnext: () => void;
 		/** Called when the user presses Finish. */
 		onfinish: () => void;
+		/** The Play and Pause button once it's on the page, for a parent that moves the focus to it. */
+		playButton?: HTMLButtonElement | undefined;
 	};
 
-	let { isRunning, isInProgress, onplaypause, onnext, onfinish }: Props = $props();
+	let {
+		isRunning,
+		isInProgress,
+		onplaypause,
+		onnext,
+		onfinish,
+		playButton = $bindable()
+	}: Props = $props();
 </script>
 
 <!-- The `*:` classes style every button alike. Disabled buttons fade and show a not-allowed
@@ -33,7 +42,7 @@
 	class="grid grid-cols-3 gap-3 *:flex *:items-center *:justify-center *:gap-2 *:rounded-lg *:py-3 *:font-medium *:disabled:cursor-not-allowed *:disabled:opacity-60 md:*:text-lg"
 >
 	<!-- Play is the main button, and Next and Finish are outlined beside it. -->
-	<button type="button" onclick={onplaypause} class={PRIMARY_BUTTON_COLOURS}>
+	<button bind:this={playButton} type="button" onclick={onplaypause} class={PRIMARY_BUTTON_COLOURS}>
 		{#if isRunning}
 			<Pause class="size-5" />
 			Pause

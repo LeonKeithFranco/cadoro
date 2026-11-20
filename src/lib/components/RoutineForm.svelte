@@ -9,6 +9,7 @@
 <script lang="ts">
 	import Plus from '@lucide/svelte/icons/plus';
 	import { dragHandleZone, type DndEvent } from 'svelte-dnd-action';
+	import { onMount } from 'svelte';
 	import {
 		addBlock,
 		canAddBlock,
@@ -55,6 +56,13 @@
 	let { draft, newId, saveError, lockedReason, onchange, onsave, oncancel }: Props = $props();
 
 	let problems = $derived(validateRoutine(draft));
+
+	/** The Title field's input, which takes the keyboard focus as the form opens. */
+	let titleInput: HTMLInputElement | undefined = $state();
+
+	// Opening the form replaces the card or the button that had the focus, which would leave it on
+	// the page's body, so it moves to the first field, where the user starts.
+	onMount(() => titleInput?.focus());
 
 	/**
 	 * The blocks while one is being dragged, in the order the drag has them so far, or `null` the
@@ -115,6 +123,7 @@
 >
 	<div class="grid gap-3 md:grid-cols-2">
 		<FormField
+			bind:input={titleInput}
 			label="Title"
 			type="text"
 			value={draft.title}
