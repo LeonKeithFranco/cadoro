@@ -7,7 +7,6 @@ import {
 	deleteBlock,
 	duplicateBlock,
 	moveBlockDown,
-	moveBlockToIndex,
 	moveBlockUp,
 	resetSingleBlockCycles
 } from './routine-blocks';
@@ -214,14 +213,6 @@ describe('deleteBlock', () => {
 });
 
 describe('moving blocks', () => {
-	it('moves a block to an index', () => {
-		expect(blockIds(moveBlockToIndex(routineOfBlocks('a', 'b', 'c'), 'a', 2))).toEqual([
-			'b',
-			'c',
-			'a'
-		]);
-	});
-
 	it('moves a block up and keeps the first block first', () => {
 		const routine = routineOfBlocks('a', 'b', 'c');
 
@@ -240,7 +231,6 @@ describe('moving blocks', () => {
 		const routine = routineOfBlocks('a', 'b');
 
 		expect(moveBlockDown(routine, 'a')).toMatchObject({ id: routine.id, rounds: 3 });
-		expect(() => moveBlockToIndex(routine, 'missing', 0)).toThrow('missing');
 		expect(() => moveBlockUp(routine, 'missing')).toThrow('missing');
 		expect(() => moveBlockDown(routine, 'missing')).toThrow('missing');
 	});
