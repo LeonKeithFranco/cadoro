@@ -144,7 +144,8 @@ They can be edited and deleted like any other routine, and aren't created again 
 - **Pause** stops the work or break timer. Paused time doesn't count as work, and a paused break keeps its remaining time.
 - **Finish** asks for confirmation, then ends the run. The run keeps counting while it asks, so the current work period, if any, is saved up to the moment Finish is confirmed. Cancel or Escape leaves the run as it was. This is how an infinite routine ends, and how a finite one ends early.
 - Before a run starts, Next and Finish are disabled.
-- A routine can't be edited or deleted while it's running, or while its ended run's summary is still open, and the routine picker is locked until the run ends. The run is shared between tabs, so this holds in every tab. On the Routines screen its Edit and Delete are disabled, with a hint. A routine already open for editing when its run starts can't be saved until the run ends, and a delete confirmed after that is ignored.
+- A routine can't be edited or deleted while it's running, or while its ended run's summary is still open, and the routine picker is locked until the run ends. The run is shared between tabs, so this holds in every tab. On the Routines screen its Edit and Delete are disabled, with a hint. A routine already open for editing when its run starts can't be saved until the run ends, and a delete confirmed after that is ignored. Storage enforces it too: saving or deleting the routine of the run in progress, which an ended run's summary keeps until Done, is refused, whatever screen or tab asks.
+- A run can't start on a routine that isn't saved, as when another tab imported a backup that replaced the routines before this tab heard of it. Storage refuses the new run, and the failure is logged, since a run of an unknown routine would make every later backup fail. Storage with no routines at all is never refused.
 
 ### The timer screen
 
@@ -188,6 +189,7 @@ Done or Escape closes the dialog and returns the routine to its starting state, 
 - The app has four openly licensed (CC0) chimes, all normalised to the same loudness, and both alerts play the first by default. Settings has one picker for each alert, a Preview button for each, and one volume slider, saved when the slider is released.
 - Each chime's source and licence are recorded in the repo.
 - Chimes are scheduled ahead, on the audio clock, so they play on time in a background tab on desktop. They're kept offline with the app.
+- Besides the audio clock, a timer of the chimes' own checks once a second, on every screen, that the scheduled chime is still in place, so a tab away from the Timer screen that was asleep places it again or drops it. It never counts time.
 - A chime is due only while its moment is still ahead. Reaching a target after a reload, or a break that was already over, never plays one late, and a break that earned 0 seconds is silent. Pause, Next, Finish and another tab's change move or cancel the scheduled chime, and a chime already playing finishes.
 - Browsers allow sound only after a gesture, so nothing sounds until a button has been pressed in the tab. Every button press counts, not only Play.
 - With the app open in several tabs, only one tab sounds each chime, and the next tab takes over when it closes. Where the browser can't take turns, every tab that has had a button pressed sounds it.
@@ -212,6 +214,7 @@ Done or Escape closes the dialog and returns the routine to its starting state, 
 - **New routine:** a "+ New routine" button adds a new routine at the top of the list, already open for editing, with a blank title that must be filled in, infinite rounds, and one block titled "Focus" of 25 minutes at 20% for 1 cycle. Cancel removes it.
 - **Duplicate:** makes a copy named "<title> (copy)" with the same rounds and blocks, placed just below the original in custom order. A title too long to fit 50 characters with the suffix is cut, so the copy's title is still valid. Its stats start empty.
 - **Delete:** asks for confirmation. A deleted routine's work stays in the stats, labelled as deleted. Delete is disabled on the only remaining routine, with a hint saying why, so there is always one to run.
+- A failed Duplicate, Delete or Move shows a short message above the list, as a failed Save does in its form, and the failure is logged. A failed Move puts the routines back in their saved order. The message clears on the next Duplicate, Delete or Move.
 
 ### Editing a routine
 
@@ -255,6 +258,7 @@ All stats come from saved work periods and runs.
 - With the routine filter on one routine, every figure and list narrows to it. The screen's empty state, a line pointing to the Timer, replaces everything only when no work at all is saved, so a routine with no work shows zeros and lists that say "No work yet." instead.
 - The chart's text alternative is a visually hidden table named "Work time per day", with a row for each day of the range, named with its year, such as "Nov 19, 2026", so a range over several years has no repeats. The bars themselves are hidden from assistive technology.
 - The work period in progress counts as work done: in Today, the chart, the weekly, monthly and all-time totals and the streaks, up to the moment the run was paused, or up to now while it counts. It is left out of time against target and targets reached until it ends, since it has no final time to compare. A run on a break has none, since its work period is saved already. The screen follows the saved run, so it shows a run that another tab starts, pauses or ends, along with the work periods that tab saves, and moves on every second while a work period counts.
+- When the saved run changes, the screen reads the work periods and routines again, and keeps showing what it has until that read arrives. Reads are numbered, and only the latest shows, so a slow older read finishing late never replaces a newer one. If a read fails, the failure is logged and the screen keeps both the work periods and the run it shows, until a later read succeeds, so a period that just ended never drops out of the figures.
 - Today moves on at local midnight and when the page becomes visible again, so a screen left open overnight shows the new day.
 - A day is the period from one local midnight to the next. Where the clocks change at midnight, so that the change day has no midnight and starts at 01:00, the next day still starts at its own midnight.
 
@@ -276,6 +280,7 @@ All stats come from saved work periods and runs.
   - it isn't JSON, or isn't a Cadoro backup (`app` isn't `"cadoro"`), or has a `formatVersion` the app doesn't know;
   - a field is missing or of the wrong type, or breaks a limit of the data model, so every routine must pass the same checks the Routines screen makes;
   - a timestamp isn't an exact UTC ISO string;
+  - a run names a routine the file lacks, in which case the reason names the run by its id and start;
   - a work period's `workedMs` isn't the sum of its segments, a segment or run ends before it starts, or its routine isn't its run's routine;
   - the `lastRoutineId` setting names no routine; or
   - two routines, two runs or two work periods share an id.
@@ -308,6 +313,7 @@ type LogEntry = {
 
 - **Changes:** every routine created, edited, duplicated, reordered and deleted, and every import, is recorded at the storage interface, so no feature can skip it. Edits include the old and new values, and a reorder that changes nothing isn't logged. Runs and work periods aren't logged, because the stats already hold them.
 - **Errors:** uncaught errors are recorded by a global handler and an error boundary, and so are the errors SvelteKit catches while loading or navigating (but not a 404). So is every failed save, read or request the app handles itself, such as a failed save of the run, the settings or a routine, or a failed request for persistent storage. An entry's `message` says what failed, and its `details` hold the error's `name`, `message`, `stack` and, when it has one, `cause`, or, for something thrown that isn't an `Error`, its text as `value`. Recording an error never throws. If the log can't take the entry, it goes to the console instead.
+  - **Repeats:** an error with the same message, error name and error message as the newest entry, within a minute of that entry's last repeat, isn't added as an entry. The newest entry gains `details.count`, how many times it happened, and `details.lastTimestamp`, when it last did, and keeps its own timestamp as the first. So an error that repeats, such as an `error` event firing in a loop, stays one entry and can't push the routine history out of the 5,000. Only an error directly after the same error collapses, and changes never do.
 - When a screen throws while rendering, a message with a Try again button replaces it, and the error is recorded.
 - Entries are stored in IndexedDB, and only the newest 5,000 are kept.
 - A page within Settings, reached from its Data card, lists entries, newest first, and can export them as a JSON file. It reads the log once when it opens and doesn't update while it's open, so an entry written meanwhile shows when the page is opened again.
