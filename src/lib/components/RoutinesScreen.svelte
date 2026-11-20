@@ -82,6 +82,7 @@
 	import type { CadoroStorage } from '../storage/storage';
 	import { COMPACT_BUTTON_SHAPE, PRIMARY_BUTTON_COLOURS } from './button-classes';
 	import ConfirmDialog from './ConfirmDialog.svelte';
+	import { ERROR_TEXT, INPUT_COLOURS, LABEL_TEXT } from './form-classes';
 	import RoutineCard from './RoutineCard.svelte';
 	import RoutineForm from './RoutineForm.svelte';
 	import ScreenHeading from './ScreenHeading.svelte';
@@ -482,11 +483,8 @@
 
 <div class="mt-4 flex flex-wrap items-end justify-between gap-3">
 	<label class="block">
-		<span class="text-sm font-medium text-zinc-700 dark:text-zinc-300">Sort by</span>
-		<select
-			bind:value={(): string => sort, chooseSort}
-			class="mt-1 block rounded-md border-zinc-500 bg-white text-zinc-900 dark:border-zinc-500 dark:bg-zinc-900 dark:text-zinc-100"
-		>
+		<span class={LABEL_TEXT}>Sort by</span>
+		<select bind:value={(): string => sort, chooseSort} class={['mt-1 block', INPUT_COLOURS]}>
 			{#each ROUTINE_SORTS as routineSort (routineSort)}
 				<option value={routineSort}>{SORT_LABELS[routineSort]}</option>
 			{/each}
@@ -559,7 +557,7 @@
 	{/if}
 
 	{#if actionFailure !== null}
-		<p role="alert" class="text-sm text-rose-700 dark:text-rose-400">{actionFailure}</p>
+		<p role="alert" class={['text-sm', ERROR_TEXT]}>{actionFailure}</p>
 	{/if}
 
 	{#if editing?.isNew}

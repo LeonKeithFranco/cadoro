@@ -4,6 +4,7 @@
 -->
 <script lang="ts">
 	import type { Routine } from '../routine';
+	import { INPUT_COLOURS, LABEL_TEXT } from './form-classes';
 
 	/** The props the routine picker takes. */
 	type Props = {
@@ -21,13 +22,13 @@
 </script>
 
 <label class="block">
-	<span class="text-sm font-medium text-zinc-700 dark:text-zinc-300">Routine</span>
+	<span class={LABEL_TEXT}>Routine</span>
 	<!-- The binding reads the chosen id from the prop, and reports the user's choice to the
 	     parent, which owns it, rather than changing the prop here. -->
 	<select
 		bind:value={(): string => selectedId, onselect}
 		{disabled}
-		class="mt-1 block w-full rounded-md border-zinc-500 bg-white text-zinc-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-500 dark:bg-zinc-900 dark:text-zinc-100"
+		class={['mt-1 block w-full disabled:cursor-not-allowed disabled:opacity-60', INPUT_COLOURS]}
 	>
 		{#each routines as routine (routine.id)}
 			<option value={routine.id}>{routine.title}</option>

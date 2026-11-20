@@ -32,6 +32,7 @@
 	} from './button-classes';
 	import ConfirmDialog from './ConfirmDialog.svelte';
 	import FormField from './FormField.svelte';
+	import { ERROR_TEXT } from './form-classes';
 
 	/** The props the routine form takes. */
 	type Props = {
@@ -202,7 +203,7 @@
 			{/each}
 		</div>
 		{#if problems.blocks !== undefined}
-			<p class="text-sm text-rose-700 dark:text-rose-400">{problems.blocks}</p>
+			<p class={['text-sm', ERROR_TEXT]}>{problems.blocks}</p>
 		{/if}
 		<div>
 			<button
@@ -223,10 +224,10 @@
 	</div>
 
 	{#if lockedReason !== undefined}
-		<p class="text-sm text-rose-700 dark:text-rose-400">{lockedReason}</p>
+		<p class={['text-sm', ERROR_TEXT]}>{lockedReason}</p>
 	{/if}
 	{#if saveError !== undefined}
-		<p role="alert" class="text-sm text-rose-700 dark:text-rose-400">{saveError}</p>
+		<p role="alert" class={['text-sm', ERROR_TEXT]}>{saveError}</p>
 	{/if}
 
 	<div class={DIALOG_ACTIONS}>
