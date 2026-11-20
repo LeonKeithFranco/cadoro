@@ -24,8 +24,7 @@ async function loadStats(storage: InMemoryStorage): Promise<{
 
 describe('the Stats page load', () => {
 	it('returns a deleted routine with the work saved for it', async () => {
-		const storage = new InMemoryStorage();
-		await storage.addRoutinesIfNone([
+		const storage = storageHolding([
 			routineWith({ id: 'focus', title: 'Focus' }),
 			routineWith({ id: 'old', title: 'Old routine' })
 		]);
