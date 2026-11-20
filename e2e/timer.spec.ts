@@ -47,3 +47,41 @@ test('a run pauses when the user leaves the Timer screen, so the time away is no
 		await expect(picker).toBeEnabled();
 	});
 });
+
+test('the pinned controls stay above the phone’s tab bar, at the top of a long routine and scrolled down', async ({
+	page
+}) => {
+	// A routine of twelve blocks, so its cards fill several screens and the controls are pinned.
+	await page.goto('/routines');
+	await page.getByRole('button', { name: 'New routine' }).click();
+	await page.getByRole('textbox', { name: 'Title', exact: true }).fill('Long routine');
+	for (let added = 1; added < 12; added++) {
+		await page.getByRole('button', { name: 'Add block' }).click();
+	}
+	await page.getByRole('button', { name: 'Save' }).click();
+	await page.goto('/');
+	await page.getByRole('combobox', { name: 'Routine' }).selectOption({ label: 'Long routine' });
+	const tabBar = page.getByRole('navigation', { name: 'Screens' });
+	const finish = page.getByRole('button', { name: 'Finish' });
+	await expect(tabBar).toBeVisible();
+	expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeGreaterThan(
+		(page.viewportSize()?.height ?? 0) * 2
+	);
+
+	for (const scrolled of [false, true]) {
+		await page.evaluate((toBottom) => {
+			window.scrollTo(0, toBottom ? document.documentElement.scrollHeight : 0);
+		}, scrolled);
+
+		const controls = await finish.boundingBox();
+		const bar = await tabBar.boundingBox();
+		if (controls === null || bar === null) {
+			throw new Error('Expected the controls and the tab bar on the page.');
+		}
+		// The tab bar is at the bottom on a phone and in the header from `md`, where the controls
+		// only have to stay inside the window.
+		const isTabBarAtBottom = bar.y > controls.y;
+		const floor = isTabBarAtBottom ? bar.y : (page.viewportSize()?.height ?? 0);
+		expect(controls.y + controls.height).toBeLessThanOrEqual(floor);
+	}
+});
