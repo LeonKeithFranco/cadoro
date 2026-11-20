@@ -2,6 +2,7 @@
 
 import type { Backup } from './backup-format';
 import { localDayText } from './day-slices';
+import { counted } from './plural';
 import { fromUtcTimestamp } from './time';
 
 /** What a backup holds, counted for the user to check before an import replaces their data. */
@@ -21,17 +22,6 @@ export type BackupSummary = {
 	/** When its latest run started, as a UTC timestamp, or `null` when it holds no runs. */
 	lastRunAt: string | null;
 };
-
-/**
- * Words a count with its unit, in the singular for 1.
- *
- * @param count - How many.
- * @param unit - The unit in the singular, such as `run`.
- * @returns For example `1 run` or `3 runs`.
- */
-export function counted(count: number, unit: string): string {
-	return `${count} ${unit}${count === 1 ? '' : 's'}`;
-}
 
 /**
  * Words what a backup holds for the import's confirmation.

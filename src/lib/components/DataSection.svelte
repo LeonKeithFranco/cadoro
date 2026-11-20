@@ -9,15 +9,11 @@
 	import { resolve } from '$app/paths';
 	import { createBackup, serializeBackup, type Backup, type BackupData } from '../backup-format';
 	import { parseBackup } from '../backup-parsing';
-	import {
-		counted,
-		describeBackupSummary,
-		summarizeBackup,
-		type BackupSummary
-	} from '../backup-summary';
+	import { describeBackupSummary, summarizeBackup, type BackupSummary } from '../backup-summary';
 	import { workPeriodsToCsv } from '../csv-export';
 	import { recordError } from '../error-log';
 	import { exportFileName } from '../export-files';
+	import { counted } from '../plural';
 	import type { SaveFile } from '../file-download';
 	import type { CadoroStorage } from '../storage/storage';
 	import { SECONDARY_BUTTON_COLOURS } from './button-colours';

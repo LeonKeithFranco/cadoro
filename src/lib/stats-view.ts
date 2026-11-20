@@ -3,6 +3,7 @@
 
 import { format } from 'date-fns';
 import { daySlicesOf, localDayText } from './day-slices';
+import { counted } from './plural';
 import { allTimeTotals, filterByRoutine, routineLabel } from './routine-stats';
 import type { Routine } from './routine';
 import type { WorkPeriod } from './run-records';
@@ -170,7 +171,7 @@ function totalRow(total: WorkTotal, labelFormat: string): TotalRow {
  * @returns The count with its unit in the singular for 1.
  */
 function formatDays(count: number): string {
-	return count === 1 ? '1 day' : `${count} days`;
+	return counted(count, 'day');
 }
 
 /**
