@@ -14,7 +14,7 @@
 	import { dragHandle } from 'svelte-dnd-action';
 	import { outOfTabOrder } from '../out-of-tab-order';
 	import { editButtonId, headingId } from '../routine-card-ids';
-	import type { Routine } from '../routine';
+	import { describeRoutine, type Routine } from '../routine';
 	import { COMPACT_BUTTON_SHAPE, SECONDARY_BUTTON_COLOURS } from './button-colours';
 
 	/** The props a routine's card takes. */
@@ -66,12 +66,7 @@
 		onmovedown
 	}: Props = $props();
 
-	let blockCount = $derived(routine.blocks.length);
-	let rounds = $derived(
-		routine.rounds === 'infinite'
-			? 'Repeats forever'
-			: `${routine.rounds} ${routine.rounds === 1 ? 'round' : 'rounds'}`
-	);
+	let description = $derived(describeRoutine(routine));
 </script>
 
 <div class="rounded-xl border border-zinc-500 bg-white p-4 dark:border-zinc-500 dark:bg-zinc-900">
@@ -96,8 +91,7 @@
 				{routine.title}
 			</h2>
 			<p class="text-sm text-zinc-600 md:text-base dark:text-zinc-400">
-				{rounds} · {blockCount}
-				{blockCount === 1 ? 'block' : 'blocks'}
+				{description}
 			</p>
 		</div>
 	</div>

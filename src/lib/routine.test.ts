@@ -3,10 +3,12 @@ import { requireDefined } from './defined';
 import {
 	canDeleteRoutine,
 	createStarterRoutines,
+	describeRoutine,
 	newBlock,
 	newRoutine,
 	pickableRoutines,
-	withTrimmedTitles
+	withTrimmedTitles,
+	type Routine
 } from './routine';
 import { validateRoutine } from './routine-validation';
 import { numberedIds } from './testing/ids';
@@ -202,5 +204,42 @@ describe('canDeleteRoutine', () => {
 		];
 
 		expect(canDeleteRoutine(routines)).toBe(false);
+	});
+});
+
+describe('describeRoutine', () => {
+	/**
+	 * Makes a routine with the given rounds and number of blocks.
+	 *
+	 * @param rounds - The routine's rounds.
+	 * @param blockCount - How many blocks it holds.
+	 * @returns The routine.
+	 */
+	function routineOf(rounds: number | 'infinite', blockCount: number): Routine {
+		const blocks = Array.from({ length: blockCount }, (_, index) => ({
+			...newBlock(() => `block-${index}`)
+		}));
+		return routineWith({ rounds, blocks });
+	}
+
+	it('uses the singular for one round and one block', () => {
+		expect(describeRoutine(routineOf(1, 1))).toBe('1 round · 1 block');
+	});
+
+	it('uses the plural for several rounds and several blocks', () => {
+		expect(describeRoutine(routineOf(2, 3))).toBe('2 rounds · 3 blocks');
+	});
+
+	it('mixes the singular rounds with plural blocks', () => {
+		expect(describeRoutine(routineOf(1, 2))).toBe('1 round · 2 blocks');
+	});
+
+	it('mixes plural rounds with the singular block', () => {
+		expect(describeRoutine(routineOf(5, 1))).toBe('5 rounds · 1 block');
+	});
+
+	it('says a routine of infinite rounds repeats forever', () => {
+		expect(describeRoutine(routineOf('infinite', 1))).toBe('Repeats forever · 1 block');
+		expect(describeRoutine(routineOf('infinite', 4))).toBe('Repeats forever · 4 blocks');
 	});
 });
