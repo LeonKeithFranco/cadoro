@@ -38,6 +38,35 @@ describe('RoutineUsageKeeper', () => {
 		expect(keeper.usage).toEqual({ runs: [runWith({})], workPeriods: [firstWorkPeriod] });
 	});
 
+	it('keeps the latest read when an earlier one finishes after it', async () => {
+		const older = { runs: [runWith({ id: 'older' })], workPeriods: [] };
+		const newer = { runs: [runWith({ id: 'newer' })], workPeriods: [] };
+		const finishOlderRead: { run: () => void } = { run: (): void => {} };
+		let reads = 0;
+		const storage: Pick<CadoroStorage, 'getRuns' | 'getWorkPeriods'> = {
+			getRuns: async () => {
+				reads += 1;
+				if (reads === 1) {
+					// The first read is slow, and holds what was saved before the second.
+					await new Promise<void>((resolve) => {
+						finishOlderRead.run = resolve;
+					});
+					return older.runs;
+				}
+				return newer.runs;
+			},
+			getWorkPeriods: () => Promise.resolve([])
+		};
+		const keeper = new RoutineUsageKeeper(storage, { runs: [], workPeriods: [] });
+
+		const firstReload = keeper.reload();
+		await keeper.reload();
+		finishOlderRead.run();
+		await firstReload;
+
+		expect(keeper.usage).toEqual(newer);
+	});
+
 	it('keeps the usage it had when a read fails, and records the error', async () => {
 		const failing: Pick<CadoroStorage, 'getRuns' | 'getWorkPeriods'> = {
 			getRuns: () => Promise.reject(new Error('The disk is full.')),

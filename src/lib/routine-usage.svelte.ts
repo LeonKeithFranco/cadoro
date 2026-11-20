@@ -10,7 +10,8 @@ import type { CadoroStorage } from './storage/storage';
  *
  * @remarks
  * The usage is replaced whole, and only once a read succeeds, so a failed read keeps what was
- * known. The value is raw state, so a screen that reads it sorts again when it's replaced.
+ * known. Reads are numbered, and only the latest one started is kept, so a slow read can't bring
+ * back older usage. The value is raw state, so a screen that reads it sorts again when it's replaced.
  */
 export class RoutineUsageKeeper {
 	/** Reads the runs and work periods. */
@@ -18,6 +19,9 @@ export class RoutineUsageKeeper {
 
 	/** The usage as last read, or as given at the start. */
 	#usage = $state.raw<RoutineUsage>({ runs: [], workPeriods: [] });
+
+	/** How many reads have started, which numbers each one so only the latest is kept. */
+	#reloadsStarted = 0;
 
 	/**
 	 * Starts with usage the app has already read.
@@ -42,12 +46,17 @@ export class RoutineUsageKeeper {
 	 * activity log and leaves the usage as it was. It never rejects.
 	 */
 	async reload(): Promise<void> {
+		this.#reloadsStarted += 1;
+		const thisReload = this.#reloadsStarted;
 		try {
 			const [runs, workPeriods] = await Promise.all([
 				this.#storage.getRuns(),
 				this.#storage.getWorkPeriods()
 			]);
-			this.#usage = { runs, workPeriods };
+			// A read that finishes after a later one started holds older data, so it's dropped.
+			if (thisReload === this.#reloadsStarted) {
+				this.#usage = { runs, workPeriods };
+			}
 		} catch (error: unknown) {
 			void recordError('The runs could not be read, so the picker may be out of order.', error);
 		}
