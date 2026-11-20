@@ -688,7 +688,7 @@ function segmentsUpTo(run: WorkingRun, now: number): readonly Segment[] {
  * @param now - The current moment, in milliseconds since 1970 (UTC).
  * @returns The work period, with its stretches up to now and its block's target.
  */
-function currentPeriodUpTo(run: WorkingRun, now: number): EndedWorkPeriod {
+export function currentPeriodUpTo(run: WorkingRun, now: number): EndedWorkPeriod {
 	const block = blockAt(run.plan, run.position);
 	const segments = segmentsUpTo(run, now);
 	return {
