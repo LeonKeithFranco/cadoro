@@ -681,11 +681,21 @@ describe('a long routine on the Timer screen', () => {
 		render(TimerScreen, { session: createSession([routineOfBlocks(12)]) });
 		window.scrollTo(0, 0);
 
-		expect(getComputedStyle(pinnedControls()).position).toBe('sticky');
-		const controls = pinnedControls().getBoundingClientRect();
-		expect(controls.bottom).toBeLessThanOrEqual(window.innerHeight);
-		expect(controls.top).toBeGreaterThan(0);
 		expect(document.documentElement.scrollHeight).toBeGreaterThan(window.innerHeight * 2);
+		const finish = page.getByRole('button', { name: 'Finish' }).element();
+		const topOfPage = finish.getBoundingClientRect();
+		expect(topOfPage.top).toBeGreaterThan(0);
+		expect(topOfPage.bottom).toBeLessThanOrEqual(window.innerHeight);
+
+		const farthest = document.documentElement.scrollHeight - window.innerHeight;
+		for (const scrollY of [farthest / 2, farthest]) {
+			window.scrollTo(0, scrollY);
+			await expect.poll(() => window.scrollY).toBeGreaterThan(0);
+
+			const scrolled = finish.getBoundingClientRect();
+			expect(scrolled.top).toBe(topOfPage.top);
+			expect(scrolled.bottom).toBeLessThanOrEqual(window.innerHeight);
+		}
 	});
 
 	it('scrolls the active block into view when the run moves to a block out of view', async () => {
