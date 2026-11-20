@@ -17,6 +17,7 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
 	import { viewBlock } from '../block-view';
+	import { announcementFor } from '../run-announcement';
 	import { sortRoutines, type RoutineSort, type RoutineUsage } from '../routine-sort';
 	import type { TimerSession } from '../timer.svelte';
 	import BlockCard from './BlockCard.svelte';
@@ -55,6 +56,9 @@
 		// block fits. Each card's scroll margin clears the pinned controls.
 		blocksElement?.children[activeBlock]?.scrollIntoView({ block: 'nearest' });
 	});
+
+	// What the live region says, which changes only as the run enters a phase worth announcing.
+	let announcement = $derived(announcementFor(session.view));
 
 	// An ended run has no position. The screen behind its summary shows no label until a new run
 	// is ready.
@@ -125,6 +129,11 @@
 <svelte:window onpagehide={(): void => session.tick()} />
 
 <ScreenHeading title="Timer" />
+
+<!-- A polite live region, so a screen reader hears of overtime, the break starting, the break
+     being over and the run ending without the focus moving, and never in the middle of what it
+     is reading. It's always in the page, since a region added with its text isn't announced. -->
+<p role="status" aria-live="polite" class="sr-only">{announcement}</p>
 
 <div class="mt-4 grid gap-4">
 	<!-- Wrapped in an arrow function, because a method passed on its own loses its `this`. -->
