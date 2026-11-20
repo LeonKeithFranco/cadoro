@@ -184,3 +184,21 @@ Nothing here blocks the release. They need a real device, so they're listed rath
 ### Release
 
 - Released as 1.2.1, a patch version, since it changes no behaviour apart from the fixes.
+
+## After 1.0: the Stats range buttons on phones (`fix/stats-range-buttons-fit`), 2026-11-20
+
+### The bug and its cause
+
+- On the phone, the names on the Daily work time range buttons ("7 days", "30 days" and the rest) didn't fit their buttons.
+- On phones the group was `grid-cols-5`, which gives each button about 52px at 360px. "30 days" is 43px wide, so it spilled past the button's padding. The buttons were also only 30px tall, too small to tap comfortably.
+
+### The fix
+
+- The group is `flex flex-wrap gap-2`. On phones each button is at least 44px tall and grows from a basis of a third of the row, so the buttons sit 3 and 2, and every row fills the card's width. From `md` up the buttons are as they were.
+- **Rejected, a plain wrap:** it left a gap at the end of each row, and the design preference is no empty space inside a container.
+- **Rejected, a plain `grow`:** at 393px it left "All" alone on a full row, so a basis of a third was added.
+- A component test in `DailyChart.svelte.test.ts` at a 320px viewport checks that each label is one line inside its button, that each button is 44px tall, and that every row reaches the group's right edge. Both layout checks failed before their fixes.
+
+### Release
+
+- Released as 1.2.2, a patch version, since it changes only how the buttons are laid out.
