@@ -5,6 +5,9 @@
 import { recordError } from '../error-log';
 import type { CadoroStorage } from './storage';
 
+/** The log message for a request for persistent storage that failed. */
+const REQUEST_FAILED_MESSAGE = 'Persistent storage could not be requested.';
+
 /** The parts of the browser's `StorageManager`, `navigator.storage`, that asking needs. */
 export type PersistenceManager = Pick<StorageManager, 'persisted' | 'persist'>;
 
@@ -38,7 +41,7 @@ export function askToPersistOnce(manager: PersistenceManager | undefined): () =>
 				await manager.persist();
 			}
 		} catch (error: unknown) {
-			void recordError('Persistent storage could not be requested.', error);
+			void recordError(REQUEST_FAILED_MESSAGE, error);
 		}
 	};
 }
@@ -108,6 +111,6 @@ export async function requestPersistentStorage(
 	try {
 		await manager.persist();
 	} catch (error: unknown) {
-		void recordError('Persistent storage could not be requested.', error);
+		void recordError(REQUEST_FAILED_MESSAGE, error);
 	}
 }
