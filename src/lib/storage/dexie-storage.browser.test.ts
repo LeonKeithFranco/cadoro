@@ -14,7 +14,7 @@ import { THEME_MIRROR_KEY } from './theme-mirror';
  *
  * @returns A new row, whose run has no `bankedMs`.
  */
-function savedRunBeforeBanking(): object {
+function savedRunBeforeBanking(): { run: Record<string, unknown> } & Record<string, unknown> {
 	const run: Record<string, unknown> = { ...savedRunInProgress.run };
 	delete run.bankedMs;
 	return { ...savedRunInProgress, run };
@@ -229,10 +229,10 @@ describe('DexieStorage', () => {
 		version1
 			.version(1)
 			.stores({ routines: 'id', runs: 'id', workPeriods: 'id', runInProgress: '' });
-		// The row as version 1 saved it, with no revision.
+		// The row as version 1 saved it, with no revision and no bank.
 		const version1Row = {
 			record: savedRunInProgress.record,
-			run: savedRunInProgress.run,
+			run: savedRunBeforeBanking().run,
 			heartbeatAt: savedRunInProgress.heartbeatAt
 		};
 		await version1.table('routines').add(routineWith({ id: 'kept' }));
@@ -243,7 +243,12 @@ describe('DexieStorage', () => {
 
 		const upgraded = new DexieStorage(name);
 
-		expect(await upgraded.getRunInProgress()).toEqual({ ...version1Row, revision: 'version-1' });
+		expect(await upgraded.getRunInProgress()).toEqual({
+			record: savedRunInProgress.record,
+			run: savedRunInProgress.run,
+			heartbeatAt: savedRunInProgress.heartbeatAt,
+			revision: 'version-1'
+		});
 		expect(await upgraded.getRoutines()).toEqual([routineWith({ id: 'kept' })]);
 		expect(await upgraded.getRuns()).toEqual([runInProgress]);
 		expect(await upgraded.getWorkPeriods()).toEqual([firstWorkPeriod]);
