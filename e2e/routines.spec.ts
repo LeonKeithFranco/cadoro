@@ -109,6 +109,10 @@ test('a routine is created, edited, reordered and deleted, and the changes are k
 		await page.getByRole('spinbutton', { name: 'Rounds' }).fill('3');
 		await blockGroup(page, 1).getByRole('textbox', { name: 'Block title' }).fill('Draft');
 		await blockGroup(page, 1).getByRole('spinbutton', { name: 'Target (minutes)' }).fill('50');
+		const breakPercent = blockGroup(page, 1).getByRole('spinbutton', { name: 'Break (% of work)' });
+		await expect(breakPercent).toHaveAccessibleDescription('10:00 break at the 50-minute target');
+		await breakPercent.fill('10');
+		await expect(breakPercent).toHaveAccessibleDescription('5:00 break at the 50-minute target');
 
 		await page.getByRole('button', { name: 'Save' }).click();
 

@@ -367,6 +367,105 @@ describe('a new routine', () => {
 	});
 });
 
+describe('the break preview', () => {
+	/**
+	 * Finds a block's break field, whose description is the preview.
+	 *
+	 * @param position - The block's place in the form, counting from 1.
+	 * @returns The block's "Break (% of work)" field.
+	 */
+	function breakField(position: number): Locator {
+		return blockGroup(position).getByRole('spinbutton', { name: 'Break (% of work)' });
+	}
+
+	/** Opens a new routine's form, whose one block is 25 minutes at 20%. */
+	async function openNewRoutine(): Promise<void> {
+		await openScreen();
+		await page.getByRole('button', { name: 'New routine' }).click();
+	}
+
+	it('shows the break earned at the target under a new routine’s block', async () => {
+		await openNewRoutine();
+
+		await expect
+			.element(breakField(1))
+			.toHaveAccessibleDescription('5:00 break at the 25-minute target');
+		await expect
+			.element(blockGroup(1).getByText('5:00 break at the 25-minute target'))
+			.toBeVisible();
+	});
+
+	it('shows it under an edited routine’s blocks too', async () => {
+		await openScreen();
+		await openForEditing('Alpha');
+
+		await expect
+			.element(breakField(2))
+			.toHaveAccessibleDescription('5:00 break at the 25-minute target');
+	});
+
+	it('updates as the percentage is typed', async () => {
+		await openNewRoutine();
+
+		await breakField(1).fill('15');
+
+		await expect
+			.element(breakField(1))
+			.toHaveAccessibleDescription('3:45 break at the 25-minute target');
+	});
+
+	it('updates when the target changes', async () => {
+		await openNewRoutine();
+
+		await blockGroup(1).getByRole('spinbutton', { name: 'Target (minutes)' }).fill('60');
+
+		await expect
+			.element(breakField(1))
+			.toHaveAccessibleDescription('12:00 break at the 60-minute target');
+	});
+
+	it('shows the percentage’s problem instead of a preview while it is invalid', async () => {
+		await openNewRoutine();
+
+		await breakField(1).fill('101');
+
+		await expect
+			.element(breakField(1))
+			.toHaveAccessibleDescription('Enter a whole number of percent, from 1 to 100.');
+		await expect.element(page.getByText('break at the', { exact: false })).not.toBeInTheDocument();
+	});
+
+	it('shows no preview while the target is invalid or empty', async () => {
+		await openNewRoutine();
+		const target = blockGroup(1).getByRole('spinbutton', { name: 'Target (minutes)' });
+
+		await target.fill('0');
+		await expect.element(page.getByText('break at the', { exact: false })).not.toBeInTheDocument();
+
+		await target.fill('');
+		await expect.element(page.getByText('break at the', { exact: false })).not.toBeInTheDocument();
+
+		await target.fill('30');
+		await expect
+			.element(breakField(1))
+			.toHaveAccessibleDescription('6:00 break at the 30-minute target');
+	});
+
+	it('gives an added block its own preview', async () => {
+		await openNewRoutine();
+		await page.getByRole('button', { name: 'Add block' }).click();
+
+		await breakField(2).fill('10');
+
+		await expect
+			.element(breakField(2))
+			.toHaveAccessibleDescription('2:30 break at the 25-minute target');
+		await expect
+			.element(breakField(1))
+			.toHaveAccessibleDescription('5:00 break at the 25-minute target');
+	});
+});
+
 describe('editing a routine', () => {
 	it('opens the form in place, in the routine’s own place in the list', async () => {
 		await openScreen();
