@@ -8,6 +8,19 @@ import { DexieStorage } from './dexie-storage';
 import { THEME_MIRROR_KEY } from './theme-mirror';
 
 /**
+ * {@link savedRunInProgress} as schema versions 1 to 4 stored it, a working run with no
+ * `bankedMs`, which only version 5 gives a work period. The upgrade tests seed this, so each
+ * chained upgrade has to fill in the bank, as a real old database needs.
+ *
+ * @returns A new row, whose run has no `bankedMs`.
+ */
+function savedRunBeforeBanking(): object {
+	const run: Record<string, unknown> = { ...savedRunInProgress.run };
+	delete run.bankedMs;
+	return { ...savedRunInProgress, run };
+}
+
+/**
  * Makes a database name no other test uses.
  *
  * @returns A name starting `test-`, then a UUID.
@@ -70,7 +83,7 @@ describe('DexieStorage', () => {
 		await version2.table('routines').add(routineWith({ id: 'kept' }));
 		await version2.table('runs').add(runInProgress);
 		await version2.table('workPeriods').add(firstWorkPeriod);
-		await version2.table('runInProgress').put(savedRunInProgress, 'current');
+		await version2.table('runInProgress').put(savedRunBeforeBanking(), 'current');
 		version2.close();
 
 		const upgraded = new DexieStorage(name);
@@ -98,7 +111,7 @@ describe('DexieStorage', () => {
 		await version3.table('routines').add(routineWith({ id: 'kept' }));
 		await version3.table('runs').add(runInProgress);
 		await version3.table('workPeriods').add(firstWorkPeriod);
-		await version3.table('runInProgress').put(savedRunInProgress, 'current');
+		await version3.table('runInProgress').put(savedRunBeforeBanking(), 'current');
 		await version3.table('settings').put({ volume: 10 }, 'current');
 		version3.close();
 
@@ -144,10 +157,7 @@ describe('DexieStorage', () => {
 
 	it('upgrades a version-4 database, giving a saved working run a bank of 0', async () => {
 		const name = newDatabaseName();
-		// The saved run as version 4 kept it, with no `bankedMs`.
-		const version4Run: Record<string, unknown> = { ...savedRunInProgress.run };
-		delete version4Run.bankedMs;
-		await saveAsVersion4(name, { ...savedRunInProgress, run: version4Run });
+		await saveAsVersion4(name, savedRunBeforeBanking());
 
 		const upgraded = new DexieStorage(name);
 
@@ -174,6 +184,18 @@ describe('DexieStorage', () => {
 		const upgraded = new DexieStorage(name);
 
 		expect(await upgraded.getRunInProgress()).toEqual(onBreak);
+	});
+
+	it('upgrades a version-4 database, leaving a saved ended run as it was', async () => {
+		const name = newDatabaseName();
+		const ended = runInProgressWith({
+			run: { status: 'ended', endedPeriods: [], outcome: 'finished' }
+		});
+		await saveAsVersion4(name, ended);
+
+		const upgraded = new DexieStorage(name);
+
+		expect(await upgraded.getRunInProgress()).toEqual(ended);
 	});
 
 	it('creates schema version 5, with every table the spec defines, each with its key', async () => {
