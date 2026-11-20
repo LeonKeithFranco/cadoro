@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useErrorLog } from './error-log';
 import { joinOpenTabs, OPEN_TAB_LOCK } from './open-tabs';
 import { InMemoryStorage } from './storage/in-memory-storage';
+import { recordedErrors } from './testing/error-log';
 
 /**
  * Makes a lock name no other test uses, since a lock this page takes lasts as long as the page,
@@ -77,33 +78,19 @@ describe('joinOpenTabs', () => {
 		expect(await joinOpenTabs(undefined, newLockName())).toBe(false);
 	});
 
-	it('logs a refused check and says none is open, so the run is restored paused', async () => {
-		const failure = new Error('Locks are blocked.');
-		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-		const isAnotherTabOpen = await joinOpenTabs(refusingLocks(failure, 'query'), newLockName());
-
-		expect(isAnotherTabOpen).toBe(false);
-		expect(consoleError).toHaveBeenCalledWith(
-			'Could not tell whether the app is open in another tab.',
-			failure
-		);
-	});
-
-	it('records a refused check, and a refused lock, in the activity log', async () => {
+	it('records a refused check in the log and says none is open, so the run is restored paused', async () => {
 		const log = new InMemoryStorage();
 		useErrorLog(log);
 
-		await joinOpenTabs(refusingLocks(new Error('Query blocked.'), 'query'), newLockName());
-		await joinOpenTabs(refusingLocks(new Error('Request blocked.'), 'request'), newLockName());
-
-		const entries = await log.getLogEntries();
-		expect(entries.map((entry) => [entry.type, entry.message, entry.details?.['message']])).toEqual(
-			[
-				['error', 'Could not tell whether the app is open in another tab.', 'Request blocked.'],
-				['error', 'Could not tell whether the app is open in another tab.', 'Query blocked.']
-			]
+		const isAnotherTabOpen = await joinOpenTabs(
+			refusingLocks(new Error('Query blocked.'), 'query'),
+			newLockName()
 		);
+
+		expect(isAnotherTabOpen).toBe(false);
+		expect(await recordedErrors(log)).toEqual([
+			['Could not tell whether the app is open in another tab.', 'Query blocked.']
+		]);
 	});
 
 	it('still says another tab is open when it finds one but its own lock is refused', async () => {
@@ -123,16 +110,18 @@ describe('joinOpenTabs', () => {
 		expect(await joinOpenTabs(locks, name)).toBe(true);
 	});
 
-	it('logs a refused lock and says none is open, rather than waiting for it', async () => {
-		const failure = new Error('Locks are blocked.');
-		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+	it('records a refused lock in the log and says none is open, rather than waiting for it', async () => {
+		const log = new InMemoryStorage();
+		useErrorLog(log);
 
-		const isAnotherTabOpen = await joinOpenTabs(refusingLocks(failure, 'request'), newLockName());
+		const isAnotherTabOpen = await joinOpenTabs(
+			refusingLocks(new Error('Request blocked.'), 'request'),
+			newLockName()
+		);
 
 		expect(isAnotherTabOpen).toBe(false);
-		expect(consoleError).toHaveBeenCalledWith(
-			'Could not tell whether the app is open in another tab.',
-			failure
-		);
+		expect(await recordedErrors(log)).toEqual([
+			['Could not tell whether the app is open in another tab.', 'Request blocked.']
+		]);
 	});
 });

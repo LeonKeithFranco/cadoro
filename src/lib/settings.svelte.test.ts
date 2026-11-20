@@ -4,6 +4,7 @@ import { DEFAULT_SETTINGS } from './settings';
 import { SettingsSession } from './settings.svelte';
 import { InMemoryStorage } from './storage/in-memory-storage';
 import type { CadoroStorage } from './storage/storage';
+import { recordedErrors } from './testing/error-log';
 
 describe('SettingsSession', () => {
 	// Puts back any method a test replaced, and takes away the log a test chose for errors.
@@ -51,11 +52,11 @@ describe('SettingsSession', () => {
 		expect(session.settings.theme).toBe('light');
 	});
 
-	it('goes back to what storage holds, and logs the error, when a save fails', async () => {
+	it('goes back to what storage holds, and records one error, when a save fails', async () => {
 		const storage = new InMemoryStorage();
 		await storage.saveSettings({ theme: 'light' });
+		useErrorLog(storage);
 		const session = new SettingsSession(storage, { ...DEFAULT_SETTINGS, theme: 'light' });
-		const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
 		vi.spyOn(storage, 'saveSettings').mockRejectedValue(new Error('The disk is full.'));
 		// Lets the session's first report from storage arrive, so only the undo can put the theme
 		// back, not that report.
@@ -64,38 +65,12 @@ describe('SettingsSession', () => {
 		await session.save({ theme: 'system' });
 
 		expect(session.settings.theme).toBe('light');
-		expect(logged).toHaveBeenCalledOnce();
+		await expect
+			.poll(() => recordedErrors(storage))
+			.toEqual([['Saving the settings failed.', 'The disk is full.']]);
 	});
 
-	it('logs both errors, and doesn’t reject, when storage can’t be read back either', async () => {
-		const storage = new InMemoryStorage();
-		const session = new SettingsSession(storage, DEFAULT_SETTINGS);
-		const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
-		vi.spyOn(storage, 'saveSettings').mockRejectedValue(new Error('The disk is full.'));
-		vi.spyOn(storage, 'getSettings').mockRejectedValue(new Error('The disk is gone.'));
-
-		await session.save({ theme: 'system' });
-
-		expect(logged).toHaveBeenCalledTimes(2);
-	});
-
-	it('records a failed save in the activity log as an error entry', async () => {
-		const storage = new InMemoryStorage();
-		useErrorLog(storage);
-		const session = new SettingsSession(storage, DEFAULT_SETTINGS);
-		vi.spyOn(storage, 'saveSettings').mockRejectedValue(new Error('The disk is full.'));
-
-		await session.save({ theme: 'system' });
-
-		await expect.poll(() => storage.getLogEntries()).toHaveLength(1);
-		expect((await storage.getLogEntries())[0]).toMatchObject({
-			type: 'error',
-			message: 'Saving the settings failed.',
-			details: { message: 'The disk is full.' }
-		});
-	});
-
-	it('records a failure to read the settings back in the activity log', async () => {
+	it('records both errors, and doesn’t reject, when storage can’t be read back either', async () => {
 		const storage = new InMemoryStorage();
 		useErrorLog(storage);
 		const session = new SettingsSession(storage, DEFAULT_SETTINGS);
@@ -104,12 +79,12 @@ describe('SettingsSession', () => {
 
 		await session.save({ theme: 'system' });
 
-		await expect.poll(() => storage.getLogEntries()).toHaveLength(2);
-		const entries = await storage.getLogEntries();
-		expect(entries.map((entry) => entry.message)).toEqual([
-			'Reading the settings back failed.',
-			'Saving the settings failed.'
-		]);
+		await expect
+			.poll(() => recordedErrors(storage))
+			.toEqual([
+				['Reading the settings back failed.', 'The disk is gone.'],
+				['Saving the settings failed.', 'The disk is full.']
+			]);
 	});
 
 	it('records in the activity log that the settings can no longer be followed', async () => {

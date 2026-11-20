@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useErrorLog } from '../error-log';
+import { recordedErrors } from '../testing/error-log';
 import { oneRoundRoutine } from '../testing/routines';
 import { savedRunInProgress } from '../testing/run-in-progress';
 import { firstWorkPeriod, runInProgress } from '../testing/run-records';
@@ -48,37 +49,21 @@ describe('askToPersistOnce', () => {
 		expect(manager.persist).toHaveBeenCalledOnce();
 	});
 
-	it('records a refused request in the activity log', async () => {
+	it('does nothing where the browser has no storage manager', async () => {
+		await expect(askToPersistOnce(undefined)()).resolves.toBeUndefined();
+	});
+
+	it("records the browser's refused request in the log rather than rejecting", async () => {
 		const log = new InMemoryStorage();
 		useErrorLog(log);
 		const manager = fakeStorageManager(false);
 		manager.persist.mockRejectedValueOnce(new Error('The request was blocked.'));
 
-		await askToPersistOnce(manager)();
-
-		expect((await log.getLogEntries())[0]).toMatchObject({
-			type: 'error',
-			message: 'Persistent storage could not be requested.',
-			details: { message: 'The request was blocked.' }
-		});
-	});
-
-	it('does nothing where the browser has no storage manager', async () => {
-		await expect(askToPersistOnce(undefined)()).resolves.toBeUndefined();
-	});
-
-	it("logs the browser's error rather than rejecting", async () => {
-		const manager = fakeStorageManager(false);
-		const failure = new Error('The request was blocked.');
-		manager.persist.mockRejectedValueOnce(failure);
-		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-
 		await expect(askToPersistOnce(manager)()).resolves.toBeUndefined();
 
-		expect(consoleError).toHaveBeenCalledWith(
-			'Persistent storage could not be requested.',
-			failure
-		);
+		expect(await recordedErrors(log)).toEqual([
+			['Persistent storage could not be requested.', 'The request was blocked.']
+		]);
 	});
 });
 
@@ -110,34 +95,18 @@ describe('askToPersistIfWorkSaved', () => {
 		expect(askToPersist).not.toHaveBeenCalled();
 	});
 
-	it('logs storage that cannot be read rather than rejecting', async () => {
+	it('records storage that cannot be read in the log rather than rejecting', async () => {
 		const storage = new InMemoryStorage();
-		const failure = new Error('IndexedDB is blocked.');
-		vi.spyOn(storage, 'hasWorkPeriods').mockRejectedValueOnce(failure);
-		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+		useErrorLog(storage);
+		vi.spyOn(storage, 'hasWorkPeriods').mockRejectedValueOnce(new Error('IndexedDB is blocked.'));
 		const askToPersist = vi.fn(async () => {});
 
 		await expect(askToPersistIfWorkSaved(storage, askToPersist)).resolves.toBeUndefined();
 
 		expect(askToPersist).not.toHaveBeenCalled();
-		expect(consoleError).toHaveBeenCalledWith('Saved work could not be checked for.', failure);
-	});
-
-	it('records storage that cannot be read in the activity log', async () => {
-		const storage = new InMemoryStorage();
-		useErrorLog(storage);
-		vi.spyOn(storage, 'hasWorkPeriods').mockRejectedValueOnce(new Error('IndexedDB is blocked.'));
-
-		await askToPersistIfWorkSaved(
-			storage,
-			vi.fn(async () => {})
-		);
-
-		expect((await storage.getLogEntries())[0]).toMatchObject({
-			type: 'error',
-			message: 'Saved work could not be checked for.',
-			details: { message: 'IndexedDB is blocked.' }
-		});
+		expect(await recordedErrors(storage)).toEqual([
+			['Saved work could not be checked for.', 'IndexedDB is blocked.']
+		]);
 	});
 });
 
