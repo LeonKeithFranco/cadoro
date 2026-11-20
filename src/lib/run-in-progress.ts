@@ -34,6 +34,11 @@ export type StoredWorkingRun = {
 	segments: StoredSegment[];
 	/** When the current stretch started, as a UTC timestamp, or `null` while paused. */
 	runningSince: string | null;
+	/**
+	 * The unused break carried into this work period, in whole seconds, as milliseconds. Rows saved
+	 * before schema version 5 lack it, and its upgrade sets it to 0.
+	 */
+	bankedMs: number;
 };
 
 /** A run during a break, as storage keeps it. */
@@ -244,7 +249,8 @@ function storedRunState(run: StartedRun): StoredRunState {
 				endedPeriods,
 				position: run.position,
 				segments: run.segments.map(storedSegment),
-				runningSince: storedMoment(run.runningSince)
+				runningSince: storedMoment(run.runningSince),
+				bankedMs: run.bankedMs
 			};
 		case 'break':
 			return {
@@ -280,7 +286,8 @@ function runFromStored(stored: StoredRunState, routine: Routine): StartedRun {
 				endedPeriods,
 				position: stored.position,
 				segments: stored.segments.map(segmentFromStored),
-				runningSince: momentFromStored(stored.runningSince)
+				runningSince: momentFromStored(stored.runningSince),
+				bankedMs: stored.bankedMs
 			};
 		case 'break':
 			return {

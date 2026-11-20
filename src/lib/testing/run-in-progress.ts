@@ -15,7 +15,8 @@ export const savedRunInProgress: StoredRunInProgress = {
 		endedPeriods: [],
 		position: { round: 0, block: 0, cycle: 0 },
 		segments: [],
-		runningSince: '2026-11-19T09:00:00.000Z'
+		runningSince: '2026-11-19T09:00:00.000Z',
+		bankedMs: 0
 	},
 	heartbeatAt: '2026-11-19T09:10:00.000Z',
 	revision: 'revision-1'

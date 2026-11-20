@@ -20,7 +20,8 @@ import {
 	isRevision,
 	VERSION_1_REVISION,
 	withHeartbeat,
-	type StoredRunInProgress
+	type StoredRunInProgress,
+	type StoredWorkingRun
 } from '../run-in-progress';
 import {
 	noRecords,
@@ -132,6 +133,33 @@ async function upgradeToVersion2(transaction: Transaction): Promise<void> {
 		});
 }
 
+/** The run in progress as schema version 4 saved it, before a work period had a bank. */
+type Version4RunInProgress = Omit<StoredRunInProgress, 'run'> & {
+	/** The run, whose working form lacks the `bankedMs` that version 5's upgrade sets. */
+	run: StoredRunInProgress['run'] | (Omit<StoredWorkingRun, 'bankedMs'> & { bankedMs?: number });
+};
+
+/**
+ * Upgrades a database saved by schema version 4 to version 5, which gives a work period the
+ * unused break banked into it. A saved working run starts with a bank of 0, as a run started
+ * before banking never had one. A break, or a row with no bank to add, is left as it is. Dexie
+ * runs it once, when a version-5 app first opens an older database.
+ *
+ * @param transaction - The upgrade's own transaction, over every table.
+ * @throws Rejects with IndexedDB's error when the row can't be read or saved, and then the
+ * database stays at version 4 and the app can't open it.
+ */
+async function upgradeToVersion5(transaction: Transaction): Promise<void> {
+	await transaction
+		.table<Version4RunInProgress, string>('runInProgress')
+		.toCollection()
+		.modify((row) => {
+			if (row.run.status === 'working') {
+				row.run.bankedMs ??= 0;
+			}
+		});
+}
+
 /**
  * The database, with a type for each table.
  *
@@ -178,6 +206,9 @@ function connect(name: string): CadoroDatabase {
 	database.version(3).stores(SCHEMA_VERSION_3_ADDS);
 	// Version 4 adds the `log` table. It starts empty, so no data needs moving.
 	database.version(4).stores(SCHEMA_VERSION_4_ADDS);
+	// Version 5 keeps every table and key, which the empty `stores` says, and gives a saved working
+	// run the bank of unused break time that a work period now has.
+	database.version(5).stores({}).upgrade(upgradeToVersion5);
 	return database;
 }
 

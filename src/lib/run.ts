@@ -4,7 +4,7 @@
 import { requireDefined } from './defined';
 import { percentOf } from './percent';
 import type { Routine } from './routine';
-import { MS_PER_SECOND, minutesToMs } from './time';
+import { MS_PER_SECOND, minutesToMs, roundUpToWholeSecondsMs } from './time';
 
 /** The parts of a routine that decide the order a run goes through it. */
 export type RoutinePlan = Pick<Routine, 'rounds' | 'blocks'>;
@@ -210,6 +210,12 @@ export type WorkingRun = {
 	readonly segments: readonly Segment[];
 	/** When the current stretch started, or `null` while paused. */
 	readonly runningSince: number | null;
+	/**
+	 * The unused break carried into this work period from earlier breaks in the run, in whole
+	 * seconds, as milliseconds. It's 0 for the run's first work period and after a break that ran
+	 * to 0:00.
+	 */
+	readonly bankedMs: number;
 };
 
 /** A run during a break, which counts down, running, paused or over. */
@@ -224,7 +230,10 @@ export type BreakRun = {
 	readonly position: Position;
 	/** Where the work period after this break is in the routine. */
 	readonly nextWorkPosition: Position;
-	/** The whole break earned, in whole seconds, as milliseconds. */
+	/**
+	 * The whole break, in whole seconds, as milliseconds: the break the work period earned plus the
+	 * unused break banked into it.
+	 */
 	readonly earnedMs: number;
 	/** The break left when the current stretch started, or when it was paused, in milliseconds. */
 	readonly remainingMs: number;
@@ -287,12 +296,13 @@ export function breakRemainingMs(run: BreakRun, now: number): number {
 export function play(run: RunState, now: number): RunState {
 	switch (run.status) {
 		case 'ready':
-			return startWork(run.plan, [], firstPosition, now);
+			return startWork(run.plan, [], firstPosition, 0, now);
 		case 'working':
 			return resume(run, now);
 		case 'break':
 			if (isBreakOver(run, now)) {
-				return startWork(run.plan, run.endedPeriods, run.nextWorkPosition, now);
+				// A break that ran to 0:00 used its bank up, however late Play comes.
+				return startWork(run.plan, run.endedPeriods, run.nextWorkPosition, 0, now);
 			}
 			return resume(run, now);
 		case 'ended':
@@ -338,8 +348,10 @@ export function pause(run: RunState, now: number): RunState {
  * period.
  *
  * @remarks
- * A work period ended early still counts as a completed cycle. A break ended early loses the time
- * it had left. A finite routine's last work period ends the run instead, without its break.
+ * A work period ended early still counts as a completed cycle. A break ended early banks the time
+ * it had left, rounded up to whole seconds as the break timer showed it, and the bank is added to
+ * the next break. A break that's already over banks 0. A finite routine's last work period ends
+ * the run instead, without its break, so its bank is dropped.
  *
  * @param run - The run.
  * @param now - The current moment, in milliseconds since 1970 (UTC).
@@ -350,8 +362,10 @@ export function next(run: RunState, now: number): RunState {
 	switch (run.status) {
 		case 'working':
 			return endWorkPeriod(run, now);
-		case 'break':
-			return startWork(run.plan, run.endedPeriods, run.nextWorkPosition, now);
+		case 'break': {
+			const bankedMs = roundUpToWholeSecondsMs(breakRemainingMs(run, now));
+			return startWork(run.plan, run.endedPeriods, run.nextWorkPosition, bankedMs, now);
+		}
 		case 'ready':
 		case 'ended':
 			return run;
@@ -363,7 +377,7 @@ export function next(run: RunState, now: number): RunState {
  *
  * @remarks
  * The current work period, if any, is saved up to now, however short. A break in progress is
- * dropped, since breaks aren't recorded. This is how an infinite routine ends, and how a finite
+ * dropped, since breaks aren't recorded, and so is the bank. This is how an infinite routine ends, and how a finite
  * one ends early.
  *
  * @param run - The run.
@@ -421,7 +435,10 @@ export type WorkView = ControlsView & {
 	readonly targetMs: number;
 	/** Whether the work has reached its target, so the timer shows overtime. */
 	readonly isOvertime: boolean;
-	/** The break earned so far, which grows as the work goes on, in whole seconds, as milliseconds. */
+	/**
+	 * The break the next break will be so far, in whole seconds, as milliseconds: the bank carried
+	 * in plus the break earned so far, which grows as the work goes on.
+	 */
 	readonly breakEarnedMs: number;
 };
 
@@ -437,7 +454,10 @@ export type BreakView = ControlsView & {
 	readonly label: string;
 	/** The time worked in the work period this break follows, in milliseconds. */
 	readonly workedMs: number;
-	/** The whole break earned, in whole seconds, as milliseconds. */
+	/**
+	 * The whole break, in whole seconds, as milliseconds: the break earned plus the bank carried
+	 * in.
+	 */
 	readonly earnedMs: number;
 	/** The break left, in milliseconds. */
 	readonly remainingMs: number;
@@ -507,7 +527,7 @@ export function viewRun(run: RunState, now: number): RunView {
 				workedMs: workedSoFarMs,
 				targetMs,
 				isOvertime: workedSoFarMs >= targetMs,
-				breakEarnedMs: earnedBreakMs(workedSoFarMs, block.breakPercent),
+				breakEarnedMs: run.bankedMs + earnedBreakMs(workedSoFarMs, block.breakPercent),
 				isRunning: run.runningSince !== null,
 				isInProgress: true
 			};
@@ -609,6 +629,8 @@ function endRun(
  * @param plan - The routine being run.
  * @param endedPeriods - The work periods the run has already ended.
  * @param position - Where the new work period is in the routine.
+ * @param bankedMs - The unused break carried into the work period, in whole seconds, as
+ * milliseconds: 0 from ready or after a break that ran out.
  * @param now - The current moment, in milliseconds since 1970 (UTC).
  * @returns The run in its new work period.
  */
@@ -616,9 +638,18 @@ function startWork(
 	plan: RoutinePlan,
 	endedPeriods: readonly EndedWorkPeriod[],
 	position: Position,
+	bankedMs: number,
 	now: number
 ): WorkingRun {
-	return { status: 'working', plan, endedPeriods, position, segments: [], runningSince: now };
+	return {
+		status: 'working',
+		plan,
+		endedPeriods,
+		position,
+		segments: [],
+		runningSince: now,
+		bankedMs
+	};
 }
 
 /**
@@ -672,6 +703,10 @@ function currentPeriodUpTo(run: WorkingRun, now: number): EndedWorkPeriod {
  * Ends a work period and starts its break, or ends the run after a finite routine's last work
  * period.
  *
+ * @remarks
+ * The break is what the work period earned plus the bank carried into it. A finite routine's last
+ * work period has no break, so its bank is dropped.
+ *
  * @param run - The run, in a work period.
  * @param now - The current moment, in milliseconds since 1970 (UTC).
  * @returns The run on the work period's break, running from now, or the run completed.
@@ -687,7 +722,7 @@ function endWorkPeriod(run: WorkingRun, now: number): BreakRun | EndedRun {
 		return endRun(run.plan, endedPeriods, 'completed');
 	}
 
-	const earnedMs = earnedBreakMs(endedPeriod.workedMs, block.breakPercent);
+	const earnedMs = earnedBreakMs(endedPeriod.workedMs, block.breakPercent) + run.bankedMs;
 	return {
 		status: 'break',
 		plan: run.plan,

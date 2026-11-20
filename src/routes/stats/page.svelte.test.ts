@@ -47,7 +47,8 @@ function countingSince(minutesAgo: number): StoredRunInProgress {
 			endedPeriods: [],
 			position: { round: 0, block: 0, cycle: 0 },
 			segments: [],
-			runningSince: new Date(START - minutesAgo * MINUTE).toISOString()
+			runningSince: new Date(START - minutesAgo * MINUTE).toISOString(),
+			bankedMs: 0
 		}
 	});
 }

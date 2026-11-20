@@ -712,7 +712,8 @@ describe('recording runs', () => {
 					endedPeriods: [],
 					position: { round: 0, block: 0, cycle: 0 },
 					segments: [{ start: '1970-01-01T00:00:00.000Z', end: '1970-01-01T00:10:00.000Z' }],
-					runningSince: null
+					runningSince: null,
+					bankedMs: 0
 				},
 				heartbeatAt: '1970-01-01T00:10:00.000Z',
 				revision: 'revision-2'
@@ -1050,6 +1051,45 @@ describe('keeping the run in progress', () => {
 			status: 'break',
 			earnedMs: minutes(5),
 			remainingMs: minutes(3),
+			isRunning: false
+		});
+	});
+
+	it('saves the bank when Next ends a break early', async () => {
+		const storage = storageForRuns();
+		const session = createSession([foreverRoutine], { storage });
+		session.play();
+		nowMs = minutes(25);
+		session.next();
+		nowMs = minutes(27);
+
+		session.next();
+
+		await expect
+			.poll(() => storage.getRunInProgress())
+			.toMatchObject({ run: { status: 'working', bankedMs: minutes(3) } });
+	});
+
+	it('restores a work period with its bank in the break earned', async () => {
+		const storage = storageForRuns();
+		const first = createSession([foreverRoutine], { storage });
+		first.play();
+		nowMs = minutes(25);
+		first.next();
+		nowMs = minutes(27);
+		first.next();
+		nowMs = minutes(28);
+		first.tick();
+		const saved = await reopen(storage, '1970-01-01T00:28:00.000Z');
+		nowMs = minutes(40);
+
+		const reopened = createSession([foreverRoutine], { storage }, { saved });
+
+		// 1 minute worked at 20% earns 12 seconds, on top of the 3 minutes banked.
+		expect(reopened.view).toMatchObject({
+			status: 'working',
+			workedMs: minutes(1),
+			breakEarnedMs: minutes(3) + seconds(12),
 			isRunning: false
 		});
 	});
