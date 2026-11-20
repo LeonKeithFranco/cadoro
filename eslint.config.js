@@ -33,6 +33,45 @@ const RUNE_DECLARATION =
 	'VariableDeclaration:has(> VariableDeclarator:matches(' +
 	`[init.callee.name=${RUNE_NAME}], [init.callee.object.name=${RUNE_NAME}]))`;
 
+/** The import pattern that keeps Dexie inside `src/lib/storage/`. */
+const DEXIE_IMPORT = {
+	regex: '^dexie(/|$)',
+	message: 'Only `src/lib/storage/` uses Dexie: go through `CadoroStorage`.'
+};
+
+/** The global that keeps IndexedDB inside `src/lib/storage/`. */
+const STORAGE_GLOBALS = [
+	{ name: 'indexedDB', message: 'Only `src/lib/storage/` opens IndexedDB.' }
+];
+
+/** The global that keeps `localStorage` to the theme mirror. */
+const LOCAL_STORAGE_GLOBAL = {
+	name: 'localStorage',
+	message: 'Only `src/lib/storage/theme-mirror.ts` uses `localStorage`.'
+};
+
+/**
+ * The engine and the pure logic modules, which take the moment as an argument and import no
+ * Svelte, SvelteKit or component.
+ */
+const PURE_MODULES = [
+	'src/lib/run.ts',
+	'src/lib/run-records.ts',
+	'src/lib/run-in-progress.ts',
+	'src/lib/block-view.ts',
+	'src/lib/routine.ts',
+	'src/lib/routine-*.ts',
+	'src/lib/stats-*.ts',
+	'src/lib/streaks.ts',
+	'src/lib/target-stats.ts',
+	'src/lib/day-slices.ts',
+	'src/lib/work-in-progress.ts',
+	'src/lib/work-totals.ts',
+	'src/lib/backup-*.ts',
+	'src/lib/csv-export.ts',
+	'src/lib/chime-schedule.ts'
+];
+
 /**
  * The rules `npm run lint` checks, which CI runs on every pull request. Each object applies to
  * the files its `files` pattern matches, and one without a pattern applies to every file. See
@@ -185,6 +224,71 @@ export default defineConfig(
 			],
 			'playwright/missing-playwright-await': 'error',
 			'playwright/valid-expect': 'error'
+		}
+	},
+	{
+		// ARCHITECTURE's invariant "Data goes only through `CadoroStorage`. Nothing else opens
+		// IndexedDB": only `src/lib/storage/` imports Dexie or touches `indexedDB`, and
+		// `localStorage` is kept to `theme-mirror.ts`, below. Tests are exempt, since they fake
+		// and inspect these.
+		files: ['src/**/*.ts', 'src/**/*.svelte'],
+		ignores: ['src/lib/storage/**', '**/*.test.ts'],
+		rules: {
+			'no-restricted-imports': ['error', { patterns: [DEXIE_IMPORT] }],
+			'no-restricted-globals': ['error', ...STORAGE_GLOBALS, LOCAL_STORAGE_GLOBAL]
+		}
+	},
+	{
+		// The same invariant inside `src/lib/storage/`, where Dexie and IndexedDB are allowed, but
+		// `localStorage` is only for the theme mirror, which `app.html`'s first paint reads.
+		files: ['src/lib/storage/**/*.ts'],
+		ignores: ['src/lib/storage/theme-mirror.ts', '**/*.test.ts'],
+		rules: { 'no-restricted-globals': ['error', LOCAL_STORAGE_GLOBAL] }
+	},
+	{
+		// ARCHITECTURE's cross-cutting concern "A failed save ... is logged with `console.error`":
+		// failures go through `recordError`, so only `error-log.ts` writes to the console. Tests
+		// spy on the console, so they're exempt.
+		files: ['src/**/*.ts', 'src/**/*.svelte'],
+		ignores: ['src/lib/error-log.ts', '**/*.test.ts'],
+		rules: { 'no-console': 'error' }
+	},
+	{
+		// ARCHITECTURE's invariant "Nothing in the engine or the view functions reads the clock, the
+		// page or Svelte": the engine and the pure logic modules take `now` as an argument, and
+		// import no Svelte, SvelteKit or component. They keep the storage invariant above too,
+		// since this block's rules replace that block's for these files.
+		files: PURE_MODULES,
+		ignores: ['**/*.test.ts'],
+		rules: {
+			'no-restricted-imports': [
+				'error',
+				{
+					patterns: [
+						DEXIE_IMPORT,
+						{ regex: '^svelte(/|$)', message: 'Pure logic imports nothing from Svelte.' },
+						{ regex: '^\\$app/', message: 'Pure logic imports nothing from SvelteKit.' },
+						{ regex: '\\.svelte(\\.ts)?$', message: 'Pure logic imports no component.' }
+					]
+				}
+			],
+			'no-restricted-globals': ['error', ...STORAGE_GLOBALS, LOCAL_STORAGE_GLOBAL],
+			'no-restricted-syntax': [
+				'error',
+				{
+					selector: "CallExpression[callee.object.name='Date'][callee.property.name='now']",
+					message: 'Pure logic takes the current moment as an argument, not from `Date.now()`.'
+				},
+				{
+					selector: "NewExpression[callee.name='Date'][arguments.length=0]",
+					message: 'Pure logic takes the current moment as an argument, not from `new Date()`.'
+				},
+				{
+					selector: "CallExpression[callee.object.name='performance'][callee.property.name='now']",
+					message:
+						'Pure logic takes the current moment as an argument, not from `performance.now()`.'
+				}
+			]
 		}
 	},
 	{

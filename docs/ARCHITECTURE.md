@@ -190,6 +190,7 @@ Beside the timer, `RunChimes` and `WakeLockKeeper` watch the session's run and t
 - `npm run typecheck` fails on any Svelte warning.
 - Signatures need explicit return types. typescript-eslint's typed rules are on, with `no-floating-promises`, `no-misused-promises` and `await-thenable` among them, and `require-await` off because promise-interface fakes have `async` methods that don't await.
 - `noUncheckedIndexedAccess` is on, so an index that must exist goes through `blockAt` or `requireDefined`, never a bare `!`.
+- ESLint enforces the invariants above in `eslint.config.js`, with per-file blocks that tests are exempt from. Only `src/lib/storage/` imports Dexie or uses `indexedDB`, and `localStorage` is only in `theme-mirror.ts`. Only `error-log.ts` writes to the console. The engine and the pure logic modules (the run, routine, stats, backup and CSV modules and `chime-schedule.ts`) import nothing from Svelte, SvelteKit or a component, and never call `Date.now()`, `new Date()` with no argument or `performance.now()`. A new pure module is added to the list in the config.
 - Tests are linted with `@vitest/eslint-plugin` and `eslint-plugin-playwright`: no skipped or focused tests, every test asserts, and Playwright calls are awaited.
 - Inline ESLint configuration is ignored (`noInlineConfig`) and `@ts-expect-error` is banned.
 - `.claude/settings.json` is checked in. It asks before an edit to `eslint.config.js`, `tsconfig.json`, `playwright.config.ts`, `.github/workflows/**` or itself.
