@@ -77,32 +77,15 @@ describe('workPeriodsToCsv', () => {
 		expect(workPeriodsToCsv([oneRoundRoutine], [orphan])).toContain('\r\nOne round,,2026');
 	});
 
-	it('quotes a title with a comma', () => {
-		const routine = routineWith({ title: 'Write, then read' });
+	it.each([
+		{ title: 'Write, then read', quoted: '"Write, then read"' },
+		{ title: 'The "deep" one', quoted: '"The ""deep"" one"' },
+		{ title: 'Two\nlines', quoted: '"Two\nlines"' },
+		{ title: 'Two\rlines', quoted: '"Two\rlines"' }
+	])('quotes the title $title as $quoted', ({ title, quoted }) => {
+		const routine = routineWith({ title });
 
-		expect(workPeriodsToCsv([routine], [firstWorkPeriod])).toContain(
-			'\r\n"Write, then read",Focus,'
-		);
-	});
-
-	it('quotes a title with a double quote and doubles the quote', () => {
-		const routine = routineWith({ title: 'The "deep" one' });
-
-		expect(workPeriodsToCsv([routine], [firstWorkPeriod])).toContain(
-			'\r\n"The ""deep"" one",Focus,'
-		);
-	});
-
-	it('quotes a title with a line break and keeps the break inside the quotes', () => {
-		const routine = routineWith({ title: 'Two\nlines' });
-
-		expect(workPeriodsToCsv([routine], [firstWorkPeriod])).toContain('\r\n"Two\nlines",Focus,');
-	});
-
-	it('quotes a title with a carriage return', () => {
-		const routine = routineWith({ title: 'Two\rlines' });
-
-		expect(workPeriodsToCsv([routine], [firstWorkPeriod])).toContain('\r\n"Two\rlines",Focus,');
+		expect(workPeriodsToCsv([routine], [firstWorkPeriod])).toContain(`\r\n${quoted},Focus,`);
 	});
 
 	it('quotes a block title with a comma', () => {
