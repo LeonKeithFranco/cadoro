@@ -13,5 +13,9 @@ export const CHOICE_COLOURS =
 /** The text of a label above a control, such as a field's name. */
 export const LABEL_TEXT = 'text-sm font-medium text-zinc-700 dark:text-zinc-300';
 
+/** The text of a link inside a screen: medium weight, rose and underlined. */
+export const LINK_TEXT =
+	'font-medium text-rose-700 underline underline-offset-2 dark:text-rose-400';
+
 /** The colours of an error message, such as a problem with a field or a failed action. */
 export const ERROR_TEXT = 'text-rose-700 dark:text-rose-400';
