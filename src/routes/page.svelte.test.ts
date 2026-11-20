@@ -14,6 +14,7 @@ import { routineWith } from '#lib/testing/routines.ts';
 import { savedRunInProgress } from '#lib/testing/run-in-progress.ts';
 import { runWith, workPeriodWith } from '#lib/testing/run-records.ts';
 import { storageHolding } from '#lib/testing/storage.ts';
+import { testSessionOptions } from '#lib/testing/timer-session.ts';
 import { TimerSession } from '#lib/timer.svelte.ts';
 import type { PageProps } from './$types';
 import TimerPage from './+page.svelte';
@@ -38,13 +39,7 @@ function pageData(
 ): PageProps['data'] {
 	const timerSession = new TimerSession(
 		routines,
-		{
-			clock: (): number => 0,
-			storage,
-			newId: numberedIds(),
-			newRevision: numberedIds('revision'),
-			onWorkSaved: vi.fn()
-		},
+		testSessionOptions(() => 0, storage),
 		{ saved: null, isAnotherTabOpen: false }
 	);
 	const settingsSession = new SettingsSession(storage, { ...DEFAULT_SETTINGS, ...settings });

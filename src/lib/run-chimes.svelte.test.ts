@@ -6,9 +6,9 @@ import { SettingsSession } from './settings.svelte';
 import type { InMemoryStorage } from './storage/in-memory-storage';
 import { FakeAudioContext, fakeFiles, type FakeSound } from './testing/audio';
 import { minutes, seconds } from './testing/durations';
-import { numberedIds } from './testing/ids';
 import { routineWith } from './testing/routines';
 import { storageHolding } from './testing/storage';
+import { restartRevisions, testSessionOptions } from './testing/timer-session';
 import { TimerSession } from './timer.svelte';
 
 /** A 25-minute block at 20%, repeating forever, so Next always starts a 5-minute break. */
@@ -16,9 +16,6 @@ const foreverRoutine = routineWith({ id: 'forever', title: 'Forever', rounds: 'i
 
 /** The fake clock's current moment, in milliseconds since 1970, which each test moves by hand. */
 let nowMs = 0;
-
-/** The revisions of every tab in a test, numbered, so two tabs never make the same one. */
-let newRevision = numberedIds('revision');
 
 /**
  * The name of this test's chime lock. Each test has its own, since a lock lasts as long as the
@@ -69,16 +66,11 @@ function openTab(
 	const settingsSession = new SettingsSession(storage, settings);
 	const timer = new TimerSession(
 		[foreverRoutine],
-		{
-			clock: (): number => nowMs,
-			storage,
-			newId: numberedIds(),
-			newRevision,
-			onWorkSaved: vi.fn(),
+		testSessionOptions(() => nowMs, storage, {
 			onPress: (): void => {
 				chimes.unlock();
 			}
-		},
+		}),
 		{ saved: null, isAnotherTabOpen: false }
 	);
 	const chimes = new RunChimes({
@@ -140,7 +132,7 @@ async function holdLockElsewhere(): Promise<() => void> {
 // Starts each test at the fake clock's 0, with revisions numbered again and a lock of its own.
 beforeEach(() => {
 	nowMs = 0;
-	newRevision = numberedIds('revision');
+	restartRevisions();
 	testCount++;
 	lockName = `cadoro-chimes-test-${testCount}`;
 });

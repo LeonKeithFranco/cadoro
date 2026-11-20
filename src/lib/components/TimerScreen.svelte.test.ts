@@ -11,6 +11,7 @@ import { numberedIds } from '../testing/ids';
 import { oneRoundRoutine } from '../testing/routines';
 import { shownTotals } from '../testing/run-summary';
 import { storageHolding } from '../testing/storage';
+import { restartRevisions, testSessionOptions } from '../testing/timer-session';
 import { TimerSession } from '../timer.svelte';
 import TimerScreen from './TimerScreen.svelte';
 
@@ -19,12 +20,6 @@ const STARTER_ROUTINES = createStarterRoutines(new Date(0), numberedIds());
 
 /** The fake clock's current moment, in milliseconds since 1970, which each test moves by hand. */
 let nowMs = 0;
-
-/**
- * Makes the revisions of every session in a test, so two sessions on one storage, as two tabs,
- * never make the same one.
- */
-let newRevision = numberedIds('revision');
 
 /**
  * Starts a session on the fake clock, so a test can drive the run the screen shows without real
@@ -41,13 +36,10 @@ function createSession(
 	storage: InMemoryStorage = storageHolding(routines),
 	newId: () => string = numberedIds()
 ): TimerSession {
-	return new TimerSession(routines, {
-		clock: () => nowMs,
-		storage,
-		newId,
-		newRevision,
-		onWorkSaved: vi.fn()
-	});
+	return new TimerSession(
+		routines,
+		testSessionOptions(() => nowMs, storage, { newId })
+	);
 }
 
 /**
@@ -97,7 +89,7 @@ async function finishRun(): Promise<void> {
 // faked so a test fires it.
 beforeEach(() => {
 	nowMs = 0;
-	newRevision = numberedIds('revision');
+	restartRevisions();
 	vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
 });
 
@@ -502,14 +494,10 @@ describe('running a routine from the Timer screen', () => {
 
 	it('pauses on leaving without counting it as a button press, so the chimes stay locked', async () => {
 		const onPress = vi.fn();
-		const session = new TimerSession(STARTER_ROUTINES, {
-			clock: (): number => nowMs,
-			storage: storageHolding(STARTER_ROUTINES),
-			newId: numberedIds(),
-			newRevision,
-			onWorkSaved: vi.fn(),
-			onPress
-		});
+		const session = new TimerSession(
+			STARTER_ROUTINES,
+			testSessionOptions(() => nowMs, storageHolding(STARTER_ROUTINES), { onPress })
+		);
 		const screen = render(TimerScreen, { session });
 		await page.getByRole('button', { name: 'Play' }).click();
 		expect(onPress).toHaveBeenCalledOnce();
