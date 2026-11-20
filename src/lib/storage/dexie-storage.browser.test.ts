@@ -307,6 +307,23 @@ describe('DexieStorage', () => {
 		await expect.poll(() => reports).toBe(2);
 	});
 
+	it('keeps both fields when two connections save different settings at the same moment, as two tabs', async () => {
+		const name = newDatabaseName();
+		const firstTab = new DexieStorage(name);
+		const secondTab = new DexieStorage(name);
+		await firstTab.getSettings();
+		await secondTab.getSettings();
+
+		await Promise.all([
+			firstTab.saveSettings({ volume: 10 }),
+			secondTab.saveSettings({ theme: 'light' })
+		]);
+
+		const settings = await new DexieStorage(name).getSettings();
+		expect(settings.volume).toBe(10);
+		expect(settings.theme).toBe('light');
+	});
+
 	it('reports an error, and no settings, when the settings can’t be read', async () => {
 		const storage = new DexieStorage(newDatabaseName());
 		await storage.getSettings();
