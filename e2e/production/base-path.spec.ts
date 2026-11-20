@@ -70,3 +70,42 @@ test("a screen's address opens that screen directly and after a reload", async (
 	await expect(statsHeading).toBeVisible();
 	expect(failures).toEqual([]);
 });
+
+test('the web app manifest names the app and stays inside the base path', async ({ page }) => {
+	await page.goto('');
+	// The link's `href` property, which the browser has resolved against the page's address.
+	const manifestAddress = await page
+		.locator('link[rel="manifest"]')
+		.evaluate((link) => (link as HTMLLinkElement).href);
+	expect(manifestAddress).toBe(new URL(`${BASE_PATH}/manifest.webmanifest`, page.url()).href);
+
+	const response = await page.request.get(manifestAddress);
+	expect(response.ok()).toBe(true);
+	const manifest = (await response.json()) as {
+		name: string;
+		short_name: string;
+		start_url: string;
+		scope: string;
+		display: string;
+		icons: { src: string; sizes: string; purpose?: string }[];
+	};
+
+	expect(manifest).toMatchObject({
+		name: 'Cadoro',
+		short_name: 'Cadoro',
+		start_url: `${BASE_PATH}/`,
+		scope: `${BASE_PATH}/`,
+		display: 'standalone'
+	});
+	expect(manifest.icons.map((icon) => icon.sizes).toSorted()).toEqual([
+		'192x192',
+		'512x512',
+		'512x512',
+		'64x64'
+	]);
+	expect(manifest.icons.filter((icon) => icon.purpose === 'maskable')).toHaveLength(1);
+	for (const icon of manifest.icons) {
+		const iconResponse = await page.request.get(new URL(icon.src, manifestAddress).href);
+		expect(iconResponse.ok(), `${icon.src} loads`).toBe(true);
+	}
+});
