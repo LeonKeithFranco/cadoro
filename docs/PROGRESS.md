@@ -6,7 +6,6 @@
 
 **Open:**
 
-- Storage has no guard against editing or deleting the running routine, which only the Routines screen stops. Milestone 9's spec sweep can decide whether it needs one.
 - Banking unused break time is an open spec item, to revisit after using the app.
 - Node 22 is supported until April 2027, so it needs moving to a newer LTS before then.
 
