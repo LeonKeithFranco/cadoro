@@ -95,6 +95,8 @@
 		 * saved run is restored from its routine and is forgotten if the routine is gone.
 		 */
 		runningRoutineId?: string | null;
+		/** The runs and work periods that the "last used" and "most work" orders read. */
+		usage?: RoutineUsage;
 		/** Returns a new unique id each time it's called. `crypto.randomUUID` unless a test gives its own. */
 		newId?: () => string;
 		/** Returns the current moment. `new Date()` unless a test gives its own. */
@@ -106,6 +108,7 @@
 		settingsSession,
 		initialRoutines,
 		runningRoutineId = null,
+		usage = NO_USAGE,
 		newId = (): string => crypto.randomUUID(),
 		now = (): Date => new Date()
 	}: Props = $props();
@@ -113,9 +116,6 @@
 	/** The routines not deleted, in custom order, as storage last reported them. */
 	// Only the first value of the prop is wanted, since storage's reports take over from there.
 	let routines = $state.raw<Routine[]>(untrack(() => [...initialRoutines]));
-
-	/** The runs and work periods that "last used" and "most work" are worked out from. */
-	let usage = $state.raw<RoutineUsage>(NO_USAGE);
 
 	let sort = $derived(settingsSession.settings.routineSort);
 	let isInCustomOrder = $derived(sort === 'custom');
@@ -183,8 +183,8 @@
 		focusTarget = null;
 	});
 
-	onMount(() => {
-		const stop = storage.watchRoutines(
+	onMount(() =>
+		storage.watchRoutines(
 			(changed) => {
 				routines = changed;
 				noticeChangesToEditedRoutine(changed);
@@ -192,19 +192,8 @@
 			(error: unknown) => {
 				void recordError('Changes to the routines can no longer be followed.', error);
 			}
-		);
-		Promise.all([storage.getRuns(), storage.getWorkPeriods()])
-			.then(([runs, workPeriods]) => {
-				usage = { runs, workPeriods };
-			})
-			.catch((error: unknown) => {
-				void recordError(
-					'The runs could not be read, so "last used" and "most work" are off.',
-					error
-				);
-			});
-		return stop;
-	});
+		)
+	);
 
 	beforeNavigate((navigation) => {
 		if (!hasUnsavedChanges) {

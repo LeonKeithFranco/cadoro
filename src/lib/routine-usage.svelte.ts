@@ -1,5 +1,6 @@
 // Keeps the runs and work periods that "last used" and "most work" are worked out from, in one
-// place, so the Timer's picker and the session's fallback routine sort from the same fresh data.
+// place, so the Timer's picker, the session's fallback routine and the Routines screen sort from
+// the same fresh data.
 
 import { recordError } from './error-log';
 import { NO_USAGE, type RoutineUsage } from './routine-sort';
