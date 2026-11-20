@@ -318,7 +318,7 @@ function requireKnownReferences(backup: Backup): void {
 	for (const [index, run] of backup.runs.entries()) {
 		if (!routineIds.has(run.routineId)) {
 			throw new InvalidBackupError(
-				`runs[${index}] refers to the routine "${run.routineId}", which the file doesn't hold.`
+				`runs[${index}] (the run "${run.id}", started ${run.startedAt}) refers to the routine "${run.routineId}", which the file doesn't hold.`
 			);
 		}
 	}

@@ -315,7 +315,7 @@ describe('parseBackup rejects a run', () => {
 		const runs = [runWith({ routineId: 'nowhere' })];
 
 		expect(rejectionOf(backupWith({ runs, workPeriods: [] }))).toBe(
-			'runs[0] refers to the routine "nowhere", which the file doesn\'t hold.'
+			'runs[0] (the run "run-1", started 2026-11-19T09:00:00.000Z) refers to the routine "nowhere", which the file doesn\'t hold.'
 		);
 	});
 
