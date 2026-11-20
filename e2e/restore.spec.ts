@@ -2,16 +2,15 @@ import { expect, test } from '@playwright/test';
 import { minutes, seconds } from '../src/lib/testing/durations';
 import { openOnPausedClock } from './clock';
 import { savedWorkPeriods } from './storage';
+import { closeSummary, finishRun, timerBox } from './timer';
 
 test('a reload mid-run restores the run paused, with exact times, and its work is saved once', async ({
 	page
 }) => {
 	await openOnPausedClock(page, '/');
 	const picker = page.getByRole('combobox', { name: 'Routine' });
-	const card = page.getByRole('region', { name: 'Focus' });
-	// Each box is named by its label, which changes with the run, such as "Work · Overtime".
-	const workBox = card.getByRole('group', { name: /^Work/ });
-	const breakBox = card.getByRole('group', { name: /^Break/ });
+	const workBox = timerBox(page, 'Focus', 'Work');
+	const breakBox = timerBox(page, 'Focus', 'Break');
 	const summary = page.getByRole('dialog', { name: 'Run summary' });
 
 	await test.step('a reload mid-work restores the run paused, with its routine', async () => {
@@ -63,11 +62,7 @@ test('a reload mid-run restores the run paused, with exact times, and its work i
 	});
 
 	await test.step('a reload keeps the summary of a run that has ended, until Done', async () => {
-		await page.getByRole('button', { name: 'Finish' }).click();
-		await page
-			.getByRole('dialog', { name: 'Finish this run?' })
-			.getByRole('button', { name: 'Finish' })
-			.click();
+		await finishRun(page);
 		await expect(summary).toBeVisible();
 
 		await page.reload();
@@ -93,7 +88,7 @@ test('a reload mid-run restores the run paused, with exact times, and its work i
 	});
 
 	await test.step('Done, then a reload, gives a new run, ready to start', async () => {
-		await summary.getByRole('button', { name: 'Done' }).click();
+		await closeSummary(page);
 
 		await page.reload();
 
@@ -106,9 +101,7 @@ test('a reload mid-run restores the run paused, with exact times, and its work i
 
 test('a reload keeps the break banked by skipping part of a break', async ({ page }) => {
 	await openOnPausedClock(page, '/');
-	const card = page.getByRole('region', { name: 'Focus' });
-	// Each box is named by its label, which changes with the run, such as "Break earned".
-	const breakBox = card.getByRole('group', { name: /^Break/ });
+	const breakBox = timerBox(page, 'Focus', 'Break');
 
 	await test.step('skipping 1:30 of a break banks it, and some more work earns on top of it', async () => {
 		await page.getByRole('button', { name: 'Play' }).click();

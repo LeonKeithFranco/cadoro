@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { waitForActiveWorker } from '../service-worker.ts';
+import { closeSummary, finishRun } from '../timer.ts';
 import { NEXT_VERSION_COOKIE } from '../update-server.ts';
 
 /**
@@ -55,20 +56,6 @@ function isNewVersionWaiting(page: Page): Promise<boolean> {
 }
 
 /**
- * Finishes the run in progress, confirming it, and closes its summary.
- *
- * @param page - A page of the app, on the Timer screen with a run in progress.
- */
-async function finishRun(page: Page): Promise<void> {
-	await page.getByRole('button', { name: 'Finish' }).click();
-	await page
-		.getByRole('dialog', { name: 'Finish this run?' })
-		.getByRole('button', { name: 'Finish' })
-		.click();
-	await page.getByRole('button', { name: 'Done' }).click();
-}
-
-/**
  * How long Reload has to load the page again, in milliseconds: the same as `expect`'s own limit,
  * so a Reload that does nothing fails as quickly, rather than at the test's 30-second timeout.
  */
@@ -114,6 +101,7 @@ test.describe('a new version of the app', () => {
 
 		await test.step('once the run ends, it offers to reload again', async () => {
 			await finishRun(page);
+			await closeSummary(page);
 
 			await expect(offer).toBeVisible();
 		});
@@ -165,6 +153,7 @@ test.describe('a new version of the app', () => {
 
 		await test.step('once the run ends, both tabs offer to reload', async () => {
 			await finishRun(firstTab);
+			await closeSummary(firstTab);
 
 			await expect(updateOffer(firstTab)).toBeVisible();
 			await expect(updateOffer(secondTab)).toBeVisible();
