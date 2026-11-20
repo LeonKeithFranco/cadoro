@@ -1,6 +1,8 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { hours, minutes } from '../src/lib/testing/durations';
 import { followLink, openOnPausedClock } from './clock';
+import { screenLink } from './screens';
+import { closeSummary, finishRun } from './timer';
 
 /** How many days pass between the journey's two runs. */
 const DAYS_BETWEEN_RUNS = 10;
@@ -20,15 +22,24 @@ async function runRoutine(page: Page, routine: string, workMs: number): Promise<
 	await page.getByRole('combobox', { name: 'Routine' }).selectOption(routine);
 	await page.getByRole('button', { name: 'Play' }).click();
 	await page.clock.fastForward(workMs);
-	await page.getByRole('button', { name: 'Finish' }).click();
-	await page
-		.getByRole('dialog', { name: 'Finish this run?' })
-		.getByRole('button', { name: 'Finish' })
-		.click();
-	await page
-		.getByRole('dialog', { name: 'Run summary' })
-		.getByRole('button', { name: 'Done' })
-		.click();
+	await finishRun(page);
+	await closeSummary(page);
+}
+
+/**
+ * Finds a headline figure of the Stats screen by its term.
+ *
+ * @param page - A page of the app, on the Stats screen with work saved.
+ * @param term - The figure's label, such as `Today`.
+ * @returns The definition beside the term, which holds the figure's value. A figure's term and
+ * definition share one parent, so the term's parent holds only its own definition.
+ */
+function figureOf(page: Page, term: string): Locator {
+	return page
+		.getByRole('term')
+		.filter({ hasText: new RegExp(`^${term}$`) })
+		.locator('..')
+		.getByRole('definition');
 }
 
 test('work from two routines on two days shows in Stats, and the filter and range change it', async ({
@@ -40,10 +51,7 @@ test('work from two routines on two days shows in Stats, and the filter and rang
 	const rangeButtons = page.getByRole('group', { name: 'Range' });
 
 	await test.step('with no work yet, Stats says so and links to the Timer', async () => {
-		await followLink(
-			page,
-			page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Stats' })
-		);
+		await followLink(page, screenLink(page, 'Stats'));
 
 		await expect(page.getByText('No work yet. Run a routine on the Timer')).toBeVisible();
 		await expect(page.getByRole('link', { name: 'Timer', exact: true }).first()).toBeVisible();
@@ -51,17 +59,11 @@ test('work from two routines on two days shows in Stats, and the filter and rang
 	});
 
 	await test.step('work saved on two days and two routines', async () => {
-		await followLink(
-			page,
-			page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Timer' })
-		);
+		await followLink(page, screenLink(page, 'Timer'));
 		await runRoutine(page, 'Classic', minutes(25));
 		await page.clock.fastForward(hours(HOURS_PER_DAY * DAYS_BETWEEN_RUNS));
 		await runRoutine(page, 'Classic with long break', minutes(10));
-		await followLink(
-			page,
-			page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Stats' })
-		);
+		await followLink(page, screenLink(page, 'Stats'));
 
 		await expect(page.getByRole('heading', { level: 1, name: 'Stats' })).toBeVisible();
 	});
@@ -75,12 +77,11 @@ test('work from two routines on two days shows in Stats, and the filter and rang
 			'Targets reached',
 			'All time'
 		]);
-		const figures = page.getByRole('definition');
 
-		await expect(figures.nth(0)).toHaveText('10:00');
-		await expect(figures.nth(1)).toHaveText('1 day');
-		await expect(figures.nth(2)).toHaveText('1 day');
-		await expect(figures.nth(5)).toHaveText('35:00');
+		await expect(figureOf(page, 'Today')).toHaveText('10:00');
+		await expect(figureOf(page, 'Current streak')).toHaveText('1 day');
+		await expect(figureOf(page, 'Longest streak')).toHaveText('1 day');
+		await expect(figureOf(page, 'All time')).toHaveText('35:00');
 	});
 
 	await test.step('the daily chart has a text alternative for the last 7 days', async () => {
@@ -123,9 +124,9 @@ test('work from two routines on two days shows in Stats, and the filter and rang
 	await test.step('filtering by a routine narrows every figure and table', async () => {
 		await routineFilter.selectOption('Classic');
 
-		await expect(page.getByRole('definition').nth(0)).toHaveText('0:00');
-		await expect(page.getByRole('definition').nth(1)).toHaveText('0 days');
-		await expect(page.getByRole('definition').nth(5)).toHaveText('25:00');
+		await expect(figureOf(page, 'Today')).toHaveText('0:00');
+		await expect(figureOf(page, 'Current streak')).toHaveText('0 days');
+		await expect(figureOf(page, 'All time')).toHaveText('25:00');
 		const perRoutine = page.getByRole('region', { name: 'All time per routine' });
 		await expect(perRoutine.getByRole('row')).toHaveCount(1 + 1);
 		await expect(perRoutine.getByRole('row', { name: /^Classic 25:00/ })).toBeVisible();
@@ -135,7 +136,7 @@ test('work from two routines on two days shows in Stats, and the filter and rang
 	await test.step('choosing All routines again brings back everything', async () => {
 		await routineFilter.selectOption('All routines');
 
-		await expect(page.getByRole('definition').nth(5)).toHaveText('35:00');
+		await expect(figureOf(page, 'All time')).toHaveText('35:00');
 		await expect(
 			page.getByRole('region', { name: 'All time per routine' }).getByRole('row')
 		).toHaveCount(1 + 2);

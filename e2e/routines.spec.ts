@@ -1,32 +1,8 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { minutes } from '../src/lib/testing/durations';
-import { followLink, openOnPausedClock } from './clock';
-
-/**
- * How long the paused clock runs to let the app notice a change saved to storage, in
- * milliseconds. Dexie's live query waits on a timer before telling the app about a change, and
- * the fake clock holds every timer back until it moves.
- */
-const SETTLE_MS = 100;
-
-/**
- * Lets the app show a change that storage reported, when the clock is paused.
- *
- * @param page - The page.
- */
-async function settle(page: Page): Promise<void> {
-	await page.clock.runFor(SETTLE_MS);
-}
-
-/**
- * Finds the list of routines on the Routines screen.
- *
- * @param page - The page.
- * @returns The list.
- */
-function routineList(page: Page): Locator {
-	return page.getByRole('list', { name: 'Routines' });
-}
+import { followLink, openOnPausedClock, settle } from './clock';
+import { routineList, screenLink } from './screens';
+import { closeSummary, finishRun } from './timer';
 
 /**
  * Finds a routine's card in the list.
@@ -292,10 +268,7 @@ test('opening another routine, or leaving the screen, with unsaved changes asks 
 	});
 
 	await test.step('leaving by a link asks too, and Cancel stays', async () => {
-		await page
-			.getByRole('navigation', { name: 'Screens' })
-			.getByRole('link', { name: 'Stats' })
-			.click();
+		await screenLink(page, 'Stats').click();
 
 		await expect(dialog).toBeVisible();
 		await dialog.getByRole('button', { name: 'Cancel' }).click();
@@ -304,17 +277,11 @@ test('opening another routine, or leaving the screen, with unsaved changes asks 
 	});
 
 	await test.step('discarding goes on to the screen, and the changes are gone', async () => {
-		await page
-			.getByRole('navigation', { name: 'Screens' })
-			.getByRole('link', { name: 'Stats' })
-			.click();
+		await screenLink(page, 'Stats').click();
 		await dialog.getByRole('button', { name: 'Discard' }).click();
 
 		await expect(page).toHaveURL('/stats');
-		await page
-			.getByRole('navigation', { name: 'Screens' })
-			.getByRole('link', { name: 'Routines' })
-			.click();
+		await screenLink(page, 'Routines').click();
 		await expect(cardOf(page, 'Classic')).toBeVisible();
 	});
 });
@@ -323,10 +290,7 @@ test('browser back with unsaved changes asks to discard them, and Cancel stays',
 	page
 }) => {
 	await page.goto('/');
-	await followLink(
-		page,
-		page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Routines' })
-	);
+	await followLink(page, screenLink(page, 'Routines'));
 	await cardOf(page, 'Classic').getByRole('button', { name: 'Edit' }).click();
 	await page.getByRole('textbox', { name: 'Title', exact: true }).fill('Changed');
 
@@ -386,7 +350,6 @@ test('a routine with two blocks runs exactly as built: each target, break, cycle
 	page
 }) => {
 	await openOnPausedClock(page, '/routines');
-	const navigation = page.getByRole('navigation', { name: 'Screens' });
 
 	await test.step('build Two blocks: 2 rounds of Draft (10 min, 50% break, 2 cycles) then Polish (5 min, 20%)', async () => {
 		await page.getByRole('button', { name: 'New routine' }).click();
@@ -407,7 +370,7 @@ test('a routine with two blocks runs exactly as built: each target, break, cycle
 		await expect(cardOf(page, 'Two blocks')).toContainText('2 rounds · 2 blocks');
 	});
 
-	await followLink(page, navigation.getByRole('link', { name: 'Timer' }));
+	await followLink(page, screenLink(page, 'Timer'));
 	await settle(page);
 	await page.getByRole('combobox', { name: 'Routine' }).selectOption('Two blocks');
 	const draftBreak = page
@@ -505,11 +468,7 @@ test('the routine being run can’t be edited or deleted, in any tab, until the 
 	});
 
 	await test.step('both stay off while the ended run’s summary is open, so a reload still finds it', async () => {
-		await firstTab.getByRole('button', { name: 'Finish' }).click();
-		await firstTab
-			.getByRole('dialog', { name: 'Finish this run?' })
-			.getByRole('button', { name: 'Finish' })
-			.click();
+		await finishRun(firstTab);
 		await settle(firstTab);
 
 		const running = cardOf(secondTab, 'Classic');
@@ -518,10 +477,7 @@ test('the routine being run can’t be edited or deleted, in any tab, until the 
 	});
 
 	await test.step('both come back once the summary is closed', async () => {
-		await firstTab
-			.getByRole('dialog', { name: 'Run summary' })
-			.getByRole('button', { name: 'Done' })
-			.click();
+		await closeSummary(firstTab);
 		await settle(firstTab);
 
 		const running = cardOf(secondTab, 'Classic');

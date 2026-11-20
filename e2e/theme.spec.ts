@@ -1,16 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
+import { expectAppRendered, openApp, seedSettings } from './screens';
 import { saveSettingsRow } from './storage';
-
-/**
- * Opens the app and waits until it has rendered, which it does once its database is open and
- * upgraded, so a journey can then write to the database.
- *
- * @param page - The page to open the app in.
- */
-async function openApp(page: Page): Promise<void> {
-	await page.goto('/');
-	await expect(page.getByRole('navigation', { name: 'Screens' })).toBeVisible();
-}
 
 /**
  * Loads only the app's HTML page, refusing every script, style and other file it asks for, so
@@ -41,23 +31,21 @@ test.describe('the theme', () => {
 
 	test('shows a saved light theme with white colours, after a reload', async ({ page }) => {
 		await openApp(page);
-		await saveSettingsRow(page, { theme: 'light' });
 
-		await page.reload();
+		await seedSettings(page, { theme: 'light' });
 
 		await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
 		await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
 		await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#ffffff');
-		await expect(page.getByRole('navigation', { name: 'Screens' })).toBeVisible();
+		await expectAppRendered(page);
 	});
 
 	test('shows a saved light theme before the app has loaded, so it never flashes dark', async ({
 		page
 	}) => {
 		await openApp(page);
-		await saveSettingsRow(page, { theme: 'light' });
 		// This reload reads the row, which refreshes the mirror in localStorage.
-		await page.reload();
+		await seedSettings(page, { theme: 'light' });
 		await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
 
 		await reloadWithoutTheApp(page);
@@ -69,8 +57,7 @@ test.describe('the theme', () => {
 	test('shows a saved dark theme on a light device before the app has loaded', async ({ page }) => {
 		await page.emulateMedia({ colorScheme: 'light' });
 		await openApp(page);
-		await saveSettingsRow(page, { theme: 'dark' });
-		await page.reload();
+		await seedSettings(page, { theme: 'dark' });
 		await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
 
 		await reloadWithoutTheApp(page);
@@ -83,8 +70,7 @@ test.describe('the theme', () => {
 	}) => {
 		await page.emulateMedia({ colorScheme: 'light' });
 		await openApp(page);
-		await saveSettingsRow(page, { theme: 'system' });
-		await page.reload();
+		await seedSettings(page, { theme: 'system' });
 		await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
 
 		await reloadWithoutTheApp(page);

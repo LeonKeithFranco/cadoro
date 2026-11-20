@@ -1,27 +1,12 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Browser, type Locator, type Page } from '@playwright/test';
 import { minutes } from '../src/lib/testing/durations';
-import { followLink, openOnPausedClock } from './clock';
-
-/**
- * How long the paused clock runs to let the app notice a change saved to storage, in
- * milliseconds. Dexie's live query waits on a timer before telling the app about a change, and
- * the fake clock holds every timer back until it moves.
- */
-const SETTLE_MS = 100;
+import { followLink, openOnPausedClock, settle } from './clock';
+import { createRoutine, routineList, screenLink } from './screens';
+import { closeSummary, finishRun } from './timer';
 
 /** The routine titles that every new browser starts with. */
 const STARTER_TITLES = ['Classic', 'Classic with long break'];
-
-/**
- * Finds the list of routines on the Routines screen.
- *
- * @param page - The page.
- * @returns The list.
- */
-function routineList(page: Page): Locator {
-	return page.getByRole('list', { name: 'Routines' });
-}
 
 /**
  * Finds the Data card on the Settings screen, which holds the import's messages. The screen has
@@ -32,19 +17,6 @@ function routineList(page: Page): Locator {
  */
 function dataCard(page: Page): Locator {
 	return page.getByRole('region', { name: 'Data' });
-}
-
-/**
- * Creates a routine of one block on the Routines screen.
- *
- * @param page - The page, on the Routines screen.
- * @param title - The routine's title.
- */
-async function createRoutine(page: Page, title: string): Promise<void> {
-	await page.getByRole('button', { name: 'New routine' }).click();
-	await page.getByRole('textbox', { name: 'Title', exact: true }).fill(title);
-	await page.getByRole('button', { name: 'Save' }).click();
-	await expect(routineList(page).getByRole('heading', { level: 2, name: title })).toBeVisible();
 }
 
 /**
@@ -142,22 +114,12 @@ async function fillWithData(page: Page): Promise<void> {
 	await page.getByRole('combobox', { name: 'Routine' }).selectOption('Classic');
 	await page.getByRole('button', { name: 'Play' }).click();
 	await page.clock.fastForward(minutes(26));
-	await page.getByRole('button', { name: 'Finish' }).click();
-	await page
-		.getByRole('dialog', { name: 'Finish this run?' })
-		.getByRole('button', { name: 'Finish' })
-		.click();
-	await page
-		.getByRole('dialog', { name: 'Run summary' })
-		.getByRole('button', { name: 'Done' })
-		.click();
+	await finishRun(page);
+	await closeSummary(page);
 
-	await followLink(
-		page,
-		page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Settings' })
-	);
+	await followLink(page, screenLink(page, 'Settings'));
 	await page.getByRole('radio', { name: 'Light' }).check();
-	await page.clock.runFor(SETTLE_MS);
+	await settle(page);
 }
 
 test('a backup from one browser restores into a fresh one with everything intact', async ({
@@ -193,18 +155,12 @@ test('a backup from one browser restores into a fresh one with everything intact
 	});
 
 	await test.step('the routines are the backed-up ones, and the deleted one stays deleted', async () => {
-		await fresh
-			.getByRole('navigation', { name: 'Screens' })
-			.getByRole('link', { name: 'Routines' })
-			.click();
+		await screenLink(fresh, 'Routines').click();
 		await expect(routineList(fresh).getByRole('heading', { level: 2 })).toHaveText([
 			'Keeper',
 			...STARTER_TITLES
 		]);
-		await fresh
-			.getByRole('navigation', { name: 'Screens' })
-			.getByRole('link', { name: 'Timer' })
-			.click();
+		await screenLink(fresh, 'Timer').click();
 		await expect(fresh.getByRole('combobox', { name: 'Routine' }).locator('option')).toHaveText([
 			'Keeper',
 			...STARTER_TITLES
@@ -286,10 +242,7 @@ test('a file that is not a valid backup is turned away with its reason, and chan
 	});
 
 	await test.step('the data is as it was', async () => {
-		await page
-			.getByRole('navigation', { name: 'Screens' })
-			.getByRole('link', { name: 'Routines' })
-			.click();
+		await screenLink(page, 'Routines').click();
 		await expect(routineList(page).getByRole('heading', { level: 2 })).toHaveText(STARTER_TITLES);
 	});
 });
@@ -300,15 +253,9 @@ test('the activity log shows a routine edit and an import, newest first, and exp
 	await page.goto('/settings');
 	const backup = await download(page, 'Back up (JSON)');
 
-	await page
-		.getByRole('navigation', { name: 'Screens' })
-		.getByRole('link', { name: 'Routines' })
-		.click();
+	await screenLink(page, 'Routines').click();
 	await createRoutine(page, 'Logged');
-	await page
-		.getByRole('navigation', { name: 'Screens' })
-		.getByRole('link', { name: 'Settings' })
-		.click();
+	await screenLink(page, 'Settings').click();
 	await chooseFile(page, backup.text, backup.name);
 	await confirmImport(page);
 	await expect(dataCard(page).getByRole('status')).toContainText('Imported 2 routines');
