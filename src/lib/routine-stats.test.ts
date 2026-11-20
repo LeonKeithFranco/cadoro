@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { allTimeTotals, filterByRoutine } from './routine-stats';
+import { allTimeTotals, filterByRoutine, workedMsByRoutine } from './routine-stats';
 import { minutes } from './testing/durations';
 import { routineWith } from './testing/routines';
 import { workPeriodWith } from './testing/run-records';
@@ -32,6 +32,27 @@ describe('filterByRoutine', () => {
 
 	it('gives nothing for a routine without work', () => {
 		expect(filterByRoutine(periods, 'unknown')).toEqual([]);
+	});
+});
+
+describe('workedMsByRoutine', () => {
+	it("adds up each routine's work, by routine id", () => {
+		const periods = [
+			workPeriodWith({ routineId: 'focus', workedMs: minutes(25) }),
+			workPeriodWith({ routineId: 'reading', workedMs: minutes(60) }),
+			workPeriodWith({ routineId: 'focus', workedMs: minutes(10) })
+		];
+
+		expect(workedMsByRoutine(periods)).toEqual(
+			new Map([
+				['focus', minutes(35)],
+				['reading', minutes(60)]
+			])
+		);
+	});
+
+	it('has no entry for a routine without work', () => {
+		expect(workedMsByRoutine([])).toEqual(new Map());
 	});
 });
 
