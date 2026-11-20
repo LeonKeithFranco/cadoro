@@ -78,7 +78,7 @@
 	import { editButtonId, headingId } from '../routine-card-ids';
 	import { duplicateRoutine } from '../routine-duplication';
 	import { moveDown, moveUp } from '../list-order';
-	import { sortRoutines, type RoutineUsage } from '../routine-sort';
+	import { NO_USAGE, sortRoutines, type RoutineUsage } from '../routine-sort';
 	import type { SettingsSession } from '../settings.svelte';
 	import type { CadoroStorage } from '../storage/storage';
 	import { COMPACT_BUTTON_SHAPE, PRIMARY_BUTTON_COLOURS } from './button-classes';
@@ -122,7 +122,7 @@
 	let routines = $state.raw<Routine[]>(untrack(() => [...initialRoutines]));
 
 	/** The runs and work periods that "last used" and "most work" are worked out from. */
-	let usage = $state.raw<RoutineUsage>({ runs: [], workPeriods: [] });
+	let usage = $state.raw<RoutineUsage>(NO_USAGE);
 
 	let sort = $derived(settingsSession.settings.routineSort);
 	let isInCustomOrder = $derived(sort === 'custom');

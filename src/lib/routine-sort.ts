@@ -26,6 +26,9 @@ export type RoutineUsage = {
 	workPeriods: WorkPeriod[];
 };
 
+/** The usage of an app with no runs or work periods saved. Shared, so it's never changed. */
+export const NO_USAGE: RoutineUsage = { runs: [], workPeriods: [] };
+
 /**
  * Compares two UTC timestamps in the same format, which order the same as the moments they name.
  *
