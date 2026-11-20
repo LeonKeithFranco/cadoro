@@ -2,17 +2,8 @@ import './testing/time-zone';
 import { describe, expect, it } from 'vitest';
 import type { DaySlice } from './day-slices';
 import { minutes } from './testing/durations';
+import { utc } from './testing/moments';
 import { RANGE_PRESETS, rangeForPreset } from './stats-range';
-
-/**
- * Reads a UTC timestamp as milliseconds, so each test writes its moments as readable literals.
- *
- * @param timestamp - A UTC timestamp, such as `2026-11-20T05:00:00Z`.
- * @returns The moment in milliseconds since 1970 (UTC).
- */
-function utc(timestamp: string): number {
-	return Date.parse(timestamp);
-}
 
 /** Midday on Thursday Nov 19 2026 in New York. */
 const NOW = utc('2026-11-19T17:00:00Z');

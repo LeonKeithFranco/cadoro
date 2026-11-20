@@ -2,17 +2,8 @@ import './testing/time-zone';
 import { describe, expect, it } from 'vitest';
 import type { DaySlice } from './day-slices';
 import { minutes } from './testing/durations';
+import { utc } from './testing/moments';
 import { streaksOf } from './streaks';
-
-/**
- * Reads a UTC timestamp as milliseconds, so each test writes its moments as readable literals.
- *
- * @param timestamp - A UTC timestamp, such as `2026-11-20T05:00:00Z`.
- * @returns The moment in milliseconds since 1970 (UTC).
- */
-function utc(timestamp: string): number {
-	return Date.parse(timestamp);
-}
 
 /**
  * Makes slices of work, one 25-minute slice for each local midnight given.

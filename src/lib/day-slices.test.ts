@@ -8,17 +8,8 @@ import {
 	startOfLocalDay
 } from './day-slices';
 import { hours, minutes } from './testing/durations';
+import { utc } from './testing/moments';
 import { workPeriodWith } from './testing/run-records';
-
-/**
- * Reads a UTC timestamp as milliseconds, so each test writes its moments as readable literals.
- *
- * @param timestamp - A UTC timestamp, such as `2026-11-20T05:00:00Z`.
- * @returns The moment in milliseconds since 1970 (UTC).
- */
-function utc(timestamp: string): number {
-	return Date.parse(timestamp);
-}
 
 describe('the test time zone', () => {
 	it('is New York, where midnight is 05:00 UTC in winter and 04:00 UTC in summer', () => {

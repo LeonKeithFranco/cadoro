@@ -4,18 +4,9 @@ import { daySlicesOf, nextLocalDay, splitAtMidnight, startOfLocalDay } from './d
 import { rangeForPreset } from './stats-range';
 import { streaksOf } from './streaks';
 import { minutes } from './testing/durations';
+import { utc } from './testing/moments';
 import { workPeriodWith } from './testing/run-records';
 import { dailyTotals } from './work-totals';
-
-/**
- * Reads a UTC timestamp as milliseconds, so each test writes its moments as readable literals.
- *
- * @param timestamp - A UTC timestamp, such as `2026-09-07T03:00:00Z`.
- * @returns The moment in milliseconds since 1970 (UTC).
- */
-function utc(timestamp: string): number {
-	return Date.parse(timestamp);
-}
 
 // In Santiago, midnight is 04:00 UTC (UTC-4) until the clocks change. On Sunday Sep 6 2026 they go
 // from Saturday 23:59:59 to Sunday 01:00, so Sep 6 starts at 01:00 (04:00 UTC) and is 23 hours
