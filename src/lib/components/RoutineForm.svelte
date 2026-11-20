@@ -151,7 +151,12 @@
 			use:dragHandleZone={{
 				items: draggedBlocks ?? draft.blocks,
 				flipDurationMs: 0,
-				dropTargetStyle: {}
+				dropTargetStyle: {},
+				// Move up and Move down move a block by keyboard, so the list and its items aren't Tab
+				// stops, which the library makes of them by default. The handles are kept out of the
+				// order in `BlockEditor`.
+				zoneTabIndex: -1,
+				zoneItemTabIndex: -1
 			}}
 			onconsider={considerBlocks}
 			onfinalize={dropBlocks}

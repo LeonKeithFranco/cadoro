@@ -487,7 +487,12 @@
 			use:dragHandleZone={{
 				items: draggedRoutines ?? sorted,
 				flipDurationMs: 0,
-				dropTargetStyle: {}
+				dropTargetStyle: {},
+				// Move up and Move down move a routine by keyboard, so the list and its items aren't
+				// Tab stops, which the library makes of them by default. The handles are kept out of
+				// the order in `RoutineCard`.
+				zoneTabIndex: -1,
+				zoneItemTabIndex: -1
 			}}
 			onconsider={considerRoutines}
 			onfinalize={dropRoutines}

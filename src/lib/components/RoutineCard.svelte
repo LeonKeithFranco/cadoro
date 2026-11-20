@@ -12,6 +12,7 @@
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import Trash from '@lucide/svelte/icons/trash';
 	import { dragHandle } from 'svelte-dnd-action';
+	import { outOfTabOrder } from '../out-of-tab-order';
 	import type { Routine } from '../routine';
 	import { COMPACT_BUTTON_SHAPE, SECONDARY_BUTTON_COLOURS } from './button-colours';
 
@@ -77,6 +78,7 @@
 		{#if hasDragHandle}
 			<div
 				use:dragHandle
+				use:outOfTabOrder
 				aria-label="Drag {routine.title}"
 				class="rounded-lg p-1.5 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
 			>

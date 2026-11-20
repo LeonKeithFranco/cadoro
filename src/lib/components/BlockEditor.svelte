@@ -12,6 +12,7 @@
 	import GripVertical from '@lucide/svelte/icons/grip-vertical';
 	import Trash from '@lucide/svelte/icons/trash';
 	import { dragHandle } from 'svelte-dnd-action';
+	import { outOfTabOrder } from '../out-of-tab-order';
 	import type { Block } from '../routine';
 	import type { BlockProblems } from '../routine-validation';
 	import { COMPACT_BUTTON_SHAPE, SECONDARY_BUTTON_COLOURS } from './button-colours';
@@ -108,6 +109,7 @@
 	<div class="mt-3 flex flex-wrap items-center gap-2">
 		<div
 			use:dragHandle
+			use:outOfTabOrder
 			aria-label="Drag block {position}"
 			class="rounded-lg p-1.5 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
 		>
