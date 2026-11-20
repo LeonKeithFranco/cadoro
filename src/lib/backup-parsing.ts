@@ -20,34 +20,15 @@ import type { Block, Routine } from './routine';
 import { TARGET_MINUTES_MAX, TARGET_MINUTES_MIN } from './routine-limits';
 import { validateRoutine, type RoutineProblems } from './routine-validation';
 import type { Run, StoredSegment, WorkPeriod } from './run-records';
-import type { RoutineSort, Settings, Theme } from './settings';
+import { ROUTINE_SORTS } from './routine-sort';
+import { THEMES, VOLUME_MAX, VOLUME_MIN, type Settings } from './settings';
 import { fromUtcTimestamp } from './time';
 
 /** The result of reading a backup file: the backup, or the reason it was rejected. */
 export type BackupParseResult = { ok: true; backup: Backup } | { ok: false; message: string };
 
-/** The themes a backup's settings may hold. */
-const THEMES: readonly Theme[] = ['system', 'light', 'dark'];
-
-/** The sort orders a backup's settings may hold. */
-const ROUTINE_SORTS: readonly RoutineSort[] = [
-	'custom',
-	'title-asc',
-	'title-desc',
-	'last-used',
-	'most-work',
-	'newest',
-	'oldest'
-];
-
 /** The run outcomes a backup may hold. */
 const OUTCOMES: readonly NonNullable<Run['outcome']>[] = ['completed', 'finished'];
-
-/** The fewest percent of volume. */
-const VOLUME_MIN = 0;
-
-/** The most percent of volume. */
-const VOLUME_MAX = 100;
 
 /**
  * The bound for whole numbers whose real limits are checked afterwards, by `validateRoutine`,
