@@ -4,6 +4,7 @@ import { render } from 'vitest-browser-svelte';
 import { minutes } from '../testing/durations';
 import { routineWith } from '../testing/routines';
 import { workPeriodWith } from '../testing/run-records';
+import { figure } from '../testing/stats-figures';
 import StatsScreen from './StatsScreen.svelte';
 
 /**
@@ -55,17 +56,6 @@ const NOW = Date.parse('2026-11-19T12:30:00Z');
  */
 function renderStats(data: Partial<{ workPeriods: typeof workPeriods }> = {}): void {
 	render(StatsScreen, { workPeriods, routines, now: NOW, ...data });
-}
-
-/**
- * Finds the value of one headline figure.
- *
- * @param label - The figure's label, such as "Today".
- * @returns A function that reads its value, for `expect.poll`, which keeps asking until the screen
- * shows it. It throws until the figure is on the screen.
- */
-function figure(label: string): () => string | undefined {
-	return () => page.getByText(label, { exact: true }).element().nextElementSibling?.textContent;
 }
 
 /**
