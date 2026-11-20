@@ -299,7 +299,11 @@
 			editing = null;
 		} catch (error) {
 			reportFailure('Saving the routine', error);
-			editing = { ...current, saveError: 'The routine could not be saved. Try again.' };
+			// Built from the form as it is now, not as it was when Save was pressed, so a change from
+			// another tab, noticed while saving, stays warned about. A form closed meanwhile stays closed.
+			if (editing !== null && editing.original.id === current.original.id) {
+				editing = { ...editing, saveError: 'The routine could not be saved. Try again.' };
+			}
 		}
 	}
 
