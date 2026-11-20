@@ -91,6 +91,19 @@ describe('allTimeTotals', () => {
 		expect(allTimeTotals(periods, [focus, reading]).perRoutine).toHaveLength(1);
 	});
 
+	it('ignores accents and case when it breaks a tie by title, like the Routines screen', () => {
+		const accented = routineWith({ id: 'accented', title: 'Éclair' });
+		const plain = routineWith({ id: 'plain', title: 'Eclair' });
+		const periods = [
+			workPeriodWith({ routineId: 'accented', workedMs: minutes(10) }),
+			workPeriodWith({ routineId: 'plain', workedMs: minutes(10) })
+		];
+
+		const titles = allTimeTotals(periods, [accented, plain]).perRoutine.map((total) => total.title);
+
+		expect(titles).toEqual(['Éclair', 'Eclair']);
+	});
+
 	it('lists routines with equal work by title', () => {
 		const periods = [
 			workPeriodWith({ routineId: 'reading', workedMs: minutes(5) }),

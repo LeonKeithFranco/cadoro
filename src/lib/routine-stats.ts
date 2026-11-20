@@ -1,6 +1,7 @@
 // Stats per routine: the routine filter and the all-time totals.
 
 import type { Routine } from './routine';
+import { compareTitles } from './routine-sort';
 import type { WorkPeriod } from './run-records';
 import { totalWorkedMs } from './work-totals';
 
@@ -90,7 +91,8 @@ export function allTimeTotals(workPeriods: WorkPeriod[], routines: Routine[]): A
 		}))
 		.filter((total) => total.workedMs > 0)
 		.sort(
-			(first, second) => second.workedMs - first.workedMs || first.title.localeCompare(second.title)
+			(first, second) =>
+				second.workedMs - first.workedMs || compareTitles(first.title, second.title)
 		);
 	return { workedMs, perRoutine };
 }

@@ -27,13 +27,13 @@ export type RoutineUsage = {
 };
 
 /**
- * Compares two texts for ordering, ignoring case and accents so "apple" sits with "Apple".
+ * Compares two routine titles for ordering, ignoring case and accents so "apple" sits with "Apple".
  *
- * @param a - The first text.
- * @param b - The second text.
+ * @param a - The first title.
+ * @param b - The second title.
  * @returns Negative when `a` comes first, positive when `b` does, 0 when they match.
  */
-function compareText(a: string, b: string): number {
+export function compareTitles(a: string, b: string): number {
 	return a.localeCompare(b, 'en', { sensitivity: 'base' });
 }
 
@@ -80,9 +80,9 @@ function comparisonFor(sort: RoutineSort, usage: RoutineUsage): (a: Routine, b: 
 		case 'custom':
 			return compareCustomOrder;
 		case 'title-asc':
-			return (a, b) => compareText(a.title, b.title);
+			return (a, b) => compareTitles(a.title, b.title);
 		case 'title-desc':
-			return (a, b) => compareText(b.title, a.title);
+			return (a, b) => compareTitles(b.title, a.title);
 		case 'newest':
 			return (a, b) => compareTimestamps(b.createdAt, a.createdAt);
 		case 'oldest':
