@@ -1,11 +1,10 @@
 // The work period that's still going, which isn't a saved work period until Next or Finish ends it,
 // but which Stats counts as work already done.
 
-import { blockAt } from './run';
-import type { StoredRunInProgress } from './run-in-progress';
-import { storedSegment, type StoredSegment, type WorkPeriod } from './run-records';
+import { blockAt, currentPeriodUpTo } from './run';
+import { followRunInProgress, type StoredRunInProgress } from './run-in-progress';
+import { storedSegment, type WorkPeriod } from './run-records';
 import type { Routine } from './routine';
-import { fromUtcTimestamp } from './time';
 
 /** The id of the work period in progress, which no saved work period has, since saved ones are UUIDs. */
 const WORK_IN_PROGRESS_ID = 'work-in-progress';
@@ -29,25 +28,17 @@ export function workInProgress(
 	routines: Routine[],
 	now: number
 ): WorkPeriod | null {
-	if (runInProgress?.run.status !== 'working') {
+	if (runInProgress === null) {
 		return null;
 	}
-	const { record, run } = runInProgress;
-	const routine = routines.find((candidate) => candidate.id === record.routineId);
-	if (routine === undefined) {
+	const followed = followRunInProgress(runInProgress, routines);
+	if (followed?.run.status !== 'working') {
 		return null;
 	}
 
-	const segments: StoredSegment[] = [...run.segments];
-	if (run.runningSince !== null) {
-		const stretch = { start: fromUtcTimestamp(run.runningSince), end: now };
-		segments.push(storedSegment({ ...stretch, end: Math.max(stretch.start, stretch.end) }));
-	}
-	const workedMs = segments.reduce(
-		(total, segment) => total + fromUtcTimestamp(segment.end) - fromUtcTimestamp(segment.start),
-		0
-	);
-	if (workedMs === 0) {
+	const { routine, record, run } = followed;
+	const period = currentPeriodUpTo(run, now);
+	if (period.workedMs === 0) {
 		return null;
 	}
 
@@ -57,8 +48,8 @@ export function workInProgress(
 		runId: record.id,
 		routineId: record.routineId,
 		blockId: block.id,
-		targetMinutes: block.targetMinutes,
-		segments,
-		workedMs
+		targetMinutes: period.targetMinutes,
+		segments: period.segments.map(storedSegment),
+		workedMs: period.workedMs
 	};
 }
