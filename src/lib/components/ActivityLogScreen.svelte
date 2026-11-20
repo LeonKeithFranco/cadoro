@@ -15,6 +15,7 @@
 	import type { CadoroStorage } from '../storage/storage';
 	import { BUTTON_SHAPE, SECONDARY_BUTTON_COLOURS } from './button-classes';
 	import { ERROR_TEXT, LINK_TEXT } from './form-classes';
+	import Card from './Card.svelte';
 	import ScreenHeading from './ScreenHeading.svelte';
 
 	/** The props the log page takes. */
@@ -78,12 +79,8 @@
 	</a>
 </p>
 
-<section
-	aria-labelledby="entries-heading"
-	class="mt-4 rounded-xl border border-zinc-500 bg-white p-4 md:p-6 dark:border-zinc-500 dark:bg-zinc-900"
->
-	<div class="flex flex-wrap items-center justify-between gap-3">
-		<h2 id="entries-heading" class="font-semibold md:text-lg">Entries, newest first</h2>
+<Card title="Entries, newest first" class="mt-4">
+	{#snippet beside()}
 		<button
 			type="button"
 			onclick={exportLog}
@@ -92,7 +89,7 @@
 		>
 			Export the log (JSON)
 		</button>
-	</div>
+	{/snippet}
 	<p class="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
 		Changes to routines, imports and errors, kept on this device only. The newest {LOG_MAX_ENTRIES.toLocaleString(
 			'en'
@@ -144,4 +141,4 @@
 			{/each}
 		</ul>
 	{/if}
-</section>
+</Card>

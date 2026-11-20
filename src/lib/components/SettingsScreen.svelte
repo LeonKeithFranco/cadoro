@@ -28,6 +28,7 @@
 	import type { SaveFile } from '../file-download';
 	import type { CadoroStorage } from '../storage/storage';
 	import { BUTTON_SHAPE, SECONDARY_BUTTON_COLOURS } from './button-classes';
+	import Card from './Card.svelte';
 	import DataSection from './DataSection.svelte';
 	import { CHOICE_COLOURS, INPUT_COLOURS, LABEL_TEXT } from './form-classes';
 	import ScreenHeading from './ScreenHeading.svelte';
@@ -75,6 +76,14 @@
 	 */
 	let isPersistent: boolean | null = $state(null);
 
+	/** The words for whether storage is persistent: On, Off, or Unknown when that isn't known. */
+	let persistenceStatus = $derived.by(() => {
+		if (isPersistent === null) {
+			return 'Unknown';
+		}
+		return isPersistent ? 'On' : 'Off';
+	});
+
 	/** Whether the browser was asked again and still didn't make storage persistent. */
 	let wasDeclined = $state(false);
 
@@ -109,11 +118,7 @@
 
 <div class="mt-4 grid gap-4">
 	<!-- Each group of settings is a card like the Timer screen's, named by its heading. -->
-	<section
-		aria-labelledby="appearance-heading"
-		class="rounded-xl border border-zinc-500 bg-white p-4 md:p-6 dark:border-zinc-500 dark:bg-zinc-900"
-	>
-		<h2 id="appearance-heading" class="font-semibold md:text-lg">Appearance</h2>
+	<Card title="Appearance">
 		<fieldset class="mt-3">
 			<legend class={LABEL_TEXT}>Theme</legend>
 			<div class="mt-2 flex flex-wrap gap-x-6 gap-y-2">
@@ -132,13 +137,9 @@
 				{/each}
 			</div>
 		</fieldset>
-	</section>
+	</Card>
 
-	<section
-		aria-labelledby="alerts-heading"
-		class="rounded-xl border border-zinc-500 bg-white p-4 md:p-6 dark:border-zinc-500 dark:bg-zinc-900"
-	>
-		<h2 id="alerts-heading" class="font-semibold md:text-lg">Alerts</h2>
+	<Card title="Alerts">
 		<div class="mt-3 grid gap-4">
 			{@render chimePicker(
 				`${idPrefix}-target-chime`,
@@ -177,13 +178,9 @@
 				/>
 			</div>
 		</div>
-	</section>
+	</Card>
 
-	<section
-		aria-labelledby="screen-heading"
-		class="rounded-xl border border-zinc-500 bg-white p-4 md:p-6 dark:border-zinc-500 dark:bg-zinc-900"
-	>
-		<h2 id="screen-heading" class="font-semibold md:text-lg">Screen</h2>
+	<Card title="Screen">
 		<label class="mt-3 flex items-center gap-2">
 			<input
 				type="checkbox"
@@ -200,23 +197,13 @@
 				This browser can't keep the screen awake, so the screen may turn off during a run.
 			</p>
 		{/if}
-	</section>
+	</Card>
 
-	<section
-		aria-labelledby="storage-heading"
-		class="rounded-xl border border-zinc-500 bg-white p-4 md:p-6 dark:border-zinc-500 dark:bg-zinc-900"
-	>
-		<h2 id="storage-heading" class="font-semibold md:text-lg">Storage</h2>
+	<Card title="Storage">
 		<div class="mt-3 flex flex-wrap items-center justify-between gap-3">
 			<p aria-live="polite">
 				<span class="text-zinc-600 dark:text-zinc-400">Persistent storage:</span>
-				{#if isPersistent === true}
-					<span class="font-medium">On</span>
-				{:else if isPersistent === false}
-					<span class="font-medium">Off</span>
-				{:else}
-					<span class="font-medium">Unknown</span>
-				{/if}
+				<span class="font-medium">{persistenceStatus}</span>
 			</p>
 			{#if isPersistent === false}
 				<button type="button" onclick={askAgain} class={[BUTTON_SHAPE, SECONDARY_BUTTON_COLOURS]}>
@@ -236,7 +223,7 @@
 			{/if}
 			Clearing the site's data, uninstalling or changing devices still erases it.
 		</p>
-	</section>
+	</Card>
 
 	<DataSection {storage} {saveFile} {now} />
 
