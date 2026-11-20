@@ -79,6 +79,23 @@ describe('the activity log page', () => {
 		await expect.element(items.nth(2)).toHaveTextContent('Created routine "Writing"');
 	});
 
+	it('reads the log once, so an entry added while it is open waits for the next visit', async () => {
+		const storage = await storageWithEntries();
+		renderLog(storage);
+		const items = page.getByRole('list', { name: 'Log entries' }).getByRole('listitem');
+		await expect.element(items).toHaveLength(3);
+
+		await storage.addLogEntry({
+			timestamp: '2026-11-19T11:00:00.000Z',
+			type: 'change',
+			message: 'Deleted routine "Writing"'
+		});
+
+		await new Promise((resolve) => setTimeout(resolve, 200));
+		await expect.element(items).toHaveLength(3);
+		await expect.element(page.getByText('Deleted routine "Writing"')).not.toBeInTheDocument();
+	});
+
 	it('writes each entry’s type in words, as Change or Error', async () => {
 		renderLog(await storageWithEntries());
 
