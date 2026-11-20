@@ -398,7 +398,7 @@
 		<span class="text-sm font-medium text-zinc-700 dark:text-zinc-300">Sort by</span>
 		<select
 			bind:value={(): string => sort, chooseSort}
-			class="mt-1 block rounded-md border-zinc-300 bg-white text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+			class="mt-1 block rounded-md border-zinc-500 bg-white text-zinc-900 dark:border-zinc-500 dark:bg-zinc-900 dark:text-zinc-100"
 		>
 			{#each SORT_OPTIONS as option (option.value)}
 				<option value={option.value}>{option.label}</option>

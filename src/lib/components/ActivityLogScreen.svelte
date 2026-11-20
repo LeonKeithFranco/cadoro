@@ -82,7 +82,7 @@
 
 <section
 	aria-labelledby="entries-heading"
-	class="mt-4 rounded-xl border border-zinc-200 bg-white p-4 md:p-6 dark:border-zinc-800 dark:bg-zinc-900"
+	class="mt-4 rounded-xl border border-zinc-500 bg-white p-4 md:p-6 dark:border-zinc-500 dark:bg-zinc-900"
 >
 	<div class="flex flex-wrap items-center justify-between gap-3">
 		<h2 id="entries-heading" class="font-semibold md:text-lg">Entries, newest first</h2>
@@ -124,7 +124,7 @@
 								'rounded-full border px-2 text-xs font-medium',
 								entry.type === 'error'
 									? 'border-rose-700 text-rose-700 dark:border-rose-300 dark:text-rose-300'
-									: 'border-zinc-400 text-zinc-700 dark:border-zinc-500 dark:text-zinc-300'
+									: 'border-zinc-500 text-zinc-700 dark:border-zinc-500 dark:text-zinc-300'
 							]}
 						>
 							{entry.type === 'error' ? 'Error' : 'Change'}

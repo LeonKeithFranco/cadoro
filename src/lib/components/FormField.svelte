@@ -40,7 +40,7 @@
 			aria-describedby={message === undefined ? undefined : messageId}
 			oninput={(event: Event & { currentTarget: HTMLInputElement }): void =>
 				oninput(event.currentTarget)}
-			class="mt-1 block w-full rounded-md border-zinc-300 bg-white text-zinc-900 disabled:cursor-not-allowed disabled:opacity-60 aria-invalid:border-rose-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:aria-invalid:border-rose-400"
+			class="mt-1 block w-full rounded-md border-zinc-500 bg-white text-zinc-900 disabled:cursor-not-allowed disabled:opacity-60 aria-invalid:border-rose-700 dark:border-zinc-500 dark:bg-zinc-900 dark:text-zinc-100 dark:aria-invalid:border-rose-400"
 		/>
 	</label>
 	<!-- Outside the label, so the message isn't part of the input's name. -->

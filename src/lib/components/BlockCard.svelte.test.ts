@@ -122,11 +122,26 @@ describe('a block card', () => {
 		await expect.element(breakFill).toHaveAttribute('style', 'width: 60%;');
 	});
 
-	it('hides the bars from screen readers, which read the times instead', async () => {
+	it("gives each box's bar a progressbar role, named by the box, with its value as a percentage", async () => {
 		render(BlockCard, { block: focusBlock() });
 
-		const workFill = page.getByRole('group', { name: 'Work' }).getByTestId('progress-fill');
-		await expect.element(workFill).toBeInTheDocument();
-		expect(workFill.element().closest('[aria-hidden="true"]')).not.toBeNull();
+		const workBar = page.getByRole('progressbar', { name: 'Work' });
+		await expect.element(workBar).toHaveAttribute('aria-valuemin', '0');
+		await expect.element(workBar).toHaveAttribute('aria-valuemax', '100');
+		await expect.element(workBar).toHaveAttribute('aria-valuenow', '50');
+		await expect
+			.element(page.getByRole('progressbar', { name: 'Break earned' }))
+			.toHaveAttribute('aria-valuenow', '0');
+	});
+
+	it("says a bar's time against its target in words, or just the time when it has no target", async () => {
+		render(BlockCard, { block: focusBlock() });
+
+		await expect
+			.element(page.getByRole('progressbar', { name: 'Work' }))
+			.toHaveAttribute('aria-valuetext', '12:30 of 25:00');
+		await expect
+			.element(page.getByRole('progressbar', { name: 'Break earned' }))
+			.toHaveAttribute('aria-valuetext', '2:30');
 	});
 });

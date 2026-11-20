@@ -50,7 +50,7 @@
 
 <section
 	aria-labelledby={headingId}
-	class="rounded-xl border border-zinc-200 bg-white p-4 md:p-6 dark:border-zinc-800 dark:bg-zinc-900"
+	class="rounded-xl border border-zinc-500 bg-white p-4 md:p-6 dark:border-zinc-500 dark:bg-zinc-900"
 >
 	<h2 id={headingId} class="font-semibold md:text-lg">Daily work time</h2>
 
