@@ -93,8 +93,9 @@ describe('ChimePlayer', () => {
 		logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 	});
 
-	// Puts the real `console.error` back.
+	// Puts the real `console.error` back, and takes away the log a test chose for errors.
 	afterEach(() => {
+		useErrorLog(null);
 		vi.restoreAllMocks();
 	});
 
@@ -145,7 +146,9 @@ describe('ChimePlayer', () => {
 			expect(fetchFile).toHaveBeenCalledTimes(1);
 		});
 
-		it('logs an audio context that cannot be made, and stays silent', async () => {
+		it('records an audio context that cannot be made in the log, and stays silent', async () => {
+			const log = new InMemoryStorage();
+			useErrorLog(log);
 			const { player } = await setUpUnlocked({
 				createContext: () => {
 					throw new Error('AudioContext is not defined');
@@ -154,23 +157,23 @@ describe('ChimePlayer', () => {
 
 			await player.reschedule(working, start);
 
-			expect(logged).toHaveBeenCalledWith(
-				'Could not set up the audio for the chimes.',
-				expect.any(Error)
-			);
+			await expect
+				.poll(() => recordedErrors(log))
+				.toEqual([['Could not set up the audio for the chimes.', 'AudioContext is not defined']]);
 			expect(player.scheduled).toEqual([]);
 		});
 
-		it('logs an audio context that cannot resume', async () => {
+		it('records an audio context that cannot resume in the log', async () => {
+			const log = new InMemoryStorage();
+			useErrorLog(log);
 			const context = new FakeAudioContext();
 			context.resumeError = new Error('Not allowed to start');
 
 			await setUpUnlocked({ createContext: () => context });
 
-			expect(logged).toHaveBeenCalledWith(
-				'Could not start the audio for the chimes.',
-				context.resumeError
-			);
+			await expect
+				.poll(() => recordedErrors(log))
+				.toEqual([['Could not start the audio for the chimes.', 'Not allowed to start']]);
 		});
 
 		it('says the audio can play once the context has resumed', async () => {
@@ -478,15 +481,16 @@ describe('ChimePlayer', () => {
 	});
 
 	describe('a chime file that cannot be played', () => {
-		it('logs a missing file, and schedules nothing', async () => {
+		it('records a missing file in the log, and schedules nothing', async () => {
+			const log = new InMemoryStorage();
+			useErrorLog(log);
 			const { player, context } = await setUpUnlocked({ fetchFile: fakeFiles({}) });
 
 			await player.reschedule(working, start);
 
-			expect(logged).toHaveBeenCalledWith(
-				`Could not load the chime ${files.target}.`,
-				new Error('The server answered 404')
-			);
+			await expect
+				.poll(() => recordedErrors(log))
+				.toContainEqual([`Could not load the chime ${files.target}.`, 'The server answered 404']);
 			expect(context.sources).toEqual([]);
 			expect(player.scheduled).toEqual([]);
 		});
@@ -656,55 +660,6 @@ describe('ChimePlayer', () => {
 
 			expect(player.scheduled[0]?.file).toBe(otherFile);
 			expect(playedFile(context, 0)).toBe('other chime');
-		});
-	});
-
-	describe('recording its failures in the activity log', () => {
-		/** Where the errors go, which each test chooses as the app's log. */
-		let log: InMemoryStorage;
-
-		// Chooses a new log, and takes it away after, so no test records into another's.
-		beforeEach(() => {
-			log = new InMemoryStorage();
-			useErrorLog(log);
-		});
-		afterEach(() => {
-			useErrorLog(null);
-		});
-
-		it('records an audio context that cannot be made', async () => {
-			const { player } = await setUpUnlocked({
-				createContext: () => {
-					throw new Error('AudioContext is not defined');
-				}
-			});
-
-			await player.reschedule(working, start);
-
-			await expect
-				.poll(() => recordedErrors(log))
-				.toEqual([['Could not set up the audio for the chimes.', 'AudioContext is not defined']]);
-		});
-
-		it('records an audio context that cannot resume', async () => {
-			const context = new FakeAudioContext();
-			context.resumeError = new Error('Not allowed to start');
-
-			await setUpUnlocked({ createContext: () => context });
-
-			await expect
-				.poll(() => recordedErrors(log))
-				.toEqual([['Could not start the audio for the chimes.', 'Not allowed to start']]);
-		});
-
-		it('records a chime file that cannot be loaded', async () => {
-			const { player } = await setUpUnlocked({ fetchFile: fakeFiles({}) });
-
-			await player.reschedule(working, start);
-
-			await expect
-				.poll(() => recordedErrors(log))
-				.toContainEqual([`Could not load the chime ${files.target}.`, 'The server answered 404']);
 		});
 	});
 });
