@@ -9,7 +9,7 @@ import { DEFAULT_SETTINGS } from '../settings';
 import { InMemoryStorage } from '../storage/in-memory-storage';
 import { oneRoundRoutine, routineWith } from '../testing/routines';
 import { savedRunInProgress } from '../testing/run-in-progress';
-import { firstWorkPeriod, runWith } from '../testing/run-records';
+import { completedRun, firstWorkPeriod } from '../testing/run-records';
 import DataSection from './DataSection.svelte';
 
 // Takes away the log a test chose for errors, and puts back what a test replaced.
@@ -36,11 +36,7 @@ async function renderCard(): Promise<Setup> {
 	await storage.addRoutinesIfNone([oneRoundRoutine]);
 	await storage.saveSettings({ volume: 30 });
 	await storage.saveRunInProgress(savedRunInProgress, null, {
-		run: runWith({
-			endedAt: '2026-11-19T09:25:00.000Z',
-			outcome: 'completed',
-			roundsReached: 1
-		}),
+		run: completedRun,
 		workPeriods: [firstWorkPeriod]
 	});
 	const saveFile = vi.fn<SaveFile>();
@@ -64,14 +60,7 @@ function validBackupText(): string {
 		createBackup(
 			{
 				routines: [oneRoundRoutine, deleted],
-				runs: [
-					runWith({
-						id: 'run-1',
-						endedAt: '2026-11-19T09:25:00.000Z',
-						outcome: 'completed',
-						roundsReached: 1
-					})
-				],
+				runs: [completedRun],
 				workPeriods: [firstWorkPeriod],
 				settings: { ...DEFAULT_SETTINGS, volume: 12 }
 			},

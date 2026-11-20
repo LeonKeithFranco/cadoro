@@ -11,7 +11,13 @@ import { DEFAULT_SETTINGS, type Settings } from '../settings';
 import { minutes } from '../testing/durations';
 import { oneRoundRoutine, routineWith } from '../testing/routines';
 import { runInProgressWith, savedRunInProgress } from '../testing/run-in-progress';
-import { firstWorkPeriod, runInProgress, runWith, workPeriodWith } from '../testing/run-records';
+import {
+	completedRun,
+	firstWorkPeriod,
+	runInProgress,
+	runWith,
+	workPeriodWith
+} from '../testing/run-records';
 import { withRoutines } from '../testing/storage';
 import { DexieStorage } from './dexie-storage';
 import { InMemoryStorage } from './in-memory-storage';
@@ -864,11 +870,7 @@ describe.each(backends)('$name', ({ create }) => {
 				run: runInProgress,
 				workPeriods: []
 			});
-			const endedRun = runWith({
-				endedAt: '2026-11-19T09:25:00.000Z',
-				outcome: 'completed',
-				roundsReached: 1
-			});
+			const endedRun = completedRun;
 
 			await storage.saveRunInProgress(savedRunInProgress, 'revision-1', {
 				run: endedRun,

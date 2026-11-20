@@ -3,7 +3,7 @@ import { createBackup, serializeBackup, type Backup } from './backup-format';
 import { parseBackup } from './backup-parsing';
 import { DEFAULT_SETTINGS } from './settings';
 import { oneRoundRoutine, routineWith } from './testing/routines';
-import { firstWorkPeriod, runWith, workPeriodWith } from './testing/run-records';
+import { completedRun, firstWorkPeriod, runWith, workPeriodWith } from './testing/run-records';
 
 /** The moment the test backups are made. */
 const exportedAt = new Date('2026-11-20T10:00:00.000Z');
@@ -21,13 +21,6 @@ const deletedRoutine = routineWith({
 	]
 });
 
-/** The run of the one-round routine, completed after 25 minutes. */
-const finishedRun = runWith({
-	endedAt: '2026-11-19T09:25:00.000Z',
-	outcome: 'completed',
-	roundsReached: 1
-});
-
 /**
  * Makes a valid backup with a test's changes on top.
  *
@@ -38,7 +31,7 @@ function backupWith(changes: Partial<Backup>): Backup {
 	const valid = createBackup(
 		{
 			routines: [oneRoundRoutine, deletedRoutine],
-			runs: [finishedRun],
+			runs: [completedRun],
 			workPeriods: [firstWorkPeriod],
 			settings: DEFAULT_SETTINGS
 		},
@@ -350,7 +343,7 @@ describe('parseBackup rejects a run', () => {
 	});
 
 	it('with a negative rounds reached', () => {
-		const runs = [{ ...finishedRun, roundsReached: -1 }];
+		const runs = [{ ...completedRun, roundsReached: -1 }];
 
 		expect(rejectionOf(backupWith({ runs }))).toBe(
 			'runs[0].roundsReached must be from 0 to 9007199254740991.'
@@ -374,7 +367,7 @@ describe('parseBackup rejects a run', () => {
 	});
 
 	it('that shares an id with another run', () => {
-		const runs = [finishedRun, finishedRun];
+		const runs = [completedRun, completedRun];
 
 		expect(rejectionOf(backupWith({ runs }))).toBe('runs[1] repeats the id "run-1".');
 	});

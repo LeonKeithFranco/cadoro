@@ -34,6 +34,13 @@ export function runWith(changes: Partial<Run>): Run {
 	return { ...runInProgress, ...changes };
 }
 
+/** {@link runInProgress}, completed after its 25 minutes, at 9:25 UTC, with 1 round reached. */
+export const completedRun: Run = runWith({
+	endedAt: '2026-11-19T09:25:00.000Z',
+	outcome: 'completed',
+	roundsReached: 1
+});
+
 /**
  * Makes a work period for a test, which differs from {@link firstWorkPeriod} only where it says.
  *
