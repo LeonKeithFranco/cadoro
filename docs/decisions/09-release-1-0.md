@@ -138,7 +138,7 @@ Nothing here blocks the release. They need a real device, so they're listed rath
 
 - Three read-only sweeps of the logic, the components and the tests found duplication, a little dead code, duplicated test set-up, error paths tested twice, a few brittle assertions, two test gaps and one likely bug. One pull request removes them without changing what the app does, apart from the named fixes.
 - Phase A changed production code and left the tests alone, except where a package named one, so the existing tests proved behaviour was kept. Phase B changed tests and left production code alone, so the unchanged code proved the tests still test it. Phase C was the guardrail edit, the visual check, the docs and the release.
-- Every fix got a regression test that was seen failing first, and every new or rewritten assertion was seen failing against broken code.
+- The two logic fixes (Back to the log with unsaved changes, and Stats title ties) got a regression test that was seen failing first. The five `fix(ui)` changes have none, since they change only classes, and were checked visually against `main` instead. Every new or rewritten assertion was seen failing against broken code.
 
 ### The three decisions with the user
 
@@ -152,7 +152,7 @@ Nothing here blocks the release. They need a real device, so they're listed rath
 
 ### The guardrail edit
 
-- The main session made the `eslint.config.js` edit itself, early, so its permission prompt came while the user was there, rather than leaving it to a writer at the end. `PURE_MODULES` gained the pure modules it missed (`run-announcement`, `time`, `percent`, `list-order`, `screens`, `theme`, `export-files`, `log`, `defined`) and the new ones (`plural`, `routine-editing`).
+- The main session made the `eslint.config.js` edit itself, early, so its permission prompt came while the user was there, rather than leaving it to a writer at the end. `PURE_MODULES` gained the pure modules it missed (`run-announcement`, `time`, `percent`, `list-order`, `screens`, `theme`, `export-files`, `log`, `defined`) and the new `plural`. `routine-editing` needed no entry, since the existing `src/lib/routine-*.ts` glob covers it.
 
 ### The fixes
 
@@ -177,6 +177,8 @@ Nothing here blocks the release. They need a real device, so they're listed rath
 
 - The client hook test prints a harmless "[Unhandled error]" line, which Vite forwards from the real `window` event the test now sends.
 - `withRepeatCounted` counts an error as a repeat when the clock moves back, which moves `lastTimestamp` back. The new `log.test.ts` locks in what the code does.
+- `date-fns` now loads with the first page, through `+layout.ts`, `routine-sort.ts`, `routine-stats.ts` and `work-totals.ts`, and `localDayText` brings it to Settings too. Its `optimizeDeps.include` entry is no longer needed for that, and is kept since it's harmless.
+- Commit `16edb68` fails the format check by itself. `3e2cb1e` fixes it. It's kept rather than rewriting pushed history.
 - The chime journey "Plays each alert's own chime" in `e2e/settings.spec.ts` flaked. It clicked the two Preview buttons back to back, and each preview loads its file before playing, so under load the chimes could start in either order while the journey asserted one. `main` had the same race, so the sweep didn't cause it. The journey now waits until the first chime has started before it clicks the second, as a user would, with no timeout, retry or sleep.
 
 ### Release

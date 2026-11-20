@@ -214,7 +214,7 @@ Beside the timer, `RunChimes` and `WakeLockKeeper` watch the session's run and t
 
 ### Builds, deploys and releases
 
-- `optimizeDeps.include` in `vite.config.ts` lists the libraries that only lazily loaded screens import (`svelte-dnd-action`, `layerchart`, `date-fns`). Without it the dev server finds them mid-journey, re-bundles and reloads the page, which fails the test running then. Add a library there when a screen imports it and nothing on the first page does.
+- `optimizeDeps.include` in `vite.config.ts` lists the libraries that only lazily loaded screens import (`svelte-dnd-action`, `layerchart`). `date-fns` is listed too, but the first page now loads it, through `+layout.ts`, `routine-sort.ts`, `routine-stats.ts` and `work-totals.ts`, so the entry is kept and harmless. Without an entry the dev server finds a library mid-journey, re-bundles and reloads the page, which fails the test running then. Add a library there when a screen imports it and nothing on the first page does.
 - The build is `adapter-static` with an `index.html` fallback, and nothing is prerendered. Workbox's service worker keeps every file, the chimes included, and answers every address with the fallback page, so the app works offline.
 - A new version waits until the user reloads, and the prompt stays hidden during a run.
 - CI runs the checks on every pull request, in Playwright's container image. A push to `main` that passes deploys to GitHub Pages, with a copy of the fallback page as `404.html`.
