@@ -32,7 +32,7 @@
 	/** The entries, newest first, or `null` while they're being read. */
 	let entries: LogEntry[] | null = $state(null);
 
-	/** Whether the entries or the export failed, with the words to show. */
+	/** The words to show when the entries could not be read, or `null` when they could. */
 	let failure: string | null = $state(null);
 
 	/** How the time of each entry is written, in the user's own time zone. */
