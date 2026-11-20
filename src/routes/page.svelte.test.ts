@@ -13,6 +13,7 @@ import { numberedIds } from '#lib/testing/ids.ts';
 import { routineWith } from '#lib/testing/routines.ts';
 import { savedRunInProgress } from '#lib/testing/run-in-progress.ts';
 import { runWith, workPeriodWith } from '#lib/testing/run-records.ts';
+import { storageHolding } from '#lib/testing/storage.ts';
 import { TimerSession } from '#lib/timer.svelte.ts';
 import type { PageProps } from './$types';
 import TimerPage from './+page.svelte';
@@ -91,17 +92,17 @@ describe('the Timer page', () => {
 	});
 
 	it('orders the picker by the work saved when the sort is most work', async () => {
-		const storage = new InMemoryStorage();
+		const routines = [
+			routineWith({ id: 'a', title: 'Alpha', customPosition: 0 }),
+			routineWith({ id: 'b', title: 'Bravo', customPosition: 1 })
+		];
+		const storage = storageHolding(routines);
 		await storage.saveRunInProgress(savedRunInProgress, null, {
 			run: runWith({ id: 'run-1', routineId: 'b' }),
 			workPeriods: [workPeriodWith({ id: 'period-1', routineId: 'b', workedMs: minutes(30) })]
 		});
 		// Saved too, since the settings session follows what storage holds.
 		await storage.saveSettings({ routineSort: 'most-work' });
-		const routines = [
-			routineWith({ id: 'a', title: 'Alpha', customPosition: 0 }),
-			routineWith({ id: 'b', title: 'Bravo', customPosition: 1 })
-		];
 
 		render(TimerPage, {
 			data: pageData(storage, { routineSort: 'most-work' }, routines),

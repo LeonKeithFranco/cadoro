@@ -4,7 +4,7 @@ import { useErrorLog } from '#lib/error-log.ts';
 import { DexieStorage } from '#lib/storage/dexie-storage.ts';
 import type { TimerSession } from '#lib/timer.svelte.ts';
 import { runInProgressWith, savedRunInProgress } from '#lib/testing/run-in-progress.ts';
-import { routineWith } from '#lib/testing/routines.ts';
+import { oneRoundRoutine, routineWith } from '#lib/testing/routines.ts';
 import { firstWorkPeriod, runInProgress, runWith } from '#lib/testing/run-records.ts';
 import type { RoutineUsageKeeper } from '#lib/routine-usage.svelte.ts';
 
@@ -48,6 +48,8 @@ async function freshLoad(): Promise<() => Promise<LoadedApp>> {
  */
 async function saveEarlierWork(): Promise<void> {
 	const storage = new DexieStorage();
+	// The run's routine, which storage requires to be saved before a run of it.
+	await storage.addRoutinesIfNone([oneRoundRoutine]);
 	await storage.saveRunInProgress(savedRunInProgress, null, {
 		run: runInProgress,
 		workPeriods: [firstWorkPeriod]

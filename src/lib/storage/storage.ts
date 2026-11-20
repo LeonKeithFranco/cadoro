@@ -212,9 +212,8 @@ export interface CadoroStorage {
 	 * revision, or none when `basedOn` isn't `null`, and nothing was saved.
 	 * @throws Rejects with an {@link Error} when `records.run` is a run not saved yet whose routine
 	 * isn't saved, as after an import in another tab replaced the routines, since a backup of
-	 * that run would be rejected. Storage with no routines at all is never refused. Rejects with the
-	 * backend's own error when a work period's id is already saved, or when the data can't be
-	 * saved. Then nothing from this call is saved.
+	 * that run would be rejected. Rejects with the backend's own error when a work period's id is
+	 * already saved, or when the data can't be saved. Then nothing from this call is saved.
 	 */
 	saveRunInProgress(
 		runInProgress: StoredRunInProgress,

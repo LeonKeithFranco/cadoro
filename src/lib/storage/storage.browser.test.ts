@@ -12,6 +12,7 @@ import { minutes } from '../testing/durations';
 import { oneRoundRoutine, routineWith } from '../testing/routines';
 import { runInProgressWith, savedRunInProgress } from '../testing/run-in-progress';
 import { firstWorkPeriod, runInProgress, runWith, workPeriodWith } from '../testing/run-records';
+import { withRoutines } from '../testing/storage';
 import { DexieStorage } from './dexie-storage';
 import { InMemoryStorage } from './in-memory-storage';
 import type { CadoroStorage, StorageOptions } from './storage';
@@ -838,7 +839,7 @@ describe.each(backends)('$name', ({ create }) => {
 
 	describe('saveRunInProgress', () => {
 		it('saves every field of a run and its work periods', async () => {
-			const storage = create();
+			const storage = await withRoutines(create(), [oneRoundRoutine]);
 			const pausedPeriod = workPeriodWith({
 				id: 'period-2',
 				segments: [
@@ -858,7 +859,7 @@ describe.each(backends)('$name', ({ create }) => {
 		});
 
 		it('replaces the run when it is saved again as it ends', async () => {
-			const storage = create();
+			const storage = await withRoutines(create(), [oneRoundRoutine]);
 			await storage.saveRunInProgress(savedRunInProgress, null, {
 				run: runInProgress,
 				workPeriods: []
@@ -892,6 +893,19 @@ describe.each(backends)('$name', ({ create }) => {
 			expect(await storage.getRunInProgress()).toBeNull();
 		});
 
+		it('refuses a new run when storage holds no routine at all', async () => {
+			const storage = create();
+
+			await expect(
+				storage.saveRunInProgress(savedRunInProgress, null, {
+					run: runInProgress,
+					workPeriods: []
+				})
+			).rejects.toThrow('routine "one-round"');
+
+			expect(await storage.getRuns()).toEqual([]);
+		});
+
 		it('accepts a new run of a routine that is deleted, since the backup still holds it', async () => {
 			const storage = create();
 			await storage.addRoutinesIfNone([
@@ -907,7 +921,7 @@ describe.each(backends)('$name', ({ create }) => {
 		});
 
 		it('adds work periods and leaves the run as it was when the run is null', async () => {
-			const storage = create();
+			const storage = await withRoutines(create(), [oneRoundRoutine]);
 			await storage.saveRunInProgress(savedRunInProgress, null, {
 				run: runInProgress,
 				workPeriods: []
@@ -923,7 +937,7 @@ describe.each(backends)('$name', ({ create }) => {
 		});
 
 		it('does not add runs or work periods to the activity log', async () => {
-			const storage = create(atNow);
+			const storage = await withRoutines(create(atNow), [oneRoundRoutine]);
 
 			await storage.saveRunInProgress(savedRunInProgress, null, {
 				run: runInProgress,
@@ -934,7 +948,7 @@ describe.each(backends)('$name', ({ create }) => {
 		});
 
 		it('rejects a work period whose id is already saved, and saves nothing from that call', async () => {
-			const storage = create();
+			const storage = await withRoutines(create(), [oneRoundRoutine]);
 			await storage.saveRunInProgress(savedRunInProgress, null, {
 				run: runInProgress,
 				workPeriods: [firstWorkPeriod]
@@ -960,7 +974,7 @@ describe.each(backends)('$name', ({ create }) => {
 		});
 
 		it('saves copies, so changing records after saving them leaves the saved ones unchanged', async () => {
-			const storage = create();
+			const storage = await withRoutines(create(), [oneRoundRoutine]);
 			const run = runWith({});
 			const period = workPeriodWith({});
 			await storage.saveRunInProgress(savedRunInProgress, null, { run, workPeriods: [period] });
@@ -999,7 +1013,7 @@ describe.each(backends)('$name', ({ create }) => {
 		});
 
 		it('replaces the run in progress with each save, leaving runs and work periods alone when it keeps nothing new', async () => {
-			const storage = create();
+			const storage = await withRoutines(create(), [oneRoundRoutine]);
 			await storage.saveRunInProgress(savedRunInProgress, null, {
 				run: runInProgress,
 				workPeriods: [firstWorkPeriod]
@@ -1038,7 +1052,7 @@ describe.each(backends)('$name', ({ create }) => {
 		});
 
 		it('refuses a change worked out from another revision, as from a tab that missed a press, and saves nothing from it', async () => {
-			const storage = create();
+			const storage = await withRoutines(create(), [oneRoundRoutine]);
 			await storage.saveRunInProgress(savedRunInProgress, null, {
 				run: runInProgress,
 				workPeriods: []
@@ -1253,7 +1267,7 @@ describe.each(backends)('$name', ({ create }) => {
 
 	describe('clearRunInProgress', () => {
 		it('forgets the run in progress, and keeps its run and work periods', async () => {
-			const storage = create();
+			const storage = await withRoutines(create(), [oneRoundRoutine]);
 			await storage.saveRunInProgress(savedRunInProgress, null, {
 				run: runInProgress,
 				workPeriods: [firstWorkPeriod]
@@ -1425,7 +1439,7 @@ describe.each(backends)('$name', ({ create }) => {
 		});
 
 		it('returns the runs in the order they started, whatever order they were saved in', async () => {
-			const storage = create();
+			const storage = await withRoutines(create(), [oneRoundRoutine]);
 			await storage.saveRunInProgress(savedRunInProgress, null, {
 				run: runWith({ id: 'afternoon', startedAt: '2026-11-19T14:00:00.000Z' }),
 				workPeriods: []
@@ -1441,7 +1455,7 @@ describe.each(backends)('$name', ({ create }) => {
 		});
 
 		it('returns copies, so changing one leaves the saved run unchanged', async () => {
-			const storage = create();
+			const storage = await withRoutines(create(), [oneRoundRoutine]);
 			await storage.saveRunInProgress(savedRunInProgress, null, {
 				run: runInProgress,
 				workPeriods: []
@@ -1497,7 +1511,7 @@ describe.each(backends)('$name', ({ create }) => {
 
 	describe('hasWorkPeriods', () => {
 		it('says no for empty storage, and while only a run is saved', async () => {
-			const storage = create();
+			const storage = await withRoutines(create(), [oneRoundRoutine]);
 			expect(await storage.hasWorkPeriods()).toBe(false);
 
 			await storage.saveRunInProgress(savedRunInProgress, null, {
@@ -1509,7 +1523,7 @@ describe.each(backends)('$name', ({ create }) => {
 		});
 
 		it('says yes once a work period is saved', async () => {
-			const storage = create();
+			const storage = await withRoutines(create(), [oneRoundRoutine]);
 
 			await storage.saveRunInProgress(savedRunInProgress, null, {
 				run: runInProgress,

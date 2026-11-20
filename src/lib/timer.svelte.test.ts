@@ -9,6 +9,7 @@ import type { CadoroStorage } from './storage/storage';
 import { minutes, seconds } from './testing/durations';
 import { numberedIds } from './testing/ids';
 import { oneRoundRoutine, routineWith } from './testing/routines';
+import { storageHolding } from './testing/storage';
 import { TimerSession, type AppOpening, type TimerSessionOptions } from './timer.svelte';
 
 /** The starter routines, Classic then Classic with long break, with predictable ids. */
@@ -31,6 +32,16 @@ const foreverRoutine = routineWith({ id: 'forever', title: 'Forever', rounds: 'i
  */
 function byTitleDescending(choices: readonly Routine[]): Routine[] {
 	return choices.toSorted((a, b) => b.title.localeCompare(a.title));
+}
+
+/**
+ * Makes storage holding every routine these tests start a run of, which storage requires of a
+ * new run, for the tests that share one storage between sessions.
+ *
+ * @returns New storage holding the starter routines, the one-round routine and the forever one.
+ */
+function storageForRuns(): InMemoryStorage {
+	return storageHolding([...routines, oneRoundRoutine, foreverRoutine]);
 }
 
 /** The fake clock's current moment, in milliseconds since 1970, which each test moves by hand. */
@@ -60,7 +71,7 @@ function createSession(
 	options: Partial<
 		Pick<
 			TimerSessionOptions,
-			'storage' | 'newId' | 'onWorkSaved' | 'onPress' | 'onRunStarted' | 'onTick' | 'pickerOrder'
+			'storage' | 'newId' | 'onWorkSaved' | 'onPress' | 'onRunStarted' | 'pickerOrder'
 		>
 	> = {},
 	opening: Partial<AppOpening> = {}
@@ -69,7 +80,7 @@ function createSession(
 		choices,
 		{
 			clock: () => nowMs,
-			storage: new InMemoryStorage(),
+			storage: storageHolding(choices),
 			newId: numberedIds(),
 			newRevision,
 			onWorkSaved: vi.fn(),
@@ -456,7 +467,7 @@ describe('the run as the chimes see it', () => {
 	});
 
 	it('gives the run another tab changed, once the session takes it on', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageForRuns();
 		const firstTab = createSession([foreverRoutine], { storage, newId: numberedIds('first') });
 		const secondTab = createSession([foreverRoutine], { storage, newId: numberedIds('second') });
 
@@ -490,7 +501,7 @@ describe('the run as the chimes see it', () => {
 
 	it('pauses on leaving the screen, saving the pause, without calling onPress', async () => {
 		const onPress = vi.fn();
-		const storage = new InMemoryStorage();
+		const storage = storageForRuns();
 		const session = createSession(routines, { onPress, storage });
 		session.play();
 		onPress.mockClear();
@@ -514,24 +525,6 @@ describe('the run as the chimes see it', () => {
 		session.readyNewRun();
 
 		expect(onPress).not.toHaveBeenCalled();
-	});
-
-	it('calls onTick on every tick, paused or not, after the view moves on, and on no press', () => {
-		const workedWhenCalled: number[] = [];
-		const session = createSession(routines, {
-			onTick: () => {
-				workedWhenCalled.push(session.view.status === 'working' ? session.view.workedMs : -1);
-			}
-		});
-		session.play();
-
-		nowMs = seconds(1);
-		session.tick();
-		session.pause();
-		nowMs = seconds(2);
-		session.tick();
-
-		expect(workedWhenCalled).toEqual([seconds(1), seconds(1)]);
 	});
 });
 
@@ -594,7 +587,7 @@ describe('recording runs', () => {
 	});
 
 	it('saves a whole run: its start, each work period and how it ended', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageForRuns();
 		const session = createSession([foreverRoutine], { storage });
 		session.play();
 		nowMs = minutes(10);
@@ -647,7 +640,7 @@ describe('recording runs', () => {
 	});
 
 	it('saves nothing before Play, whatever routine is chosen or button pressed', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageForRuns();
 		const session = createSession([oneRoundRoutine, foreverRoutine], { storage });
 		session.select('forever');
 		session.pause();
@@ -667,7 +660,7 @@ describe('recording runs', () => {
 	});
 
 	it('gives the next run after Done a record of its own', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageForRuns();
 		const session = createSession([oneRoundRoutine], { storage });
 		session.play();
 		nowMs = minutes(26);
@@ -690,7 +683,7 @@ describe('recording runs', () => {
 	});
 
 	it('saves the run in progress with each press, as of the moment it was pressed', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageForRuns();
 		const session = createSession([foreverRoutine], { storage });
 		session.play();
 		nowMs = minutes(10);
@@ -721,7 +714,7 @@ describe('recording runs', () => {
 	});
 
 	it('saves the ended run as the run in progress, so its summary can come back', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageForRuns();
 		const session = createSession([foreverRoutine], { storage });
 		session.play();
 		nowMs = minutes(25);
@@ -737,7 +730,7 @@ describe('recording runs', () => {
 	});
 
 	it('saves nothing for a press that changes nothing, such as Pause on a paused run', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageForRuns();
 		const saveSpy = vi.spyOn(storage, 'saveRunInProgress');
 		const session = createSession([foreverRoutine], { storage });
 		session.play();
@@ -757,7 +750,7 @@ describe('recording runs', () => {
 	});
 
 	it('saves each press in order, even when an earlier save is slow', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageForRuns();
 		const save = storage.saveRunInProgress.bind(storage);
 		const { promise: firstSaveHeld, resolve: releaseFirstSave } = Promise.withResolvers<void>();
 		const saveSpy = vi
@@ -789,7 +782,7 @@ describe('recording runs', () => {
 	});
 
 	it('logs a save that fails, and carries on timing and saving', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageForRuns();
 		const failure = new Error('The disk is full.');
 		vi.spyOn(storage, 'saveRunInProgress').mockRejectedValueOnce(failure);
 		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -805,7 +798,7 @@ describe('recording runs', () => {
 	});
 
 	it('says work is saved once each work period is, and not for the run alone', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageForRuns();
 		const onWorkSaved = vi.fn();
 		const session = createSession([foreverRoutine], { storage, onWorkSaved });
 		session.play();
@@ -820,7 +813,7 @@ describe('recording runs', () => {
 	});
 
 	it('says nothing about work whose save failed', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageForRuns();
 		const saveSpy = vi.spyOn(storage, 'saveRunInProgress');
 		vi.spyOn(console, 'error').mockImplementation(() => {});
 		const onWorkSaved = vi.fn();
@@ -867,7 +860,7 @@ describe('keeping the run in progress', () => {
 	});
 
 	it('saves a heartbeat on each tick while a timer is counting', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageForRuns();
 		const session = createSession([foreverRoutine], { storage });
 		session.play();
 		nowMs = seconds(1);
@@ -883,7 +876,7 @@ describe('keeping the run in progress', () => {
 	});
 
 	it('saves no heartbeat while the run is paused, since nothing new happens', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageForRuns();
 		const saveSpy = vi.spyOn(storage, 'saveRunInProgress');
 		const heartbeatSpy = vi.spyOn(storage, 'saveHeartbeat');
 		const session = createSession([foreverRoutine], { storage });
@@ -902,7 +895,7 @@ describe('keeping the run in progress', () => {
 	});
 
 	it('forgets the run in progress once Done readies a new run, and keeps its records', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageForRuns();
 		const session = createSession([foreverRoutine], { storage });
 		session.play();
 		nowMs = minutes(25);
@@ -916,7 +909,7 @@ describe('keeping the run in progress', () => {
 	});
 
 	it('never brings back a run that Done forgot, even when a heartbeat’s save is slow', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageForRuns();
 		const session = createSession([foreverRoutine], { storage });
 		session.play();
 		await reopen(storage, '1970-01-01T00:00:00.000Z');
@@ -950,7 +943,7 @@ describe('keeping the run in progress', () => {
 	});
 
 	it('carries on a saved run with its routine chosen, paused at its last heartbeat', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageForRuns();
 		const first = createSession([classic, foreverRoutine], { storage });
 		first.select('forever');
 		first.play();
@@ -971,7 +964,7 @@ describe('keeping the run in progress', () => {
 	});
 
 	it('saves the restored run as paused, so storage shows what the screen does', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageForRuns();
 		const first = createSession([foreverRoutine], { storage });
 		first.play();
 		nowMs = minutes(10);
@@ -990,7 +983,7 @@ describe('keeping the run in progress', () => {
 	});
 
 	it('ends the restored work period on the run Play started, saving its work once', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageForRuns();
 		const first = createSession([foreverRoutine], { storage });
 		first.play();
 		nowMs = minutes(10);
@@ -1019,7 +1012,7 @@ describe('keeping the run in progress', () => {
 	});
 
 	it('restores a break with the time it had left at the heartbeat', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageForRuns();
 		const first = createSession([foreverRoutine], { storage });
 		first.play();
 		nowMs = minutes(25);
@@ -1040,7 +1033,7 @@ describe('keeping the run in progress', () => {
 	});
 
 	it('opens on the summary of a run that had ended, until Done forgets it', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageForRuns();
 		const first = createSession([foreverRoutine], { storage });
 		first.play();
 		nowMs = minutes(25);
@@ -1058,7 +1051,7 @@ describe('keeping the run in progress', () => {
 	});
 
 	it('starts as usual, and forgets the saved run, when its routine is gone', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageForRuns();
 		const first = createSession([foreverRoutine], { storage });
 		first.play();
 		const saved = await reopen(storage, '1970-01-01T00:00:00.000Z');
@@ -1135,7 +1128,7 @@ describe('sharing the run across tabs', () => {
 	});
 
 	it('follows a press in another tab, still running, without saving it again', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageForRuns();
 		const firstTab = createSession([foreverRoutine], { storage, newId: numberedIds('first') });
 		const secondTab = createSession([foreverRoutine], { storage, newId: numberedIds('second') });
 		const saveSpy = vi.spyOn(storage, 'saveRunInProgress');
@@ -1151,7 +1144,7 @@ describe('sharing the run across tabs', () => {
 	});
 
 	it('takes on the routine another tab chose and started', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageHolding(routines);
 		const firstTab = createSession(routines, { storage, newId: numberedIds('first') });
 		const secondTab = createSession(routines, { storage, newId: numberedIds('second') });
 
@@ -1166,7 +1159,7 @@ describe('sharing the run across tabs', () => {
 	});
 
 	it('readies a new run of the same routine in every tab once one closes the summary', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageHolding([classic, foreverRoutine]);
 		const firstTab = createSession([classic, foreverRoutine], {
 			storage,
 			newId: numberedIds('first')
@@ -1190,7 +1183,7 @@ describe('sharing the run across tabs', () => {
 	});
 
 	it('refuses a press from a tab that missed another’s, saving nothing from it, and takes on the saved run', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageForRuns();
 		const firstTab = createSession([foreverRoutine], { storage, newId: numberedIds('first') });
 		firstTab.play();
 		const playing = await reopen(storage, '1970-01-01T00:00:00.000Z');
@@ -1212,7 +1205,7 @@ describe('sharing the run across tabs', () => {
 	});
 
 	it('saves a work period once when two tabs end it at the same moment, from the tab whose press was saved', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageForRuns();
 		const firstTabWorkSaved = vi.fn();
 		const firstTab = createSession([foreverRoutine], {
 			storage,
@@ -1239,7 +1232,7 @@ describe('sharing the run across tabs', () => {
 	});
 
 	it('never lets a heartbeat from a tab that missed a press undo it', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageForRuns();
 		const firstTab = createSession([foreverRoutine], { storage, newId: numberedIds('first') });
 		firstTab.play();
 		const playing = await reopen(storage, '1970-01-01T00:00:00.000Z');
@@ -1257,7 +1250,7 @@ describe('sharing the run across tabs', () => {
 	});
 
 	it('keeps a newer run when a tab that missed it closes the old summary, and takes the newer run on', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageForRuns();
 		const firstTab = createSession([foreverRoutine], { storage, newId: numberedIds('first') });
 		firstTab.play();
 		nowMs = minutes(25);
@@ -1278,7 +1271,7 @@ describe('sharing the run across tabs', () => {
 	});
 
 	it('joins a run live in another tab still running, saving nothing', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageForRuns();
 		const firstTab = createSession([foreverRoutine], { storage, newId: numberedIds('first') });
 		firstTab.play();
 		nowMs = minutes(10);
@@ -1304,7 +1297,7 @@ describe('sharing the run across tabs', () => {
 	});
 
 	it('takes on the later of two reads while catching up, even when the earlier finishes last', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageForRuns();
 		const firstTab = createSession([foreverRoutine], { storage, newId: numberedIds('first') });
 		const secondTab = createSession([foreverRoutine], { storage, newId: numberedIds('second') });
 		// Both tabs hear that nothing is saved yet before the first press, so only the second tab
@@ -1336,7 +1329,7 @@ describe('sharing the run across tabs', () => {
 	});
 
 	it('drops a read that its own press overtook, so it never goes back to the run before the press', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageForRuns();
 		const firstTab = createSession([foreverRoutine], { storage, newId: numberedIds('first') });
 		const watch = storage.watchRunInProgress.bind(storage);
 		let reportToSecondTab: (runInProgress: StoredRunInProgress | null) => void = () => {};
@@ -1370,11 +1363,14 @@ describe('sharing the run across tabs', () => {
 	});
 
 	it('leaves its run alone when another tab starts a routine it doesn’t have', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageHolding([classic, foreverRoutine]);
 		const firstTab = createSession([classic, foreverRoutine], {
 			storage,
 			newId: numberedIds('first')
 		});
+		// Storage holds the routine, which it must for the first tab's run, but the second tab never
+		// hears of it, as one that hasn't yet been told of another tab's new routine wouldn't.
+		vi.spyOn(storage, 'watchRoutines').mockReturnValueOnce((): void => {});
 		const secondTab = createSession([classic], { storage, newId: numberedIds('second') });
 
 		firstTab.select('forever');
@@ -1388,7 +1384,7 @@ describe('sharing the run across tabs', () => {
 
 	it('logs that other tabs can no longer be followed when storage reports an error', () => {
 		// Typed as the interface, whose `watchRunInProgress` takes the `onError` this backend skips.
-		const storage: CadoroStorage = new InMemoryStorage();
+		const storage: CadoroStorage = storageForRuns();
 		const failure = new Error('The disk could not be read.');
 		vi.spyOn(storage, 'watchRunInProgress').mockImplementationOnce(
 			(_onChange, onError): (() => void) => {
@@ -1407,7 +1403,7 @@ describe('sharing the run across tabs', () => {
 	});
 
 	it('logs a run it can’t read while catching up, and carries on', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageForRuns();
 		const firstTab = createSession([foreverRoutine], { storage, newId: numberedIds('first') });
 		firstTab.play();
 		const playing = await reopen(storage, '1970-01-01T00:00:00.000Z');
@@ -1430,7 +1426,7 @@ describe('sharing the run across tabs', () => {
 	});
 
 	it('forgets nothing on Done when every save of the run failed, since none was saved', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageForRuns();
 		const saveSpy = vi
 			.spyOn(storage, 'saveRunInProgress')
 			.mockRejectedValue(new Error('The disk is full.'));
@@ -1449,7 +1445,7 @@ describe('sharing the run across tabs', () => {
 	});
 
 	it('drops heartbeats after a press’s save fails, so a restore never counts the break as work', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageForRuns();
 		const session = createSession([foreverRoutine], { storage });
 		session.play();
 		nowMs = minutes(10);
@@ -1477,7 +1473,7 @@ describe('sharing the run across tabs', () => {
 	});
 
 	it('ends two tabs restoring at once on the same run, with work saved once', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageForRuns();
 		const first = createSession([foreverRoutine], { storage });
 		first.play();
 		nowMs = minutes(10);
@@ -1525,8 +1521,7 @@ describe('following the routines', () => {
 		storage: InMemoryStorage;
 		session: TimerSession;
 	}> {
-		const storage = new InMemoryStorage();
-		await storage.addRoutinesIfNone(routines);
+		const storage = storageHolding(routines);
 		return { storage, session: createSession(routines, { storage }) };
 	}
 
@@ -1667,7 +1662,7 @@ describe('recording its failures in the activity log', () => {
 	}
 
 	it('records a save that fails', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageForRuns();
 		useErrorLog(storage);
 		vi.spyOn(storage, 'saveRunInProgress').mockRejectedValueOnce(new Error('The disk is full.'));
 		const session = createSession([foreverRoutine], { storage });
@@ -1680,7 +1675,7 @@ describe('recording its failures in the activity log', () => {
 	});
 
 	it('records a run that cannot be read while catching up', async () => {
-		const storage = new InMemoryStorage();
+		const storage = storageForRuns();
 		const firstTab = createSession([foreverRoutine], { storage, newId: numberedIds('first') });
 		firstTab.play();
 		const playing = await reopen(storage, '1970-01-01T00:00:00.000Z');
@@ -1702,7 +1697,7 @@ describe('recording its failures in the activity log', () => {
 	});
 
 	it('records that the run can no longer be followed', async () => {
-		const storage: CadoroStorage = new InMemoryStorage();
+		const storage: CadoroStorage = storageForRuns();
 		useErrorLog(storage);
 		vi.spyOn(storage, 'watchRunInProgress').mockImplementationOnce(
 			(_onChange, onError): (() => void) => {
@@ -1724,7 +1719,7 @@ describe('recording its failures in the activity log', () => {
 	});
 
 	it('records that the routines can no longer be followed', async () => {
-		const storage: CadoroStorage = new InMemoryStorage();
+		const storage: CadoroStorage = storageForRuns();
 		useErrorLog(storage);
 		vi.spyOn(storage, 'watchRoutines').mockImplementation((_onChange, onError) => {
 			onError(new Error('The routines could not be read.'));

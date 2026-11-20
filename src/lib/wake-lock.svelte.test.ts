@@ -7,6 +7,7 @@ import { InMemoryStorage } from './storage/in-memory-storage';
 import { minutes } from './testing/durations';
 import { numberedIds } from './testing/ids';
 import { routineWith } from './testing/routines';
+import { storageHolding } from './testing/storage';
 import { TimerSession } from './timer.svelte';
 import {
 	WakeLockKeeper,
@@ -141,7 +142,7 @@ type Setup = {
  * @returns What the test follows and controls, with the setting on, as it is by default.
  */
 function setUp({ isSupported = true }: { isSupported?: boolean } = {}): Setup {
-	const storage = new InMemoryStorage();
+	const storage = storageHolding([foreverRoutine]);
 	const wakeLock = new FakeWakeLock();
 	const page = new FakePage();
 	const settings = new SettingsSession(storage, DEFAULT_SETTINGS);
