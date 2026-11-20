@@ -14,6 +14,7 @@ The decision log: what was decided as Cadoro was built, why, and the options rej
 - `06-routines.md`: milestone 6, the routine rules in pure logic, storage and the activity log, the Routines screen, locking the running routine, the Timer's sorted picker and pinned controls, pre-bundled libraries, and the journeys.
 - `07-stats.md`: milestone 7, the stats logic split by what each module knows, local days and the pinned test time zone, the Stats screen and its accessible chart, deleted routines' labels, and the journeys.
 - `08-backup-and-log.md`: milestone 8, what the backup leaves out, file names and days, how an invalid file is rejected, replacing the data in one transaction, recording errors and falling back to the console, the log page, and the journeys.
+- `09-release-1-0.md`: milestone 9, the test coverage audit and the bugs it found, the guardrails, the spec tidy, the accessibility fixes, Node staying on 22, the README and self-host check, and the device checks for 1.0.
 
 ## Adding a decision
 
