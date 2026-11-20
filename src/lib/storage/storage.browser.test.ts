@@ -722,6 +722,103 @@ describe.each(backends)('$name', ({ create }) => {
 			]);
 		});
 
+		describe('a repeated error', () => {
+			/**
+			 * Makes an error entry.
+			 *
+			 * @param timestamp - When it happened.
+			 * @param changes - What differs from the usual entry, such as its message.
+			 * @returns The entry.
+			 */
+			function errorAt(
+				timestamp: string,
+				changes: { message?: string; name?: string } = {}
+			): Parameters<CadoroStorage['addLogEntry']>[0] {
+				return {
+					timestamp,
+					type: 'error',
+					message: changes.message ?? 'Something failed.',
+					details: { name: changes.name ?? 'Error', message: 'x' }
+				};
+			}
+
+			it('is collapsed into the entry before it, with a count and the moment of the last one', async () => {
+				const storage = create();
+
+				await storage.addLogEntry(errorAt('2026-11-19T10:00:00.000Z'));
+				await storage.addLogEntry(errorAt('2026-11-19T10:00:05.000Z'));
+				await storage.addLogEntry(errorAt('2026-11-19T10:00:30.000Z'));
+
+				const entries = await storage.getLogEntries();
+				expect(entries).toHaveLength(1);
+				expect(entries[0]).toMatchObject({
+					timestamp: '2026-11-19T10:00:00.000Z',
+					details: {
+						name: 'Error',
+						message: 'x',
+						count: 3,
+						lastTimestamp: '2026-11-19T10:00:30.000Z'
+					}
+				});
+			});
+
+			it('keeps collapsing while the errors keep coming, each within the window of the last', async () => {
+				const storage = create();
+
+				for (const second of [0, 50, 100, 150]) {
+					const timestamp = new Date(Date.UTC(2026, 10, 19, 10, 0, second)).toISOString();
+					await storage.addLogEntry(errorAt(timestamp));
+				}
+
+				const entries = await storage.getLogEntries();
+				expect(entries).toHaveLength(1);
+				expect(entries[0]?.details).toMatchObject({ count: 4 });
+			});
+
+			it('is a new entry once the window has passed since the last one', async () => {
+				const storage = create();
+
+				await storage.addLogEntry(errorAt('2026-11-19T10:00:00.000Z'));
+				await storage.addLogEntry(errorAt('2026-11-19T10:05:00.000Z'));
+
+				expect(await storage.getLogEntries()).toHaveLength(2);
+			});
+
+			it('is a new entry when its message or its error’s name differs', async () => {
+				const storage = create();
+
+				await storage.addLogEntry(errorAt('2026-11-19T10:00:00.000Z'));
+				await storage.addLogEntry(errorAt('2026-11-19T10:00:01.000Z', { message: 'Other.' }));
+				await storage.addLogEntry(errorAt('2026-11-19T10:00:02.000Z', { name: 'TypeError' }));
+
+				expect(await storage.getLogEntries()).toHaveLength(3);
+			});
+
+			it('never collapses with a change entry, or two changes', async () => {
+				const storage = await storageWithAbc(create);
+
+				await storage.saveRoutine(routineWith({ id: 'a', title: 'One' }));
+				await storage.saveRoutine(routineWith({ id: 'a', title: 'One', rounds: 2 }));
+				await storage.addLogEntry(errorAt(NOW, { message: 'Edited routine "One"' }));
+
+				expect(await storage.getLogEntries()).toHaveLength(3);
+			});
+
+			it('can’t push routine changes out of the log, however many times it repeats', async () => {
+				const storage = await storageWithAbc(create, { ...atNow, logLimit: 3 });
+				await storage.saveRoutine(routineWith({ id: 'a', title: 'One' }));
+
+				for (let repeat = 0; repeat < 10; repeat++) {
+					await storage.addLogEntry(errorAt(NOW));
+				}
+
+				expect((await storage.getLogEntries()).map((entry) => entry.message)).toEqual([
+					'Something failed.',
+					'Edited routine "One"'
+				]);
+			});
+		});
+
 		it('keeps only the newest entries once the log is over its limit', async () => {
 			const storage = await storageWithAbc(create, { ...atNow, logLimit: 3 });
 

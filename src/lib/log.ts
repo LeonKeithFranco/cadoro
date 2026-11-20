@@ -3,6 +3,12 @@
 /** How many entries the log keeps. Once it holds more, the oldest are dropped. */
 export const LOG_MAX_ENTRIES = 5000;
 
+/**
+ * How long, in milliseconds, after an error a repeat of it is still counted in the same entry.
+ * It runs from the last repeat, so an error that keeps coming stays one entry.
+ */
+export const ERROR_REPEAT_WINDOW_MS = 60_000;
+
 /** What an entry holds before storage gives it an id. */
 export type NewLogEntry = {
 	/** When it happened, as a UTC timestamp. */
@@ -20,3 +26,45 @@ export type LogEntry = NewLogEntry & {
 	/** Counts up from 1 with each entry saved, so a higher id is a later entry. */
 	id: number;
 };
+
+/**
+ * Counts an error in the entry before it, when it repeats that entry.
+ *
+ * @remarks
+ * An error that repeats, such as an `error` event firing in a loop, would otherwise fill the
+ * log and push the routine history out of it. A repeat is an error with the same message and
+ * the same error name as the newest entry, which is itself an error, within
+ * {@link ERROR_REPEAT_WINDOW_MS} of that entry's last repeat. The entry keeps its own id,
+ * timestamp and details, as the first occurrence, and gains `details.count`, how many times it
+ * happened, and `details.lastTimestamp`, when it last did.
+ *
+ * @param newest - The newest entry in the log, or `undefined` when the log is empty.
+ * @param entry - The entry about to be added.
+ * @returns The newest entry as it should now be saved, or `null` when `entry` doesn't repeat it
+ * and is to be added as an entry of its own.
+ */
+export function withRepeatCounted(
+	newest: LogEntry | undefined,
+	entry: NewLogEntry
+): LogEntry | null {
+	if (newest?.type !== 'error' || entry.type !== 'error' || newest.message !== entry.message) {
+		return null;
+	}
+	if (newest.details?.['name'] !== entry.details?.['name']) {
+		return null;
+	}
+
+	const lastTimestamp = newest.details?.['lastTimestamp'];
+	const lastMoment = typeof lastTimestamp === 'string' ? lastTimestamp : newest.timestamp;
+	const sinceLastMs = Date.parse(entry.timestamp) - Date.parse(lastMoment);
+	if (!(sinceLastMs <= ERROR_REPEAT_WINDOW_MS)) {
+		return null;
+	}
+
+	const count = newest.details?.['count'];
+	const timesSoFar = typeof count === 'number' ? count : 1;
+	return {
+		...newest,
+		details: { ...newest.details, count: timesSoFar + 1, lastTimestamp: entry.timestamp }
+	};
+}

@@ -4,7 +4,7 @@
 import type { BackupData } from '../backup-format';
 import { importLogEntry } from '../backup-log';
 import type { BackupSummary } from '../backup-summary';
-import { LOG_MAX_ENTRIES, type LogEntry, type NewLogEntry } from '../log';
+import { LOG_MAX_ENTRIES, withRepeatCounted, type LogEntry, type NewLogEntry } from '../log';
 import { pickableRoutines, type Routine } from '../routine';
 import {
 	planCreate,
@@ -143,6 +143,13 @@ export class InMemoryStorage implements CadoroStorage {
 	}
 
 	async addLogEntry(entry: NewLogEntry): Promise<void> {
+		const newest = this.#log.at(-1);
+		const counted = withRepeatCounted(newest, structuredClone(entry));
+		if (counted !== null) {
+			this.#log[this.#log.length - 1] = counted;
+			return;
+		}
+
 		this.#log.push({ id: this.#nextLogId, ...structuredClone(entry) });
 		this.#nextLogId += 1;
 		this.#log = this.#log.slice(-this.#logLimit);

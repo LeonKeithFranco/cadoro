@@ -160,6 +160,11 @@ export interface CadoroStorage {
 	 * This is how errors are recorded. Routine changes and imports write their own entries, as
 	 * part of the change.
 	 *
+	 * An error that repeats the newest entry, with the same message and error name within a
+	 * minute of its last repeat, isn't added. The newest entry's `details.count` goes up and its
+	 * `details.lastTimestamp` is set instead, as `withRepeatCounted` in `log.ts` explains, so a
+	 * flood of one error can't push the routine history out of the log.
+	 *
 	 * @param entry - The entry to add, to which storage gives an id.
 	 * @throws Rejects with the backend's own error when the entry can't be written.
 	 */
