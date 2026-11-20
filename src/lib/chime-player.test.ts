@@ -5,6 +5,7 @@ import { createRun, next, pause, play, type RunState } from './run';
 import { InMemoryStorage } from './storage/in-memory-storage';
 import { FakeAudioContext, fakeFiles, undecodable, type FakeSound } from './testing/audio';
 import { minutes, seconds } from './testing/durations';
+import { recordedErrors } from './testing/error-log';
 import { routineWith } from './testing/routines';
 
 /** The moment every run in these tests starts, an arbitrary one in milliseconds since 1970. */
@@ -671,16 +672,6 @@ describe('ChimePlayer', () => {
 			useErrorLog(null);
 		});
 
-		/**
-		 * Reads the messages of the error entries recorded so far.
-		 *
-		 * @returns The messages, newest first.
-		 */
-		async function recordedMessages(): Promise<string[]> {
-			const entries = await log.getLogEntries();
-			return entries.filter((entry) => entry.type === 'error').map((entry) => entry.message);
-		}
-
 		it('records an audio context that cannot be made', async () => {
 			const { player } = await setUpUnlocked({
 				createContext: () => {
@@ -690,7 +681,9 @@ describe('ChimePlayer', () => {
 
 			await player.reschedule(working, start);
 
-			await expect.poll(recordedMessages).toEqual(['Could not set up the audio for the chimes.']);
+			await expect
+				.poll(() => recordedErrors(log))
+				.toEqual([['Could not set up the audio for the chimes.', 'AudioContext is not defined']]);
 		});
 
 		it('records an audio context that cannot resume', async () => {
@@ -699,7 +692,9 @@ describe('ChimePlayer', () => {
 
 			await setUpUnlocked({ createContext: () => context });
 
-			await expect.poll(recordedMessages).toEqual(['Could not start the audio for the chimes.']);
+			await expect
+				.poll(() => recordedErrors(log))
+				.toEqual([['Could not start the audio for the chimes.', 'Not allowed to start']]);
 		});
 
 		it('records a chime file that cannot be loaded', async () => {
@@ -707,7 +702,9 @@ describe('ChimePlayer', () => {
 
 			await player.reschedule(working, start);
 
-			await expect.poll(recordedMessages).toContain(`Could not load the chime ${files.target}.`);
+			await expect
+				.poll(() => recordedErrors(log))
+				.toContainEqual([`Could not load the chime ${files.target}.`, 'The server answered 404']);
 		});
 	});
 });

@@ -6,6 +6,7 @@ import type { RunRecords } from './run-records';
 import { InMemoryStorage } from './storage/in-memory-storage';
 import type { CadoroStorage } from './storage/storage';
 import { minutes, seconds } from './testing/durations';
+import { recordedErrors } from './testing/error-log';
 import { numberedIds } from './testing/ids';
 import {
 	classic,
@@ -1691,19 +1692,6 @@ describe('recording its failures in the activity log', () => {
 		vi.restoreAllMocks();
 	});
 
-	/**
-	 * Reads the error entries recorded so far.
-	 *
-	 * @param log - The storage the errors were recorded in.
-	 * @returns The messages and the error messages of the entries, newest first.
-	 */
-	async function recorded(log: CadoroStorage): Promise<[string, unknown][]> {
-		const entries = await log.getLogEntries();
-		return entries
-			.filter((entry) => entry.type === 'error')
-			.map((entry) => [entry.message, entry.details?.['message']]);
-	}
-
 	it('records a save that fails', async () => {
 		const storage = storageForRuns();
 		useErrorLog(storage);
@@ -1713,7 +1701,7 @@ describe('recording its failures in the activity log', () => {
 		session.play();
 
 		await expect
-			.poll(() => recorded(storage))
+			.poll(() => recordedErrors(storage))
 			.toEqual([['The run could not be saved.', 'The disk is full.']]);
 	});
 
@@ -1735,7 +1723,7 @@ describe('recording its failures in the activity log', () => {
 		secondTab.next();
 
 		await expect
-			.poll(() => recorded(storage))
+			.poll(() => recordedErrors(storage))
 			.toContainEqual(['The run could not be read.', 'The disk could not be read.']);
 	});
 
@@ -1752,7 +1740,7 @@ describe('recording its failures in the activity log', () => {
 		createSession([foreverRoutine], { storage });
 
 		await expect
-			.poll(() => recorded(storage))
+			.poll(() => recordedErrors(storage))
 			.toEqual([
 				[
 					'Changes to the run from other tabs can no longer be followed.',
@@ -1772,7 +1760,7 @@ describe('recording its failures in the activity log', () => {
 		createSession(routines, { storage });
 
 		await expect
-			.poll(() => recorded(storage))
+			.poll(() => recordedErrors(storage))
 			.toEqual([
 				['Changes to the routines can no longer be followed.', 'The routines could not be read.']
 			]);
