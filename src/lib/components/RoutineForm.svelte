@@ -26,9 +26,10 @@
 	import BlockEditor from './BlockEditor.svelte';
 	import {
 		COMPACT_BUTTON_SHAPE,
+		DIALOG_ACTIONS,
 		PRIMARY_BUTTON_COLOURS,
 		SECONDARY_BUTTON_COLOURS
-	} from './button-colours';
+	} from './button-classes';
 	import ConfirmDialog from './ConfirmDialog.svelte';
 	import FormField from './FormField.svelte';
 
@@ -228,7 +229,7 @@
 		<p role="alert" class="text-sm text-rose-700 dark:text-rose-400">{saveError}</p>
 	{/if}
 
-	<div class="flex justify-end gap-3 *:rounded-lg *:px-6 *:py-2 *:font-medium">
+	<div class={DIALOG_ACTIONS}>
 		<button type="button" onclick={oncancel} class={SECONDARY_BUTTON_COLOURS}>Cancel</button>
 		<button
 			type="submit"

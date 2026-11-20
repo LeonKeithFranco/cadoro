@@ -27,7 +27,7 @@
 	} from '../storage/persistence';
 	import type { SaveFile } from '../file-download';
 	import type { CadoroStorage } from '../storage/storage';
-	import { SECONDARY_BUTTON_COLOURS } from './button-colours';
+	import { BUTTON_SHAPE, SECONDARY_BUTTON_COLOURS } from './button-classes';
 	import DataSection from './DataSection.svelte';
 	import ScreenHeading from './ScreenHeading.svelte';
 
@@ -233,7 +233,7 @@
 				<button
 					type="button"
 					onclick={askAgain}
-					class={['rounded-lg px-4 py-2 font-medium', SECONDARY_BUTTON_COLOURS]}
+					class={[BUTTON_SHAPE, SECONDARY_BUTTON_COLOURS]}
 				>
 					Ask again
 				</button>
@@ -285,10 +285,7 @@
 			<button
 				type="button"
 				onclick={(): void => void chimes.preview(chosen)}
-				class={[
-					'flex items-center gap-2 rounded-lg px-4 py-2 font-medium',
-					SECONDARY_BUTTON_COLOURS
-				]}
+				class={['flex items-center gap-2', BUTTON_SHAPE, SECONDARY_BUTTON_COLOURS]}
 			>
 				<Volume2 class="size-5" />
 				Preview <span class="sr-only">{label.toLowerCase()}</span>

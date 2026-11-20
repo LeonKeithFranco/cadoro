@@ -17,7 +17,7 @@
 	import type { Block } from '../routine';
 	import { describeBreakAtTarget } from '../routine-break-preview';
 	import type { BlockProblems } from '../routine-validation';
-	import { COMPACT_BUTTON_SHAPE, SECONDARY_BUTTON_COLOURS } from './button-colours';
+	import { COMPACT_BUTTON_SHAPE, SECONDARY_BUTTON_COLOURS } from './button-classes';
 	import FormField from './FormField.svelte';
 
 	/** The props a block's form takes. */

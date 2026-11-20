@@ -80,7 +80,7 @@
 	import { sortRoutines, type RoutineUsage } from '../routine-sort';
 	import type { SettingsSession } from '../settings.svelte';
 	import type { CadoroStorage } from '../storage/storage';
-	import { COMPACT_BUTTON_SHAPE, PRIMARY_BUTTON_COLOURS } from './button-colours';
+	import { COMPACT_BUTTON_SHAPE, PRIMARY_BUTTON_COLOURS } from './button-classes';
 	import ConfirmDialog from './ConfirmDialog.svelte';
 	import RoutineCard from './RoutineCard.svelte';
 	import RoutineForm from './RoutineForm.svelte';

@@ -13,7 +13,7 @@
 	import type { SaveFile } from '../file-download';
 	import { LOG_MAX_ENTRIES, type LogEntry } from '../log';
 	import type { CadoroStorage } from '../storage/storage';
-	import { SECONDARY_BUTTON_COLOURS } from './button-colours';
+	import { SECONDARY_BUTTON_COLOURS } from './button-classes';
 	import ScreenHeading from './ScreenHeading.svelte';
 
 	/** The props the log page takes. */

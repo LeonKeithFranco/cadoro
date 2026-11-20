@@ -6,7 +6,7 @@
 <script lang="ts">
 	import type { RunSummary } from '../run';
 	import { formatElapsed } from '../time';
-	import { PRIMARY_BUTTON_COLOURS } from './button-colours';
+	import { PRIMARY_BUTTON_COLOURS } from './button-classes';
 	import ModalDialog from './ModalDialog.svelte';
 
 	/** The props the run summary takes. */

@@ -1,4 +1,4 @@
-// The colours of the app's buttons, in light and dark, so every screen and dialog matches.
+// The colours and shapes of the app's buttons, in light and dark, so every screen and dialog matches.
 // Tailwind finds these class names here too, since it scans every source file for whole names.
 
 /** The colours of a screen's or dialog's main button, filled in rose so it stands out. */
@@ -11,6 +11,19 @@ export const PRIMARY_BUTTON_COLOURS =
  */
 export const COMPACT_BUTTON_SHAPE =
 	'inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60';
+
+/**
+ * The shape of a regular button, which takes the colours above. A disabled one fades and shows a
+ * not-allowed cursor.
+ */
+export const BUTTON_SHAPE =
+	'rounded-lg px-4 py-2 font-medium disabled:cursor-not-allowed disabled:opacity-60';
+
+/**
+ * The row of buttons at the foot of a dialog or a form: right-aligned, with every button the
+ * same shape. Each dialog gives its buttons their colours, and a dialog adds its own top margin.
+ */
+export const DIALOG_ACTIONS = 'flex justify-end gap-3 *:rounded-lg *:px-6 *:py-2 *:font-medium';
 
 /** The colours of the other buttons beside the main one, outlined so they step back. */
 export const SECONDARY_BUTTON_COLOURS =

@@ -4,7 +4,7 @@
   changes. Cancel and Escape change nothing.
 -->
 <script lang="ts">
-	import { PRIMARY_BUTTON_COLOURS, SECONDARY_BUTTON_COLOURS } from './button-colours';
+	import { PRIMARY_BUTTON_COLOURS, SECONDARY_BUTTON_COLOURS } from './button-classes';
 	import ModalDialog from './ModalDialog.svelte';
 
 	/** The props the confirmation takes. */

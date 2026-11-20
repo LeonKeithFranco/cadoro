@@ -8,7 +8,7 @@
 	import Pause from '@lucide/svelte/icons/pause';
 	import Play from '@lucide/svelte/icons/play';
 	import SkipForward from '@lucide/svelte/icons/skip-forward';
-	import { PRIMARY_BUTTON_COLOURS, SECONDARY_BUTTON_COLOURS } from './button-colours';
+	import { PRIMARY_BUTTON_COLOURS, SECONDARY_BUTTON_COLOURS } from './button-classes';
 
 	/** The props the controls take. */
 	type Props = {
