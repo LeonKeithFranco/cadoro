@@ -103,3 +103,38 @@ test('a reload mid-run restores the run paused, with exact times, and its work i
 		await expect(workBox).toContainText('0:00 / 25:00');
 	});
 });
+
+test('a reload keeps the break banked by skipping part of a break', async ({ page }) => {
+	await openOnPausedClock(page, '/');
+	const card = page.getByRole('region', { name: 'Focus' });
+	// Each box is named by its label, which changes with the run, such as "Break earned".
+	const breakBox = card.getByRole('group', { name: /^Break/ });
+
+	await test.step('skipping 1:30 of a break banks it, and some more work earns on top of it', async () => {
+		await page.getByRole('button', { name: 'Play' }).click();
+		// 20% of 10 minutes is 2:00, and 30 seconds of it go before Next skips the rest.
+		await page.clock.fastForward(minutes(10));
+		await page.getByRole('button', { name: 'Next' }).click();
+		await page.clock.fastForward(seconds(30));
+		await page.getByRole('button', { name: 'Next' }).click();
+		// 20% of 5 minutes is 1:00.
+		await page.clock.fastForward(minutes(5));
+
+		await expect(breakBox).toContainText('2:30');
+	});
+
+	await test.step('a reload restores the work period paused, with the bank still in its break earned', async () => {
+		await page.reload();
+
+		await expect(page.getByRole('button', { name: 'Play' })).toBeVisible();
+		await expect(breakBox).toHaveAccessibleName('Break earned');
+		await expect(breakBox).toContainText('2:30');
+	});
+
+	await test.step('Play resumes it, and the break earned keeps growing from the bank', async () => {
+		await page.getByRole('button', { name: 'Play' }).click();
+		await page.clock.fastForward(minutes(5));
+
+		await expect(breakBox).toContainText('3:30');
+	});
+});
