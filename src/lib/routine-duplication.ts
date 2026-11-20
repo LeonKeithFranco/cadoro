@@ -27,8 +27,8 @@ export function copyTitle(title: string): string {
  *
  * @remarks
  * Its stats start empty, because its id and its blocks' ids are new, and a run or work period
- * belongs to an id. It has the original's `customPosition`, so it's placed by the caller, usually
- * just below the original with `insertRoutine`.
+ * belongs to an id. It has the original's `customPosition`, so `planDuplicate` places it, just
+ * below the original.
  *
  * @param routine - The routine to copy.
  * @param now - The moment the copy is created.
