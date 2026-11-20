@@ -583,7 +583,9 @@ describe('one tab sounding', () => {
 		await expect.poll(() => storage.getLogEntries()).toHaveLength(1);
 		expect((await storage.getLogEntries())[0]).toMatchObject({
 			type: 'error',
-			message: 'Could not take turns with other tabs, so this tab sounds the chimes.'
+			message: 'Could not take turns with other tabs, so this tab sounds the chimes.',
+			// The browser's own refusal, a `DOMException`, which the log keeps by its name.
+			details: { name: 'NotSupportedError' }
 		});
 	});
 });
