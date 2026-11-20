@@ -278,6 +278,35 @@ describe('DexieStorage', () => {
 		await expect.poll(() => reports.at(-1)?.volume).toBe(5);
 	});
 
+	it('reports the routines again when another connection imports the same routines', async () => {
+		const name = newDatabaseName();
+		const firstTab = new DexieStorage(name);
+		const secondTab = new DexieStorage(name);
+		const routine = routineWith({ id: 'same' });
+		await firstTab.addRoutinesIfNone([routine]);
+		let reports = 0;
+		firstTab.watchRoutines(
+			() => (reports += 1),
+			() => {}
+		);
+		await expect.poll(() => reports).toBe(1);
+
+		await secondTab.replaceAllData(
+			{ routines: [routine], runs: [], workPeriods: [], settings: DEFAULT_SETTINGS },
+			{
+				formatVersion: 1,
+				exportedAt: '2026-11-17T08:00:00.000Z',
+				routineCount: 1,
+				runCount: 0,
+				workPeriodCount: 0,
+				firstRunAt: null,
+				lastRunAt: null
+			}
+		);
+
+		await expect.poll(() => reports).toBe(2);
+	});
+
 	it('reports an error, and no settings, when the settings can’t be read', async () => {
 		const storage = new DexieStorage(newDatabaseName());
 		await storage.getSettings();

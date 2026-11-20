@@ -28,7 +28,7 @@
 
 	// Starts from what `load` read, then follows storage. A change to the run in progress, such as
 	// another tab pressing Next, may have saved a work period, so the work periods and routines are
-	// read again. The figures keep what they show until that read arrives, so the work of a period
+	// read again, and so are they when the routines change, as an import in another tab does. The figures keep what they show until that read arrives, so the work of a period
 	// that just ended never drops to zero, and keep it if the read fails.
 	$effect(() => {
 		runInProgress = data.runInProgress;
@@ -40,6 +40,28 @@
 		let revisionShown = data.runInProgress?.revision ?? null;
 		let latestSaved = data.runInProgress;
 		let reading = 0;
+
+		/** Reads the routines and work periods again, showing them once both have arrived. */
+		function readAgain(): void {
+			reading += 1;
+			void Promise.all([data.storage.getAllRoutines(), data.storage.getWorkPeriods()])
+				.then(([readRoutines, readWorkPeriods]) => {
+					if (stopped) {
+						return;
+					}
+					routines = readRoutines;
+					workPeriods = readWorkPeriods;
+					runInProgress = latestSaved;
+					now = Date.now();
+				})
+				.catch((error: unknown) => {
+					void recordError('Could not read the work periods for Stats.', error);
+				})
+				.finally(() => {
+					reading -= 1;
+				});
+		}
+
 		const stopFollowing = data.storage.watchRunInProgress(
 			(saved) => {
 				latestSaved = saved;
@@ -53,31 +75,33 @@
 					return;
 				}
 				revisionShown = saved?.revision ?? null;
-				reading += 1;
-				void Promise.all([data.storage.getAllRoutines(), data.storage.getWorkPeriods()])
-					.then(([readRoutines, readWorkPeriods]) => {
-						if (stopped) {
-							return;
-						}
-						routines = readRoutines;
-						workPeriods = readWorkPeriods;
-						runInProgress = latestSaved;
-						now = Date.now();
-					})
-					.catch((error: unknown) => {
-						void recordError('Could not read the work periods for Stats.', error);
-					})
-					.finally(() => {
-						reading -= 1;
-					});
+				readAgain();
 			},
 			(error) => {
 				void recordError('Could not read the run in progress for Stats.', error);
 			}
 		);
+
+		// An import replaces the routines and the work periods together, and can leave the run in
+		// progress at none, so with no run to change, only the routines tell this tab. The first
+		// report only replays what `load` read.
+		let replayed = false;
+		const stopFollowingRoutines = data.storage.watchRoutines(
+			() => {
+				if (!replayed) {
+					replayed = true;
+					return;
+				}
+				readAgain();
+			},
+			(error) => {
+				void recordError('Could not read the routines for Stats.', error);
+			}
+		);
 		return (): void => {
 			stopped = true;
 			stopFollowing();
+			stopFollowingRoutines();
 		};
 	});
 
