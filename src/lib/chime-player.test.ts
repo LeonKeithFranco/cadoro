@@ -391,6 +391,31 @@ describe('ChimePlayer', () => {
 			]);
 		});
 
+		it('leaves a chime in place when it is 50 ms off its moment, so a catch-up does not restart it', async () => {
+			const { player, context } = await setUpScheduled();
+
+			wallMs = start + 50;
+			await player.catchUp();
+
+			expect(player.scheduled).toEqual([
+				expect.objectContaining({ at: start + minutes(25), startsAt: 25 * 60 })
+			]);
+			expect(context.sources).toHaveLength(1);
+			expect(context.sources[0]?.isStopped).toBe(false);
+		});
+
+		it('places a chime again when it is 150 ms off its moment', async () => {
+			const { player, context } = await setUpScheduled();
+
+			wallMs = start + 150;
+			await player.catchUp();
+
+			expect(player.scheduled).toEqual([
+				expect.objectContaining({ at: start + minutes(25), startsAt: 25 * 60 - 0.15 })
+			]);
+			expect(context.sources[0]?.isStopped).toBe(true);
+		});
+
 		it('catches up with nothing before anything was scheduled', async () => {
 			const { player, context } = await setUpUnlocked({ clock: () => wallMs });
 
