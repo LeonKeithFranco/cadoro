@@ -5,7 +5,7 @@ import packageJson from '../../../package.json' with { type: 'json' };
 import { DEFAULT_SETTINGS, type Settings } from '../settings';
 import { SettingsSession } from '../settings.svelte';
 import { InMemoryStorage } from '../storage/in-memory-storage';
-import type { PersistenceManager } from '../storage/persistence';
+import { fakeStorageManager, type FakeStorageManager } from '../testing/storage-manager';
 import SettingsScreen from './SettingsScreen.svelte';
 
 /** What a test sets up and checks: the storage and the session on it, and the fakes passed in. */
@@ -17,40 +17,8 @@ type Setup = {
 	/** A spy standing in for the run's chimes, which previews play through. */
 	preview: Mock<(chime: string) => Promise<void>>;
 	/** The fake storage manager, or `undefined` for a browser without one. */
-	manager: FakeManager | undefined;
+	manager: FakeStorageManager | undefined;
 };
-
-/** A stand-in for `navigator.storage` that a test controls. */
-type FakeManager = PersistenceManager & {
-	/** Whether storage is persistent now. */
-	isPersistent: boolean;
-	/** Whether the browser grants a request for persistent storage. */
-	willGrant: boolean;
-	/** Counts the requests for persistent storage. */
-	persistCalls: number;
-};
-
-/**
- * Makes a fake storage manager.
- *
- * @param isPersistent - Whether storage is persistent to begin with.
- * @param willGrant - Whether the browser grants a request for persistent storage.
- * @returns The manager, whose fields a test may change.
- */
-function fakeManager(isPersistent: boolean, willGrant = true): FakeManager {
-	const manager: FakeManager = {
-		isPersistent,
-		willGrant,
-		persistCalls: 0,
-		persisted: () => Promise.resolve(manager.isPersistent),
-		persist: () => {
-			manager.persistCalls++;
-			manager.isPersistent = manager.isPersistent || manager.willGrant;
-			return Promise.resolve(manager.isPersistent);
-		}
-	};
-	return manager;
-}
 
 /**
  * Renders the Settings screen on in-memory storage.
@@ -63,11 +31,11 @@ function fakeManager(isPersistent: boolean, willGrant = true): FakeManager {
 async function renderScreen({
 	saved = {},
 	isSupported = true,
-	manager = fakeManager(true)
+	manager = fakeStorageManager(true)
 }: {
 	saved?: Partial<Settings>;
 	isSupported?: boolean;
-	manager?: FakeManager | null;
+	manager?: FakeStorageManager | null;
 } = {}): Promise<Setup> {
 	const storage = new InMemoryStorage();
 	await storage.saveSettings(saved);
@@ -271,32 +239,32 @@ describe('the Settings screen', () => {
 
 	describe('persistent storage', () => {
 		it('says it is on, with no button to ask again', async () => {
-			await renderScreen({ manager: fakeManager(true) });
+			await renderScreen({ manager: fakeStorageManager(true) });
 
 			await expect.element(page.getByText('On', { exact: true })).toBeVisible();
 			await expect.element(page.getByRole('button', { name: 'Ask again' })).not.toBeInTheDocument();
 		});
 
 		it('says it is off, with a button to ask again', async () => {
-			await renderScreen({ manager: fakeManager(false) });
+			await renderScreen({ manager: fakeStorageManager(false) });
 
 			await expect.element(page.getByText('Off', { exact: true })).toBeVisible();
 			await expect.element(page.getByRole('button', { name: 'Ask again' })).toBeVisible();
 		});
 
 		it('asks the browser again, and shows it on once the browser grants it', async () => {
-			const manager = fakeManager(false, true);
+			const manager = fakeStorageManager(false, true);
 			await renderScreen({ manager });
 
 			await page.getByRole('button', { name: 'Ask again' }).click();
 
 			await expect.element(page.getByText('On', { exact: true })).toBeVisible();
-			expect(manager.persistCalls).toBe(1);
+			expect(manager.persist).toHaveBeenCalledOnce();
 			await expect.element(page.getByRole('button', { name: 'Ask again' })).not.toBeInTheDocument();
 		});
 
 		it('says the browser declined when it still is not persistent after asking', async () => {
-			const manager = fakeManager(false, false);
+			const manager = fakeStorageManager(false, false);
 			await renderScreen({ manager });
 
 			await page.getByRole('button', { name: 'Ask again' }).click();

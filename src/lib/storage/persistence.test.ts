@@ -1,9 +1,10 @@
-import { afterEach, describe, expect, it, vi, type Mock } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useErrorLog } from '../error-log';
 import { oneRoundRoutine } from '../testing/routines';
 import { savedRunInProgress } from '../testing/run-in-progress';
 import { firstWorkPeriod, runInProgress } from '../testing/run-records';
 import { storageHolding } from '../testing/storage';
+import { fakeStorageManager } from '../testing/storage-manager';
 import { InMemoryStorage } from './in-memory-storage';
 import {
 	askToPersistIfWorkSaved,
@@ -11,30 +12,6 @@ import {
 	isStoragePersistent,
 	requestPersistentStorage
 } from './persistence';
-
-/**
- * A stand-in for `navigator.storage`. The real one's answer depends on the browser's own
- * judgement, such as whether the app is installed, which a test can't control.
- */
-type FakeManager = {
-	/** Answers whether storage is persistent already. */
-	persisted: Mock<() => Promise<boolean>>;
-	/** Answers the request for persistent storage, granting it. */
-	persist: Mock<() => Promise<boolean>>;
-};
-
-/**
- * Makes a fake storage manager.
- *
- * @param isPersisted - What `persisted()` answers: whether storage is persistent already.
- * @returns The fake, whose methods record their calls.
- */
-function fakeManager(isPersisted: boolean): FakeManager {
-	return {
-		persisted: vi.fn(async () => isPersisted),
-		persist: vi.fn(async () => true)
-	};
-}
 
 // Puts back `console.error`, which some tests silence to check what's logged, and takes away the
 // log a test chose for errors.
@@ -45,7 +22,7 @@ afterEach(() => {
 
 describe('askToPersistOnce', () => {
 	it('asks the browser for persistent storage when storage is not persistent yet', async () => {
-		const manager = fakeManager(false);
+		const manager = fakeStorageManager(false);
 
 		await askToPersistOnce(manager)();
 
@@ -53,7 +30,7 @@ describe('askToPersistOnce', () => {
 	});
 
 	it('does not ask when storage is persistent already', async () => {
-		const manager = fakeManager(true);
+		const manager = fakeStorageManager(true);
 
 		await askToPersistOnce(manager)();
 
@@ -61,7 +38,7 @@ describe('askToPersistOnce', () => {
 	});
 
 	it('asks only the first time, even when called again before the browser answers', async () => {
-		const manager = fakeManager(false);
+		const manager = fakeStorageManager(false);
 		const askToPersist = askToPersistOnce(manager);
 
 		await Promise.all([askToPersist(), askToPersist()]);
@@ -74,7 +51,7 @@ describe('askToPersistOnce', () => {
 	it('records a refused request in the activity log', async () => {
 		const log = new InMemoryStorage();
 		useErrorLog(log);
-		const manager = fakeManager(false);
+		const manager = fakeStorageManager(false);
 		manager.persist.mockRejectedValueOnce(new Error('The request was blocked.'));
 
 		await askToPersistOnce(manager)();
@@ -91,7 +68,7 @@ describe('askToPersistOnce', () => {
 	});
 
 	it("logs the browser's error rather than rejecting", async () => {
-		const manager = fakeManager(false);
+		const manager = fakeStorageManager(false);
 		const failure = new Error('The request was blocked.');
 		manager.persist.mockRejectedValueOnce(failure);
 		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -166,8 +143,8 @@ describe('askToPersistIfWorkSaved', () => {
 
 describe('isStoragePersistent', () => {
 	it('says whether the browser keeps storage persistent', async () => {
-		expect(await isStoragePersistent(fakeManager(true))).toBe(true);
-		expect(await isStoragePersistent(fakeManager(false))).toBe(false);
+		expect(await isStoragePersistent(fakeStorageManager(true))).toBe(true);
+		expect(await isStoragePersistent(fakeStorageManager(false))).toBe(false);
 	});
 
 	it('says it can’t tell where the browser has no storage manager', async () => {
@@ -196,7 +173,7 @@ describe('isStoragePersistent', () => {
 
 describe('requestPersistentStorage', () => {
 	it('asks every time it is called, since the user asked', async () => {
-		const manager = fakeManager(false);
+		const manager = fakeStorageManager(false);
 
 		await requestPersistentStorage(manager);
 		await requestPersistentStorage(manager);
