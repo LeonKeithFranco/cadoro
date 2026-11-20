@@ -8,14 +8,7 @@
   shows as it's made.
 -->
 <script module lang="ts">
-	import type { RouteId } from '$app/types';
 	import { ROUTINE_SORTS, type RoutineSort } from '../routine-sort';
-
-	/**
-	 * The screens the user can leave for, which is the only place leaving can be asked about and
-	 * then carried on to with `goto`, since the app has no other pages.
-	 */
-	const SCREEN_ROUTES: RouteId[] = ['/', '/routines', '/stats', '/settings'];
 
 	/** The `id` of the "New routine" button, which the keyboard focus returns to. */
 	const NEW_ROUTINE_BUTTON_ID = 'new-routine';
@@ -62,7 +55,7 @@
 
 <script lang="ts">
 	import { beforeNavigate, goto } from '$app/navigation';
-	import { resolve } from '$app/paths';
+	import type { ResolvedPathname } from '$app/types';
 	import Plus from '@lucide/svelte/icons/plus';
 	import { dragHandleZone, type DndEvent } from 'svelte-dnd-action';
 	import { onMount, untrack } from 'svelte';
@@ -220,13 +213,17 @@
 
 		// Closing the tab can't wait for the dialog, so the browser asks instead.
 		navigation.cancel();
-		const screen = SCREEN_ROUTES.find((route) => route === navigation.to?.route.id);
-		if (navigation.willUnload || screen === undefined) {
+		const destination = navigation.to?.url;
+		if (navigation.willUnload || destination === undefined) {
 			return;
 		}
+		// The router's address already starts with the base path, which is all `resolve()` would add,
+		// so it's typed as resolved for the lint rule that asks every `goto` for a resolved address.
+		const address =
+			`${destination.pathname}${destination.search}${destination.hash}` as ResolvedPathname;
 		afterDiscard = (): void => {
 			editing = null;
-			void goto(resolve(screen));
+			void goto(address);
 		};
 	});
 

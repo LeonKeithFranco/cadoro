@@ -705,7 +705,8 @@ describe('discarding changes', () => {
 	/**
 	 * Makes the router's `beforeNavigate` callback, which the screen gave it, ask to leave.
 	 *
-	 * @param route - The route the user is going to.
+	 * @param route - The route the user is going to, which is also its address, as the app has no
+	 * base path in tests.
 	 * @returns The spy for `cancel`, which stops the navigation.
 	 */
 	function leaveFor(route: string): ReturnType<typeof vi.fn> {
@@ -717,7 +718,7 @@ describe('discarding changes', () => {
 		const navigation = {
 			cancel,
 			willUnload: false,
-			to: { route: { id: route } }
+			to: { url: new URL(route, window.location.origin), route: { id: route } }
 		} as unknown as BeforeNavigate;
 		callback(navigation);
 		return cancel;
@@ -735,6 +736,20 @@ describe('discarding changes', () => {
 		await expect.element(dialog).toBeVisible();
 		await dialog.getByRole('button', { name: 'Discard' }).click();
 		expect(goto).toHaveBeenCalledWith('/stats');
+	});
+
+	it('asks before leaving for the activity log with unsaved changes, and goes on there once discarded', async () => {
+		await openScreen();
+		await openForEditing('Alpha');
+		await typeTitle('Renamed');
+
+		const cancel = leaveFor('/settings/log');
+
+		expect(cancel).toHaveBeenCalledOnce();
+		const dialog = page.getByRole('dialog', { name: 'Discard changes?' });
+		await expect.element(dialog).toBeVisible();
+		await dialog.getByRole('button', { name: 'Discard' }).click();
+		expect(goto).toHaveBeenCalledWith('/settings/log');
 	});
 
 	it('stays on the screen, editing, when the user cancels leaving', async () => {
