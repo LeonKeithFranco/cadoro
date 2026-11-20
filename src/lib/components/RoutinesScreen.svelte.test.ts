@@ -12,6 +12,7 @@ import type { CadoroStorage } from '../storage/storage';
 import { numberedIds } from '../testing/ids';
 import { blockWith as sharedBlockWith, routineWith } from '../testing/routines';
 import { runWith } from '../testing/run-records';
+import { storageHolding } from '../testing/storage';
 import type { Run } from '../run-records';
 import RoutinesScreen from './RoutinesScreen.svelte';
 
@@ -93,8 +94,7 @@ async function openScreen(
 	runs: Run[] = [],
 	runningRoutineId: string | null = null
 ): Promise<OpenScreen> {
-	const storage = new InMemoryStorage({ now: (): Date => new Date(NOW) });
-	await storage.addRoutinesIfNone(routines);
+	const storage = storageHolding(routines, { now: (): Date => new Date(NOW) });
 	// Saved before the session starts following the settings, which report what storage holds.
 	await storage.saveSettings(settings);
 	const settingsSession = new SettingsSession(storage, settingsFrom(settings));
@@ -889,8 +889,9 @@ describe('the keyboard focus', () => {
 	});
 
 	it('stays in a new form that was opened before the saved routine showed', async () => {
-		const storage: CadoroStorage = new InMemoryStorage({ now: (): Date => new Date(NOW) });
-		await storage.addRoutinesIfNone(threeRoutines());
+		const storage: CadoroStorage = storageHolding(threeRoutines(), {
+			now: (): Date => new Date(NOW)
+		});
 		const reportsNotYetDelivered: (() => void)[] = [];
 		let isHoldingReports = false;
 		const watchRoutines = storage.watchRoutines.bind(storage);

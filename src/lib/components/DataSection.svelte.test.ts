@@ -10,6 +10,7 @@ import { InMemoryStorage } from '../storage/in-memory-storage';
 import { oneRoundRoutine, routineWith } from '../testing/routines';
 import { savedRunInProgress } from '../testing/run-in-progress';
 import { completedRun, firstWorkPeriod } from '../testing/run-records';
+import { storageHolding } from '../testing/storage';
 import DataSection from './DataSection.svelte';
 
 // Takes away the log a test chose for errors, and puts back what a test replaced.
@@ -32,8 +33,7 @@ type Setup = {
  * @returns The storage and the download spy.
  */
 async function renderCard(): Promise<Setup> {
-	const storage = new InMemoryStorage();
-	await storage.addRoutinesIfNone([oneRoundRoutine]);
+	const storage = storageHolding([oneRoundRoutine]);
 	await storage.saveSettings({ volume: 30 });
 	await storage.saveRunInProgress(savedRunInProgress, null, {
 		run: completedRun,

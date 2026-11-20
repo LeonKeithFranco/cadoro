@@ -6,6 +6,7 @@ import type { TimerSession } from '#lib/timer.svelte.ts';
 import { runInProgressWith, savedRunInProgress } from '#lib/testing/run-in-progress.ts';
 import { oneRoundRoutine, routineWith } from '#lib/testing/routines.ts';
 import { firstWorkPeriod, runInProgress, runWith } from '#lib/testing/run-records.ts';
+import { withRoutines } from '#lib/testing/storage.ts';
 import type { RoutineUsageKeeper } from '#lib/routine-usage.svelte.ts';
 import type { RunChimes } from '#lib/run-chimes.svelte.ts';
 
@@ -57,9 +58,8 @@ const chimesOfLoadedApps: RunChimes[] = [];
  * @returns A promise that resolves once the work period is saved.
  */
 async function saveEarlierWork(): Promise<void> {
-	const storage = new DexieStorage();
 	// The run's routine, which storage requires to be saved before a run of it.
-	await storage.addRoutinesIfNone([oneRoundRoutine]);
+	const storage = await withRoutines(new DexieStorage(), [oneRoundRoutine]);
 	await storage.saveRunInProgress(savedRunInProgress, null, {
 		run: runInProgress,
 		workPeriods: [firstWorkPeriod]
@@ -100,8 +100,7 @@ describe('the root layout’s load', () => {
 	});
 
 	it('picks the fallback routine with the usage the Timer’s picker reads, not the usage at launch', async () => {
-		const storage = new DexieStorage();
-		await storage.addRoutinesIfNone([
+		const storage = await withRoutines(new DexieStorage(), [
 			routineWith({ id: 'a', customPosition: 0 }),
 			routineWith({ id: 'b', customPosition: 1 }),
 			routineWith({ id: 'c', customPosition: 2 })

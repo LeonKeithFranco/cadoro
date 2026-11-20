@@ -1624,13 +1624,12 @@ describe('following the routines', () => {
 	});
 
 	it('chooses the first routine in the picker, not in custom order, when the chosen one is deleted', async () => {
-		const storage = new InMemoryStorage();
 		const three = [
 			routineWith({ id: 'a', title: 'A', customPosition: 0 }),
 			routineWith({ id: 'b', title: 'B', customPosition: 1 }),
 			routineWith({ id: 'c', title: 'C', customPosition: 2 })
 		];
-		await storage.addRoutinesIfNone(three);
+		const storage = storageHolding(three);
 		const session = createSession(three, { storage, pickerOrder: byTitleDescending });
 		session.select('b');
 
