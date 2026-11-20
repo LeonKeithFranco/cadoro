@@ -5,6 +5,8 @@ import { oneRoundRoutine } from '#lib/testing/routines.ts';
 import { runInProgressWith } from '#lib/testing/run-in-progress.ts';
 import { runInProgress as startedRecord } from '#lib/testing/run-records.ts';
 import type { StoredRunInProgress } from '#lib/run-in-progress.ts';
+import type { WorkPeriod } from '#lib/run-records.ts';
+import { workPeriodWith } from '#lib/testing/run-records.ts';
 import type { PageProps } from './$types';
 import StatsPage from './+page.svelte';
 
@@ -17,7 +19,9 @@ const MINUTE = 60_000;
 // Fakes only the clock and the interval, so the page reads a moment the test controls while the
 // test's own polling keeps its real timers.
 beforeEach(() => {
-	vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
+	vi.useFakeTimers({
+		toFake: ['Date', 'setInterval', 'clearInterval', 'setTimeout', 'clearTimeout']
+	});
 	vi.setSystemTime(START);
 });
 
@@ -49,10 +53,12 @@ function countingSince(minutesAgo: number): StoredRunInProgress {
  *
  * @param storage - The storage the page follows.
  * @param runInProgress - The run in progress the `load` read.
+ * @param workPeriods - The work periods the `load` read.
  */
 async function renderStats(
 	storage: InMemoryStorage,
-	runInProgress: StoredRunInProgress | null
+	runInProgress: StoredRunInProgress | null,
+	workPeriods: WorkPeriod[] = []
 ): Promise<void> {
 	if (runInProgress !== null) {
 		await storage.saveRunInProgress(runInProgress, null, { run: startedRecord, workPeriods: [] });
@@ -60,7 +66,7 @@ async function renderStats(
 	const data = {
 		storage,
 		routines: [oneRoundRoutine],
-		workPeriods: [],
+		workPeriods,
 		runInProgress
 	} as unknown as PageProps['data'];
 	render(StatsPage, { data, params: {} });
@@ -105,5 +111,44 @@ describe('the Stats page and the run in progress', () => {
 		vi.advanceTimersByTime(3 * MINUTE);
 
 		await expect.poll(figure('All time')).toBe('23:00');
+	});
+});
+
+/**
+ * Makes a work period of ten minutes on a local day, ending at 23:50, in the browser's own time
+ * zone, which the tests can't pin.
+ *
+ * @returns The work period.
+ */
+function lateWorkOnNov19(): WorkPeriod {
+	const start = new Date(2026, 10, 19, 23, 40);
+	const end = new Date(2026, 10, 19, 23, 50);
+	return workPeriodWith({
+		segments: [{ start: start.toISOString(), end: end.toISOString() }],
+		workedMs: 10 * MINUTE
+	});
+}
+
+describe('the Stats page left open past midnight', () => {
+	it('shows the new day as today when local midnight passes', async () => {
+		vi.setSystemTime(new Date(2026, 10, 19, 23, 59));
+		await renderStats(new InMemoryStorage(), null, [lateWorkOnNov19()]);
+		await expect.poll(figure('Today')).toBe('10:00');
+
+		vi.advanceTimersByTime(2 * MINUTE);
+
+		await expect.poll(figure('Today')).toBe('0:00');
+	});
+
+	it('shows the new day as today when the page becomes visible again after midnight', async () => {
+		vi.setSystemTime(new Date(2026, 10, 19, 23, 59));
+		await renderStats(new InMemoryStorage(), null, [lateWorkOnNov19()]);
+		await expect.poll(figure('Today')).toBe('10:00');
+
+		// The device slept through midnight, so no timer ran.
+		vi.setSystemTime(new Date(2026, 10, 20, 9, 0));
+		document.dispatchEvent(new Event('visibilitychange'));
+
+		await expect.poll(figure('Today')).toBe('0:00');
 	});
 });
