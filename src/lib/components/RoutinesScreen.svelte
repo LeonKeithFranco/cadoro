@@ -238,16 +238,6 @@
 	}
 
 	/**
-	 * Tells the user and logs that a save or other change to storage failed.
-	 *
-	 * @param what - What was being done, such as "Deleting the routine".
-	 * @param error - What storage threw.
-	 */
-	function reportFailure(what: string, error: unknown): void {
-		void recordError(`${what} failed.`, error);
-	}
-
-	/**
 	 * Moves the keyboard focus to an element once the page shows what the last change did.
 	 *
 	 * @remarks
@@ -331,7 +321,7 @@
 			// The routine's card, which a new routine gets as it's saved, is where the user was.
 			focusEditButtonOnceShown(current.draft.id);
 		} catch (error) {
-			reportFailure('Saving the routine', error);
+			void recordError('Saving the routine failed.', error);
 			// Built from the form as it is now, not as it was when Save was pressed, so a change from
 			// another tab, noticed while saving, stays warned about. A form closed meanwhile stays closed.
 			if (editing !== null && editing.original.id === current.original.id) {
@@ -350,7 +340,7 @@
 		try {
 			await storage.duplicateRoutine(duplicateRoutine(routine, now(), newId), routine.id);
 		} catch (error) {
-			reportFailure('Duplicating the routine', error);
+			void recordError('Duplicating the routine failed.', error);
 			actionFailure = 'The routine could not be duplicated. Try again.';
 		}
 	}
@@ -373,7 +363,7 @@
 				focusEditButtonOnceShown(neighbour.id);
 			}
 		} catch (error) {
-			reportFailure('Deleting the routine', error);
+			void recordError('Deleting the routine failed.', error);
 			actionFailure = 'The routine could not be deleted. Try again.';
 		}
 	}
@@ -389,7 +379,7 @@
 		try {
 			await storage.reorderRoutines(ordered.map((routine) => routine.id));
 		} catch (error) {
-			reportFailure('Reordering the routines', error);
+			void recordError('Reordering the routines failed.', error);
 			actionFailure = 'The routines could not be moved. Try again.';
 			routines = await storage.getRoutines();
 		}
