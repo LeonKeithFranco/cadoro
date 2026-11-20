@@ -1,7 +1,7 @@
 // Splits work at local midnight, so each day's work time can be added up. This is the only place
 // that works out local days: moments are stored in UTC, and the time zone matters only for stats.
 
-import { addDays, startOfDay } from 'date-fns';
+import { addDays, format, startOfDay } from 'date-fns';
 import { fromUtcTimestamp } from './time';
 import type { WorkPeriod } from './run-records';
 
@@ -21,6 +21,16 @@ export type DaySlice = {
  */
 export function startOfLocalDay(moment: number): number {
 	return startOfDay(moment).getTime();
+}
+
+/**
+ * Writes the local day a moment falls on as text.
+ *
+ * @param moment - A moment, in milliseconds since 1970 (UTC).
+ * @returns The day in the user's time zone, such as `2026-11-19`.
+ */
+export function localDayText(moment: number): string {
+	return format(moment, 'yyyy-MM-dd');
 }
 
 /**

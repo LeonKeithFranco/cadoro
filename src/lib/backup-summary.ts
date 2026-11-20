@@ -1,6 +1,7 @@
 // What a valid backup holds, for the import's confirmation.
 
 import type { Backup } from './backup-format';
+import { localDayText } from './day-slices';
 import { fromUtcTimestamp } from './time';
 
 /** What a backup holds, counted for the user to check before an import replaces their data. */
@@ -61,8 +62,7 @@ export function describeBackupSummary(summary: BackupSummary): string {
  * @returns The day in the user's time zone, such as `2026-11-19`.
  */
 function localDay(timestamp: string): string {
-	// The `en-CA` locale writes a date as year, month and day, joined with dashes.
-	return new Date(fromUtcTimestamp(timestamp)).toLocaleDateString('en-CA');
+	return localDayText(fromUtcTimestamp(timestamp));
 }
 
 /**

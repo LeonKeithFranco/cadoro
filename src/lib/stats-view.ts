@@ -2,7 +2,7 @@
 // is calculated by the stats modules, and this only picks them and writes them as text.
 
 import { format } from 'date-fns';
-import { daySlicesOf } from './day-slices';
+import { daySlicesOf, localDayText } from './day-slices';
 import { allTimeTotals, filterByRoutine, routineLabel } from './routine-stats';
 import type { Routine } from './routine';
 import type { WorkPeriod } from './run-records';
@@ -119,7 +119,7 @@ export function viewStats(input: StatsInput): StatsView {
 		timeAgainstTarget: formatPercent(timeAgainstTarget(workPeriods)),
 		targetsReached: formatPercent(targetsReached(workPeriods)),
 		days: dailyTotals(slices, range).map((total) => ({
-			day: format(total.start, 'yyyy-MM-dd'),
+			day: localDayText(total.start),
 			label: format(total.start, 'MMM d'),
 			dateLabel: format(total.start, 'MMM d, yyyy'),
 			minutes: total.workedMs / MS_PER_MINUTE,

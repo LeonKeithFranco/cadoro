@@ -1,6 +1,12 @@
 import { TEST_TIME_ZONE } from './testing/time-zone';
 import { describe, expect, it } from 'vitest';
-import { daySlicesOf, nextLocalDay, splitAtMidnight, startOfLocalDay } from './day-slices';
+import {
+	daySlicesOf,
+	localDayText,
+	nextLocalDay,
+	splitAtMidnight,
+	startOfLocalDay
+} from './day-slices';
 import { hours, minutes } from './testing/durations';
 import { workPeriodWith } from './testing/run-records';
 
@@ -26,6 +32,21 @@ describe('startOfLocalDay', () => {
 	it('gives the local midnight, even when the UTC date is already the next day', () => {
 		// 23:30 on Nov 19 in New York is 04:30 UTC on Nov 20.
 		expect(startOfLocalDay(utc('2026-11-20T04:30:00Z'))).toBe(utc('2026-11-19T05:00:00Z'));
+	});
+});
+
+describe('localDayText', () => {
+	it('writes the local day as year, month and day with zero padding', () => {
+		expect(localDayText(utc('2027-01-05T17:00:00Z'))).toBe('2027-01-05');
+	});
+
+	it('keeps the previous local day until local midnight, even after UTC midnight', () => {
+		// 23:59 on Nov 19 in New York is 04:59 UTC on Nov 20.
+		expect(localDayText(utc('2026-11-20T04:59:00Z'))).toBe('2026-11-19');
+	});
+
+	it('starts the next local day at local midnight', () => {
+		expect(localDayText(utc('2026-11-20T05:00:00Z'))).toBe('2026-11-20');
 	});
 });
 
