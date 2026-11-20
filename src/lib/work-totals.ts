@@ -23,6 +23,16 @@ export type DayRange = {
 };
 
 /**
+ * Adds up the work time of work periods, day slices or anything else that records it.
+ *
+ * @param items - The items to add up, each with the work it holds in milliseconds.
+ * @returns The total in milliseconds, or 0 for no items.
+ */
+export function totalWorkedMs(items: { workedMs: number }[]): number {
+	return items.reduce((total, item) => total + item.workedMs, 0);
+}
+
+/**
  * Adds up work time by the bucket each day falls in.
  *
  * @param slices - The work, split by local day.
@@ -93,7 +103,5 @@ export function monthlyTotals(slices: DaySlice[]): WorkTotal[] {
  */
 export function workedToday(slices: DaySlice[], now: number): number {
 	const today = startOfLocalDay(now);
-	return slices
-		.filter((slice) => slice.dayStart === today)
-		.reduce((total, slice) => total + slice.workedMs, 0);
+	return totalWorkedMs(slices.filter((slice) => slice.dayStart === today));
 }

@@ -3,6 +3,7 @@
 import { asPercentOf } from './percent';
 import type { WorkPeriod } from './run-records';
 import { minutesToMs } from './time';
+import { totalWorkedMs } from './work-totals';
 
 /**
  * Works out the total time worked as a percentage of the total of the periods' targets.
@@ -16,7 +17,7 @@ import { minutesToMs } from './time';
  * nothing can be a percentage of no target.
  */
 export function timeAgainstTarget(workPeriods: WorkPeriod[]): number | null {
-	const totalWorkedMs = workPeriods.reduce((total, period) => total + period.workedMs, 0);
+	const workedMs = totalWorkedMs(workPeriods);
 	const totalTargetMs = workPeriods.reduce(
 		(total, period) => total + minutesToMs(period.targetMinutes),
 		0
@@ -24,7 +25,7 @@ export function timeAgainstTarget(workPeriods: WorkPeriod[]): number | null {
 	if (totalTargetMs === 0) {
 		return null;
 	}
-	return asPercentOf(totalWorkedMs, totalTargetMs);
+	return asPercentOf(workedMs, totalTargetMs);
 }
 
 /**
