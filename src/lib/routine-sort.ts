@@ -1,6 +1,6 @@
 // The seven orders the Routines screen and the Timer's picker can list routines in.
 
-import { compareCustomOrder, type Routine } from './routine';
+import { compareCustomOrder, compareTitles, type Routine } from './routine';
 import { workedMsByRoutine } from './routine-stats';
 import type { Run, WorkPeriod } from './run-records';
 
@@ -25,17 +25,6 @@ export type RoutineUsage = {
 	/** Every work period saved, of any routine. */
 	workPeriods: WorkPeriod[];
 };
-
-/**
- * Compares two routine titles for ordering, ignoring case and accents so "apple" sits with "Apple".
- *
- * @param a - The first title.
- * @param b - The second title.
- * @returns Negative when `a` comes first, positive when `b` does, 0 when they match.
- */
-export function compareTitles(a: string, b: string): number {
-	return a.localeCompare(b, 'en', { sensitivity: 'base' });
-}
 
 /**
  * Compares two UTC timestamps in the same format, which order the same as the moments they name.
