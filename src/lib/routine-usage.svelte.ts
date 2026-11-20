@@ -1,0 +1,55 @@
+// Keeps the runs and work periods that "last used" and "most work" are worked out from, in one
+// place, so the Timer's picker and the session's fallback routine sort from the same fresh data.
+
+import { recordError } from './error-log';
+import type { RoutineUsage } from './routine-sort';
+import type { CadoroStorage } from './storage/storage';
+
+/**
+ * Holds the routine usage, which the app reads again whenever it may have changed.
+ *
+ * @remarks
+ * The usage is replaced whole, and only once a read succeeds, so a failed read keeps what was
+ * known. The value is raw state, so a screen that reads it sorts again when it's replaced.
+ */
+export class RoutineUsageKeeper {
+	/** Reads the runs and work periods. */
+	readonly #storage: Pick<CadoroStorage, 'getRuns' | 'getWorkPeriods'>;
+
+	/** The usage as last read, or as given at the start. */
+	#usage = $state.raw<RoutineUsage>({ runs: [], workPeriods: [] });
+
+	/**
+	 * Starts with usage the app has already read.
+	 *
+	 * @param storage - What the runs and work periods are read from.
+	 * @param usage - The usage read as the app opened.
+	 */
+	constructor(storage: Pick<CadoroStorage, 'getRuns' | 'getWorkPeriods'>, usage: RoutineUsage) {
+		this.#storage = storage;
+		this.#usage = usage;
+	}
+
+	/** Every run and work period saved, as last read. */
+	get usage(): RoutineUsage {
+		return this.#usage;
+	}
+
+	/**
+	 * Reads the runs and work periods again, and keeps them.
+	 *
+	 * @returns A promise that settles once the read has finished. A failed read is recorded in the
+	 * activity log and leaves the usage as it was. It never rejects.
+	 */
+	async reload(): Promise<void> {
+		try {
+			const [runs, workPeriods] = await Promise.all([
+				this.#storage.getRuns(),
+				this.#storage.getWorkPeriods()
+			]);
+			this.#usage = { runs, workPeriods };
+		} catch (error: unknown) {
+			void recordError('The runs could not be read, so the picker may be out of order.', error);
+		}
+	}
+}

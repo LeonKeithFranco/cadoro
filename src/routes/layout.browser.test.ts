@@ -4,7 +4,9 @@ import { useErrorLog } from '#lib/error-log.ts';
 import { DexieStorage } from '#lib/storage/dexie-storage.ts';
 import type { TimerSession } from '#lib/timer.svelte.ts';
 import { runInProgressWith, savedRunInProgress } from '#lib/testing/run-in-progress.ts';
-import { firstWorkPeriod, runInProgress } from '#lib/testing/run-records.ts';
+import { routineWith } from '#lib/testing/routines.ts';
+import { firstWorkPeriod, runInProgress, runWith } from '#lib/testing/run-records.ts';
+import type { RoutineUsageKeeper } from '#lib/routine-usage.svelte.ts';
 
 /** The name of the database the layout's `load` opens, which these tests empty before each test. */
 const APP_DATABASE_NAME = 'cadoro';
@@ -16,6 +18,8 @@ let importCount = 0;
 type LoadedApp = {
 	/** The app's one timer session. */
 	timerSession: TimerSession;
+	/** The runs and work periods the picker sorts by, read again on request. */
+	routineUsage: RoutineUsageKeeper;
 };
 
 /**
@@ -77,6 +81,30 @@ describe('the root layout’s load', () => {
 		const second = await load();
 
 		expect(second.timerSession).toBe(first.timerSession);
+	});
+
+	it('picks the fallback routine with the usage the Timer’s picker reads, not the usage at launch', async () => {
+		const storage = new DexieStorage();
+		await storage.addRoutinesIfNone([
+			routineWith({ id: 'a', customPosition: 0 }),
+			routineWith({ id: 'b', customPosition: 1 }),
+			routineWith({ id: 'c', customPosition: 2 })
+		]);
+		await storage.saveSettings({ routineSort: 'last-used', lastRoutineId: 'a' });
+		const load = await freshLoad();
+		const { timerSession, routineUsage } = await load();
+		// A run of c, saved after the app opened, which the picker then reads.
+		await storage.saveRunInProgress(savedRunInProgress, null, {
+			run: runWith({ routineId: 'c' }),
+			workPeriods: []
+		});
+		await storage.clearRunInProgress(savedRunInProgress.revision);
+		await routineUsage.reload();
+
+		// The ready run's routine, a, is deleted, so the session falls back to the picker's first.
+		await storage.deleteRoutine('a');
+
+		await expect.poll(() => timerSession.routine.id).toBe('c');
 	});
 
 	it('does not ask for persistent storage when the app opens with no work saved', async () => {
