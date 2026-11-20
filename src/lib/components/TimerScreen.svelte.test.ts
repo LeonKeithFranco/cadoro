@@ -344,6 +344,23 @@ describe('running a routine from the Timer screen', () => {
 			.toHaveTextContent('5:00 / 25:00');
 	});
 
+	it('opens the Finish question with focus on Cancel and says what finishing does, so a stray Enter keeps the run going', async () => {
+		render(TimerScreen, { session: createSession() });
+		await page.getByRole('button', { name: 'Play' }).click();
+		elapse(minutes(4));
+
+		await page.getByRole('button', { name: 'Finish' }).click();
+
+		const dialog = page.getByRole('dialog', { name: 'Finish this run?' });
+		await expect
+			.element(dialog.getByText('This ends the run and shows its summary.'))
+			.toBeVisible();
+		await expect.element(dialog.getByRole('button', { name: 'Cancel' })).toHaveFocus();
+		await userEvent.keyboard('{Enter}');
+		await expect.element(page.getByRole('dialog')).not.toBeInTheDocument();
+		await expect.element(page.getByRole('button', { name: 'Pause' })).toBeVisible();
+	});
+
 	it('keeps the run going, as if Finish had not been pressed, when the user cancels', async () => {
 		render(TimerScreen, { session: createSession() });
 		await page.getByRole('button', { name: 'Play' }).click();
