@@ -1,5 +1,21 @@
 import { expect, test } from '@playwright/test';
+import { CHIME_IDS } from '../../src/lib/chimes.ts';
 import { waitForActiveWorker } from '../service-worker.ts';
+
+test('a service worker registered from a deep screen covers the whole app', async ({ page }) => {
+	await page.goto('settings/log');
+	await expect(page.getByRole('heading', { level: 1, name: 'Activity log' })).toBeVisible();
+	await waitForActiveWorker(page);
+
+	const scope = await page.evaluate(
+		async () => (await navigator.serviceWorker.getRegistration())?.scope
+	);
+	expect(scope).toBe(new URL('/cadoro/', page.url()).href);
+
+	await page.context().setOffline(true);
+	await page.goto('');
+	await expect(page.getByRole('heading', { level: 1, name: 'Timer' })).toBeVisible();
+});
 
 test('after one visit, the app opens and runs with no connection', async ({ page }) => {
 	const navigation = page.getByRole('navigation', { name: 'Screens' });
@@ -22,12 +38,11 @@ test('after one visit, the app opens and runs with no connection', async ({ page
 	});
 
 	await test.step('offline, every chime still loads', async () => {
-		const statuses = await page.evaluate(async () => {
-			const names = ['bell-ding-1', 'bell-ding-2', 'bell-ding-3', 'bell-ding-4'];
+		const statuses = await page.evaluate(async (names) => {
 			const responses = await Promise.all(names.map((name) => fetch(`chimes/${name}.mp3`)));
 			return responses.map((response) => response.status);
-		});
-		expect(statuses).toEqual([200, 200, 200, 200]);
+		}, CHIME_IDS);
+		expect(statuses).toEqual(CHIME_IDS.map(() => 200));
 	});
 
 	await test.step('offline, other screens open from their link and their address', async () => {
