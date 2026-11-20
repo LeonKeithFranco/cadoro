@@ -28,7 +28,6 @@ It's built primarily for one person. Anyone else can use it from GitHub Pages, w
 - System notifications and vibration (alerts are sound only)
 - Task lists, or labels and notes on work periods
 - Recording breaks, or the number of pauses, in stats
-- Banking unused break time
 
 ## Terms
 
@@ -138,9 +137,11 @@ They can be edited and deleted like any other routine, and aren't created again 
 - **Play** starts the run with the first work period. During a run, the same button pauses and resumes.
 - **Work counts up** from 0:00. At the target, the target chime plays once, the timer changes look to show overtime, and it keeps counting.
 - **Next** ends the current work period at any time, even before the target, and starts its break. The work period still counts as a completed cycle.
-- **The break earned** is the time actually worked times the block's break percentage, with no cap or minimum. It's rounded once, to the nearest whole second, when the break starts.
+- **The break earned** is the time actually worked times the block's break percentage, with no cap or minimum. It's rounded once, to the nearest whole second, when the break starts. The next break is the break earned plus the bank.
 - **Breaks count down.** At 0:00 the break chime plays, and the app waits for you to press Play before the next work period starts.
-- **Next during a break** ends it early and starts the next work period. The unused break is lost.
+- **Next during a break**, whether it's running, paused or just started, ends it early, starts the next work period and banks the break left, rounded up to whole seconds, exactly as the break timer showed it. A break that's already over banks 0.
+- **The bank** is added to the next break, so that break is the break earned plus the bank. Next part-way through it banks what's left again. A break that reaches 0:00 has used up the bank, and time before Play after that is free and never counts against it.
+- The bank lasts the whole run, across cycles, blocks and rounds, and has no cap. It ends with the run, by Finish or when a finite routine's last work period ends, whose bank is lost since that period has no break.
 - **Pause** stops the work or break timer. Paused time doesn't count as work, and a paused break keeps its remaining time.
 - **Finish** asks for confirmation, then ends the run. The run keeps counting while it asks, so the current work period, if any, is saved up to the moment Finish is confirmed. Cancel or Escape leaves the run as it was. This is how an infinite routine ends, and how a finite one ends early.
 - Before a run starts, Next and Finish are disabled.
@@ -160,9 +161,9 @@ They can be edited and deleted like any other routine, and aren't created again 
 - The active timer is highlighted, and the screen shows exactly where the run is in both rounds and cycles, such as "Round 2 of 4 · Block 2 of 3 · Cycle 1 of 3". For an infinite routine it shows "Round 5" with no total. A part whose total is 1 never changes, so it's left out: Classic shows just "Round 5", and a block of 1 cycle shows no cycle.
 - A block of two or more cycles also shows its cycle across from its title, such as `Cycle 2 / 3`, matching the position above. Before Play, the first block shows the cycle the run will start on. A block the run isn't in shows `Cycle 0 / 3`.
 - Each box has its label on the left, its time on the right and a progress bar below. Boxes not in use show zeroed times, such as `0:00 / 25:00` and `0:00`, with empty bars.
-- While a work period runs, its box shows the elapsed time and the target, such as `31:40 / 25:00`, and its bar fills towards the target. The break box below is labelled "Break earned" and shows the break earned so far, which updates as you work.
+- While a work period runs, its box shows the elapsed time and the target, such as `31:40 / 25:00`, and its bar fills towards the target. The break box below is labelled "Break earned" and shows the bank plus the break earned so far, as one number, which updates as you work. With 3:00 banked it reads `3:00` at the start, and `8:00` at a 25-minute target at 20%.
 - Past the target, the work box's outline, time and bar turn amber, its bar stays full, and its label reads "Work · Overtime", so overtime isn't shown by colour alone.
-- During a break, the break box counts down, and its bar shows the break left out of the break earned. The block's work box keeps the time that earned the break, with its bar as it was. At 0:00 the break box reads "Break over".
+- During a break, the break box counts down from the whole break, the break earned plus the bank, and its bar shows the break left out of that total. The block's work box keeps the time that earned the break, with its bar as it was. At 0:00 the break box reads "Break over".
 - Times show as `m:ss` under an hour and `h:mm:ss` from an hour.
 - Play/Pause, Next and Finish sit below the blocks. When the blocks are taller than the screen, they stay pinned at the bottom of it, above the phone's tab bar.
 - When the run moves to a block that's out of view, the page scrolls it into view. Nothing scrolls when every block fits.
@@ -199,7 +200,7 @@ Done or Escape closes the dialog and returns the routine to its starting state, 
 - Each chime's source and licence are recorded in the repo.
 - Chimes are scheduled ahead, on the audio clock, so they play on time in a background tab on desktop. They're kept offline with the app.
 - Besides the audio clock, a timer of the chimes' own checks once a second, on every screen, that the scheduled chime is still in place, so a tab away from the Timer screen that was asleep places it again or drops it. It never counts time.
-- A chime is due only while its moment is still ahead. Reaching a target after a reload, or a break that was already over, never plays one late, and a break that earned 0 seconds is silent. Pause, Next, Finish and another tab's change move or cancel the scheduled chime, and a chime already playing finishes.
+- A chime is due only while its moment is still ahead. Reaching a target after a reload, or a break that was already over, never plays one late, and a break of 0 seconds is silent. Pause, Next, Finish and another tab's change move or cancel the scheduled chime, and a chime already playing finishes.
 - Browsers allow sound only after a gesture, so nothing sounds until a button has been pressed in the tab. Every button press counts, not only Play.
 - With the app open in several tabs, only one tab sounds each chime, and the next tab takes over when it closes. Where the browser can't take turns, every tab that has had a button pressed sounds it.
 - A Preview plays at once in the tab where it's pressed, at the chosen volume, whether or not that tab holds the chimes' turn, and doesn't change the run's scheduled chimes.
