@@ -10,6 +10,7 @@
 	import Plus from '@lucide/svelte/icons/plus';
 	import { dragHandleZone, type DndEvent } from 'svelte-dnd-action';
 	import { onMount } from 'svelte';
+	import { dragZoneOptions } from '../drag-zone';
 	import {
 		addBlock,
 		canAddBlock,
@@ -159,16 +160,7 @@
 		<!-- The zone and its handles are only here while editing, and the routine list has none
 		     while a routine is open, since the library's handle zones share one state. -->
 		<div
-			use:dragHandleZone={{
-				items: draggedBlocks ?? draft.blocks,
-				flipDurationMs: 0,
-				dropTargetStyle: {},
-				// Move up and Move down move a block by keyboard, so the list and its items aren't Tab
-				// stops, which the library makes of them by default. The handles are kept out of the
-				// order in `BlockEditor`.
-				zoneTabIndex: -1,
-				zoneItemTabIndex: -1
-			}}
+			use:dragHandleZone={dragZoneOptions(draggedBlocks ?? draft.blocks)}
 			onconsider={considerBlocks}
 			onfinalize={dropBlocks}
 			aria-label="Blocks"
