@@ -116,20 +116,18 @@ describe('parseBackup accepts', () => {
 });
 
 describe('parseBackup rejects a file', () => {
-	it('that is not JSON', () => {
-		expect(rejectionOf('not json {')).toBe('This file is not valid JSON.');
+	it.for([
+		{ contents: 'not json {', description: 'that is not JSON' },
+		{ contents: '', description: 'that is empty' }
+	])('$description, saying it is not valid JSON', ({ contents }) => {
+		expect(rejectionOf(contents)).toBe('This file is not valid JSON.');
 	});
 
-	it('that is empty', () => {
-		expect(rejectionOf('')).toBe('This file is not valid JSON.');
-	});
-
-	it('whose JSON is not an object', () => {
-		expect(rejectionOf('[1, 2]')).toBe('The file must be an object.');
-	});
-
-	it('whose JSON is null', () => {
-		expect(rejectionOf('null')).toBe('The file must be an object.');
+	it.for([
+		{ contents: '[1, 2]', description: 'is an array' },
+		{ contents: 'null', description: 'is null' }
+	])('whose JSON $description, saying the file must be an object', ({ contents }) => {
+		expect(rejectionOf(contents)).toBe('The file must be an object.');
 	});
 
 	it('that is JSON of another kind, not a Cadoro backup', () => {
