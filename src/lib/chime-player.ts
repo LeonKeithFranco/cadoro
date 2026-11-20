@@ -355,11 +355,25 @@ export class ChimePlayer {
 		}
 		const delaySeconds = (chime.at - nowAfterLoad) / MS_PER_SECOND;
 		const startsAt = output.context.currentTime + delaySeconds;
+		const source = this.#startSource(output, sound, startsAt);
+		this.#scheduled.push({ ...chime, startsAt, file, source });
+	}
+
+	/**
+	 * Starts a chime playing through the volume control.
+	 *
+	 * @param output - The audio output to play through.
+	 * @param sound - The decoded chime.
+	 * @param startsAt - When it starts, in seconds on the audio clock. A moment that has passed
+	 * starts it at once.
+	 * @returns The source playing it, so it can be cancelled.
+	 */
+	#startSource(output: AudioOutput, sound: ChimeSound, startsAt: number): ChimeSource {
 		const source = output.context.createBufferSource();
 		source.buffer = sound;
 		source.connect(output.volume);
 		source.start(startsAt);
-		this.#scheduled.push({ ...chime, startsAt, file, source });
+		return source;
 	}
 
 	/**
@@ -385,11 +399,8 @@ export class ChimePlayer {
 		if (sound === null) {
 			return;
 		}
-		const source = output.context.createBufferSource();
-		source.buffer = sound;
-		source.connect(output.volume);
 		// A moment that has passed starts the chime at once.
-		source.start(0);
+		this.#startSource(output, sound, 0);
 	}
 
 	/**
