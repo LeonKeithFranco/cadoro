@@ -11,14 +11,6 @@ declare global {
 	 * writes it into the code when it builds or serves the app.
 	 */
 	const __APP_VERSION__: string;
-
-	namespace App {
-		// interface Error {}
-		// interface Locals {}
-		// interface PageData {}
-		// interface PageState {}
-		// interface Platform {}
-	}
 }
 
 export {};
