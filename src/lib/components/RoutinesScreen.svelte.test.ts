@@ -1084,6 +1084,29 @@ describe('when saving fails', () => {
 			.toHaveValue('Renamed');
 	});
 
+	it('keeps the warning that the routine changed elsewhere while the save was running', async () => {
+		const { storage } = await openScreen();
+		const { promise: failure, reject: failSave } = Promise.withResolvers<void>();
+		const saveRoutine = vi.spyOn(storage, 'saveRoutine').mockImplementationOnce(() => failure);
+		await openForEditing('Alpha');
+		await typeTitle('Mine');
+		const alpha = requireDefined((await storage.getRoutines())[0], 'Alpha');
+		await page.getByRole('button', { name: 'Save' }).click();
+		await expect.poll(() => saveRoutine.mock.calls).toHaveLength(1);
+
+		// Another tab changes the routine while the save is still running, then the save fails.
+		await storage.saveRoutine({ ...alpha, title: 'Theirs' });
+		await expect
+			.element(page.getByRole('status').getByText('changed in another tab', { exact: false }))
+			.toBeVisible();
+		failSave(new Error('The disk is full.'));
+
+		await expect
+			.element(page.getByRole('form', { name: 'Edit routine' }).getByRole('alert'))
+			.toHaveTextContent('The routine could not be saved. Try again.');
+		await expect.element(page.getByText('Save will overwrite', { exact: false })).toBeVisible();
+	});
+
 	it('records the failure in the activity log', async () => {
 		const { storage } = await openScreen();
 		useErrorLog(storage);
