@@ -2,7 +2,7 @@
   @component
   Puts a child that throws while it renders inside an `ErrorBoundary`, for the boundary's tests,
   with a button outside the boundary that makes the child stop throwing, as fixing the cause of an
-  error would.
+  error would, and another that moves to a different screen, as navigating does.
 -->
 <script lang="ts">
 	import ErrorBoundary from '#lib/components/ErrorBoundary.svelte';
@@ -17,6 +17,9 @@
 
 	/** Whether the button has fixed the cause. */
 	let isFixed = $state(false);
+
+	/** Which screen the boundary is showing, which the second button changes, as navigation does. */
+	let screen = $state('first');
 
 	/** Whether the child still throws. */
 	let isBroken = $derived(shouldThrow && !isFixed);
@@ -38,7 +41,14 @@
 	}}>Fix it</button
 >
 
-<ErrorBoundary>
+<button
+	type="button"
+	onclick={(): void => {
+		screen = 'another';
+	}}>Go to another screen</button
+>
+
+<ErrorBoundary resetKey={screen}>
 	{#if isBroken}
 		{explode()}
 	{:else}

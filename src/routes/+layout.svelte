@@ -28,7 +28,7 @@
 
 <!-- On phones, the bottom padding keeps the end of the screen clear of the tab bar. -->
 <main class="mx-auto max-w-3xl p-4 pb-24 md:pb-4">
-	<ErrorBoundary>
+	<ErrorBoundary resetKey={page.url.pathname}>
 		{@render children()}
 	</ErrorBoundary>
 </main>

@@ -62,4 +62,16 @@ describe('the error boundary', () => {
 		await expect.element(page.getByText('All is well')).toBeVisible();
 		expect(page.getByRole('alert').query()).toBeNull();
 	});
+
+	it('shows the content again, without Try again, once the reset key changes', async () => {
+		useErrorLog(new InMemoryStorage());
+		render(ErrorBoundaryHarness, { shouldThrow: true });
+		await expect.element(page.getByRole('alert')).toBeVisible();
+
+		await page.getByRole('button', { name: 'Fix it' }).click();
+		await page.getByRole('button', { name: 'Go to another screen' }).click();
+
+		await expect.element(page.getByText('All is well')).toBeVisible();
+		expect(page.getByRole('alert').query()).toBeNull();
+	});
 });
