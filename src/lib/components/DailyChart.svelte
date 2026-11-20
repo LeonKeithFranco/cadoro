@@ -53,10 +53,10 @@
 </script>
 
 <Card title="Daily work time">
-	<!-- The presets keep their own widths and wrap onto a second row where the card is too narrow,
-	     rather than squeezing their names, which don't fit five to a row on a phone. On phones
-	     they're 44px tall to touch and start three to a row and grow to fill it, so no row ends in a gap. From `md`
-	     they're the shorter desktop size at their own widths. -->
+	<!-- The names don't fit five to a row on a phone, so the presets wrap instead of squeezing
+	     them. On phones the buttons are 44px tall to touch, start three to a row and grow to fill
+	     it, so no row ends in a gap. From `md` they're the shorter desktop size, at their own
+	     widths on one row. -->
 	<div role="group" aria-label="Range" class="mt-3 flex flex-wrap gap-2">
 		{#each RANGE_PRESETS as option (option)}
 			<button
