@@ -17,6 +17,7 @@ import {
 import { isRevision, withHeartbeat, type StoredRunInProgress } from '../run-in-progress';
 import {
 	noRecords,
+	requireRoutineOfNewRun,
 	runsOldestFirst,
 	workPeriodsOldestFirst,
 	type Run,
@@ -168,6 +169,9 @@ export class InMemoryStorage implements CadoroStorage {
 
 		// Every check comes before any change, so a rejected call saves nothing, as a rolled-back
 		// transaction does in IndexedDB.
+		if (records.run !== null && !this.#runs.has(records.run.id)) {
+			requireRoutineOfNewRun(new Set(this.#routines.map((routine) => routine.id)), records.run);
+		}
 		const newIds = new Set<string>();
 		for (const period of records.workPeriods) {
 			if (this.#workPeriods.has(period.id) || newIds.has(period.id)) {

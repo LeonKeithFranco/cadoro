@@ -24,6 +24,7 @@ import {
 } from '../run-in-progress';
 import {
 	noRecords,
+	requireRoutineOfNewRun,
 	runsOldestFirst,
 	workPeriodsOldestFirst,
 	type Run,
@@ -362,30 +363,38 @@ export class DexieStorage implements CadoroStorage {
 		basedOn: string | null,
 		records: RunRecords = noRecords()
 	): Promise<boolean> {
-		const { runInProgress: runInProgressTable, runs, workPeriods } = this.#database;
+		const { runInProgress: runInProgressTable, runs, workPeriods, routines } = this.#database;
 
-		// One read-write transaction across the three tables, so the revision is checked and the
+		// One read-write transaction across the four tables, so the revision is checked and the
 		// run in progress, the run and its work periods are saved together or not at all.
 		// IndexedDB runs read-write transactions on the same tables one after another, even across
 		// tabs, so no other tab's save can come between the check and the writes. A failed
 		// `bulkAdd` that isn't caught aborts the transaction, as Dexie's docs say, which undoes
 		// both `put`s too. Outside a transaction, the others would stay saved.
-		return this.#database.transaction('rw', [runInProgressTable, runs, workPeriods], async () => {
-			const saved = await runInProgressTable.get(RUN_IN_PROGRESS_KEY);
-			if (!isRevision(saved ?? null, basedOn)) {
-				return false;
-			}
+		return this.#database.transaction(
+			'rw',
+			[runInProgressTable, runs, workPeriods, routines],
+			async () => {
+				const saved = await runInProgressTable.get(RUN_IN_PROGRESS_KEY);
+				if (!isRevision(saved ?? null, basedOn)) {
+					return false;
+				}
+				// A run saved again as it ends has its routine checked as it starts, not again.
+				if (records.run !== null && (await runs.get(records.run.id)) === undefined) {
+					requireRoutineOfNewRun(new Set(await routines.toCollection().primaryKeys()), records.run);
+				}
 
-			// The key is given, since it isn't a field of the row.
-			await runInProgressTable.put(runInProgress, RUN_IN_PROGRESS_KEY);
-			if (records.run !== null) {
-				// `put` adds the run or replaces it, as it's saved again when it ends.
-				await runs.put(records.run);
+				// The key is given, since it isn't a field of the row.
+				await runInProgressTable.put(runInProgress, RUN_IN_PROGRESS_KEY);
+				if (records.run !== null) {
+					// `put` adds the run or replaces it, as it's saved again when it ends.
+					await runs.put(records.run);
+				}
+				// `bulkAdd` refuses an id that's already saved, so a work period is never overwritten.
+				await workPeriods.bulkAdd(records.workPeriods);
+				return true;
 			}
-			// `bulkAdd` refuses an id that's already saved, so a work period is never overwritten.
-			await workPeriods.bulkAdd(records.workPeriods);
-			return true;
-		});
+		);
 	}
 
 	async saveHeartbeat(revision: string, heartbeatAt: string): Promise<boolean> {

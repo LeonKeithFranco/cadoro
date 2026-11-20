@@ -661,7 +661,7 @@ describe('DexieStorage', () => {
 
 	it('aborts an import that fails midway, keeping every old table as it was', async () => {
 		const storage = new DexieStorage(newDatabaseName());
-		await storage.addRoutinesIfNone([routineWith({ id: 'a' })]);
+		await storage.addRoutinesIfNone([routineWith({ id: 'one-round' })]);
 		await storage.saveSettings({ volume: 5 });
 		await storage.saveRunInProgress(savedRunInProgress, null, {
 			run: runInProgress,
