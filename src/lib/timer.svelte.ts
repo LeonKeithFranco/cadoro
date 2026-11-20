@@ -57,12 +57,6 @@ export type TimerSessionOptions = {
 	 */
 	onRunStarted?: (routineId: string) => void;
 	/**
-	 * Called on every tick, after the view moves on, which the app uses to check that the
-	 * scheduled chime is still in place, since a background tab may hear of nothing else after a
-	 * laptop sleeps. Nothing is called when left out.
-	 */
-	onTick?: () => void;
-	/**
 	 * Puts the routines in the order the picker lists them, which the Routines screen's sort
 	 * chooses, so "the first routine" means the picker's first. The routines in custom order when
 	 * left out.
@@ -130,9 +124,6 @@ export class TimerSession {
 
 	/** Called with the routine's id when a press starts a run. */
 	readonly #onRunStarted: (routineId: string) => void;
-
-	/** Called on every tick, after the view moves on. */
-	readonly #onTick: () => void;
 
 	/** Puts the routines in the picker's order, to find the picker's first. */
 	readonly #pickerOrder: (routines: readonly Routine[]) => readonly Routine[];
@@ -221,7 +212,6 @@ export class TimerSession {
 			onWorkSaved,
 			onPress = (): void => {},
 			onRunStarted = (): void => {},
-			onTick = (): void => {},
 			pickerOrder = (list): readonly Routine[] => list
 		}: TimerSessionOptions,
 		{ saved, isAnotherTabOpen, lastRoutineId = null }: AppOpening = {
@@ -242,7 +232,6 @@ export class TimerSession {
 		this.#onWorkSaved = onWorkSaved;
 		this.#onPress = onPress;
 		this.#onRunStarted = onRunStarted;
-		this.#onTick = onTick;
 		this.#pickerOrder = pickerOrder;
 
 		const carriedOn = TimerSession.#carryOn(saved, routines, isAnotherTabOpen);
@@ -467,11 +456,10 @@ export class TimerSession {
 	 * The heartbeat is the moment a restored run is paused at, so the screen also calls this as
 	 * the page is hidden, in case the app is stopped before the next tick. A paused run has
 	 * nothing new to save. Only the heartbeat is saved, never the run, so a tab that hasn't yet
-	 * seen another tab's press can't undo it. `onTick` is called on every tick, paused or not.
+	 * seen another tab's press can't undo it.
 	 */
 	tick(): void {
 		this.#moveOn();
-		this.#onTick();
 		const revision = this.#revision;
 		if (!this.view.isRunning || revision === null) {
 			return;
