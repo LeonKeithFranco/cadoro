@@ -80,3 +80,24 @@ Nothing here blocks the release. They need a real device, so they're listed rath
 - The phone's screen stays on during a run.
 - The four chimes sound right by ear.
 - Keyboard use and a screen reader on the Timer's live region and on the focus moves.
+
+## After 1.0: the break preview (`feat/break-preview`), 2026-11-20
+
+### Why
+
+- The user asked for it after using the app: the routine form showed the break as a percentage only, so the time it gives had to be worked out by hand.
+
+### Placement
+
+- A faded hint under the Break field, reusing `FormField`'s hint, so screen readers read it through `aria-describedby`. An invalid percentage shows its problem in the hint's place.
+- Rejected: a faded number inside the input, which is narrow on a phone and sits beside the spinner, and text beside the label, which wraps on a phone.
+
+### Format and meaning
+
+- The timer's format: m:ss, or h:mm:ss from an hour, such as "5:00 break at the 25-minute target". Rejected: words such as "3 min 45 s", and rounding to whole minutes, which is less exact.
+- It is the break at the target, since the real break follows the time actually worked. It reuses `earnedBreakMs`, so it rounds exactly as a real break does.
+- It is hidden while the target or the percentage is invalid.
+
+### Release
+
+- Released as a minor version, 1.1.0, since it adds a visible feature.

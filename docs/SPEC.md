@@ -237,6 +237,7 @@ Done or Escape closes the dialog and returns the routine to its starting state, 
 - Each block has a drag handle, Move up and Move down buttons, Duplicate, which inserts a copy below it with every field kept, and Delete, which asks for confirmation. Delete is disabled when only one block is left.
 - An "Add block" button below the blocks adds a new block at the end, titled "Focus", with a 25-minute target, a 20% break and 1 cycle. It's disabled at 20 blocks.
 - While a routine has one block, its cycles field shows 1 and is disabled, with a hint that rounds repeat a single block. Deleting blocks down to one resets the remaining block's cycles to 1, and rounds stay as they were.
+- Under each block's "Break (% of work)" field, a faded hint shows the break earned at the block's target, in the break timer's format (m:ss, or h:mm:ss from an hour), such as "5:00 break at the 25-minute target". It updates as the target or the percentage is typed, and is hidden while either is invalid. An invalid percentage shows its problem in the hint's place. It applies to new and edited routines.
 - Every field is validated against the limits in the data model before Save is allowed.
 - Renaming a routine keeps its history attached.
 
