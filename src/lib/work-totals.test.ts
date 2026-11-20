@@ -2,6 +2,7 @@ import './testing/time-zone';
 import { describe, expect, it } from 'vitest';
 import type { DaySlice } from './day-slices';
 import { hours, minutes } from './testing/durations';
+import { utc } from './testing/moments';
 import {
 	dailyTotals,
 	monthlyTotals,
@@ -9,16 +10,6 @@ import {
 	weeklyTotals,
 	workedToday
 } from './work-totals';
-
-/**
- * Reads a UTC timestamp as milliseconds, so each test writes its moments as readable literals.
- *
- * @param timestamp - A UTC timestamp, such as `2026-11-20T05:00:00Z`.
- * @returns The moment in milliseconds since 1970 (UTC).
- */
-function utc(timestamp: string): number {
-	return Date.parse(timestamp);
-}
 
 /**
  * Makes a slice of work for a test.
