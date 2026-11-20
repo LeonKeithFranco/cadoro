@@ -272,6 +272,32 @@ describe('the Data card', () => {
 			expect(await storage.readBackupData()).toEqual(before);
 		});
 
+		it('turns away a file that cannot be read, recording the error and changing nothing', async () => {
+			const { storage } = await renderCard();
+			useErrorLog(storage);
+			const before = await storage.readBackupData();
+			const unreadable = new File(['{}'], 'backup.json', { type: 'application/json' });
+			vi.spyOn(unreadable, 'text').mockRejectedValue(new Error('The file vanished.'));
+			const input = page.getByLabelText('Import a backup').element() as HTMLInputElement;
+			const transfer = new DataTransfer();
+			transfer.items.add(unreadable);
+			input.files = transfer.files;
+
+			input.dispatchEvent(new Event('change', { bubbles: true }));
+
+			await expect
+				.element(page.getByRole('alert'))
+				.toHaveTextContent('The file could not be read. Nothing was changed.');
+			expect(page.getByRole('dialog').query()).toBeNull();
+			await expect.poll(() => storage.getLogEntries()).toHaveLength(1);
+			expect((await storage.getLogEntries())[0]).toMatchObject({
+				type: 'error',
+				message: 'The backup file could not be read.',
+				details: { message: 'The file vanished.' }
+			});
+			expect(await storage.readBackupData()).toEqual(before);
+		});
+
 		it('turns away a backup from a newer version of the app', async () => {
 			const { storage } = await renderCard();
 			const before = await storage.readBackupData();
