@@ -1,6 +1,6 @@
 // Reordering routines in the custom order, which each routine's `customPosition` keeps.
 
-import { moveDown, moveToIndex, moveUp } from './list-order';
+import { moveDown, moveUp } from './list-order';
 import type { Routine } from './routine';
 
 /**
@@ -21,35 +21,6 @@ function numberedInOrder(routines: Routine[]): Routine[] {
  */
 function inCustomOrder(routines: Routine[]): Routine[] {
 	return routines.toSorted((a, b) => a.customPosition - b.customPosition);
-}
-
-/**
- * Closes any gaps and ties in the custom order.
- *
- * @param routines - The routines in any order.
- * @returns New routines in custom order, with `customPosition` 0, 1, 2 and so on. Routines with the
- * same position keep the order they were given in.
- */
-export function renumberRoutines(routines: Routine[]): Routine[] {
-	return numberedInOrder(inCustomOrder(routines));
-}
-
-/**
- * Moves a routine to an index in the custom order.
- *
- * @remarks
- * The caller passes the routines the list shows, so the index means a place in that list, and
- * leaves out any it keeps hidden, such as the deleted ones.
- *
- * @param routines - The routines in any order.
- * @param id - The id of the routine to move.
- * @param index - Where it should end up, counting from 0. An index outside the list puts it first
- * or last.
- * @returns New routines in the new custom order, with `customPosition` 0, 1, 2 and so on.
- * @throws {@link Error} When no routine has that id.
- */
-export function moveRoutineToIndex(routines: Routine[], id: string, index: number): Routine[] {
-	return numberedInOrder(moveToIndex(inCustomOrder(routines), id, index));
 }
 
 /**
