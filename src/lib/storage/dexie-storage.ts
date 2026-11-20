@@ -250,11 +250,15 @@ export class DexieStorage implements CadoroStorage {
 	}
 
 	async saveRoutine(routine: Routine): Promise<void> {
-		await this.#changeRoutines((routines) => planSave(routines, routine, this.#now()));
+		await this.#changeRoutines((routines, runningRoutineId) =>
+			planSave(routines, routine, this.#now(), runningRoutineId)
+		);
 	}
 
 	async deleteRoutine(id: string): Promise<boolean> {
-		const change = await this.#changeRoutines((routines) => planDelete(routines, id, this.#now()));
+		const change = await this.#changeRoutines((routines, runningRoutineId) =>
+			planDelete(routines, id, this.#now(), runningRoutineId)
+		);
 		return change !== null;
 	}
 
@@ -280,17 +284,23 @@ export class DexieStorage implements CadoroStorage {
 	 * error entry through `recordErrorIn`, which writes to `console.error` when the log can't take
 	 * even that.
 	 *
-	 * @param plan - Works out the change from every routine saved, or returns `null` for none.
+	 * The run in progress is read in the same transaction, so a plan can refuse a change to the
+	 * routine that run is of.
+	 *
+	 * @param plan - Works out the change from every routine saved and the id of the routine of the
+	 * run in progress, or `null` when none is saved, or returns `null` for no change.
 	 * @returns The change that was saved, or `null` when the plan found nothing to change.
 	 * @throws Rejects with the plan's error, or IndexedDB's when the routines can't be read or
 	 * saved, and then nothing is saved and nothing is logged.
 	 */
 	async #changeRoutines(
-		plan: (routines: Routine[]) => RoutineChange | null
+		plan: (routines: Routine[], runningRoutineId: string | null) => RoutineChange | null
 	): Promise<RoutineChange | null> {
 		const table = this.#database.routines;
-		const change = await this.#database.transaction('rw', table, async () => {
-			const planned = plan(await table.toArray());
+		const runInProgressTable = this.#database.runInProgress;
+		const change = await this.#database.transaction('rw', [table, runInProgressTable], async () => {
+			const running = await runInProgressTable.get(RUN_IN_PROGRESS_KEY);
+			const planned = plan(await table.toArray(), running?.record.routineId ?? null);
 			if (planned !== null) {
 				await table.bulkPut(planned.writes);
 			}

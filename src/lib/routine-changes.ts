@@ -48,6 +48,21 @@ function findLiveRoutine(routines: Routine[], id: string): Routine {
 }
 
 /**
+ * Refuses a change to the routine of the run in progress, since a run restored from storage
+ * needs its routine, and the run is about what the routine was when it started.
+ *
+ * @param routine - The routine to change.
+ * @param runningRoutineId - The id of the routine of the run in progress, or `null` for none.
+ * @param change - What would be done to it, as a past participle, for the message.
+ * @throws {@link Error} When the routine is the running one.
+ */
+function refuseRunning(routine: Routine, runningRoutineId: string | null, change: string): void {
+	if (routine.id === runningRoutineId) {
+		throw new Error(`The routine "${routine.title}" is running, so it can't be ${change}.`);
+	}
+}
+
+/**
  * Works out what saving a routine at the top, or at another place in the list, changes.
  *
  * @remarks
@@ -126,11 +141,20 @@ export function planDuplicate(
  * @param routines - Every routine saved, deleted ones included.
  * @param edited - The routine as edited, with the id of the routine it edits.
  * @param now - The moment of the change.
+ * @param runningRoutineId - The id of the routine of the run in progress, or `null` when none is
+ * running, which can't be edited.
  * @returns The routine as it's now saved, and a log entry with its old and new content.
- * @throws {@link Error} When no routine that isn't deleted has the edit's id.
+ * @throws {@link Error} When no routine that isn't deleted has the edit's id, or when it's the
+ * running routine.
  */
-export function planSave(routines: Routine[], edited: Routine, now: Date): RoutineChange {
+export function planSave(
+	routines: Routine[],
+	edited: Routine,
+	now: Date,
+	runningRoutineId: string | null = null
+): RoutineChange {
 	const saved = findLiveRoutine(routines, edited.id);
+	refuseRunning(saved, runningRoutineId, 'edited');
 	const result: Routine = { ...saved, ...contentOf(edited) };
 	return {
 		writes: [result],
@@ -154,12 +178,21 @@ export function planSave(routines: Routine[], edited: Routine, now: Date): Routi
  * @param routines - Every routine saved, deleted ones included.
  * @param id - The id of the routine to delete.
  * @param now - The moment of the change, which becomes the routine's `deletedAt`.
+ * @param runningRoutineId - The id of the routine of the run in progress, or `null` when none is
+ * running, which can't be deleted.
  * @returns The deleted routine, with a log entry holding what it was, or `null` when it's the only
  * routine not deleted, which is never deleted, so there's always one to run.
- * @throws {@link Error} When no routine that isn't deleted has that id.
+ * @throws {@link Error} When no routine that isn't deleted has that id, or when it's the running
+ * routine.
  */
-export function planDelete(routines: Routine[], id: string, now: Date): RoutineChange | null {
+export function planDelete(
+	routines: Routine[],
+	id: string,
+	now: Date,
+	runningRoutineId: string | null = null
+): RoutineChange | null {
 	const routine = findLiveRoutine(routines, id);
+	refuseRunning(routine, runningRoutineId, 'deleted');
 	if (!canDeleteRoutine(routines)) {
 		return null;
 	}

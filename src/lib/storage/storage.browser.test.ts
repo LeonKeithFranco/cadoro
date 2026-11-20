@@ -374,6 +374,66 @@ describe.each(backends)('$name', ({ create }) => {
 		});
 	});
 
+	describe('the routine of the run in progress', () => {
+		/**
+		 * Makes storage holding routines a, b and c, with a run of routine `a` in progress.
+		 *
+		 * @returns The storage.
+		 */
+		async function storageRunning(): Promise<CadoroStorage> {
+			const storage = await storageWithAbc(create);
+			await storage.saveRunInProgress(
+				runInProgressWith({ record: runWith({ routineId: 'a' }) }),
+				null
+			);
+			return storage;
+		}
+
+		it('can’t be edited, so the run keeps the routine it started with', async () => {
+			const storage = await storageRunning();
+
+			await expect(storage.saveRoutine(routineWith({ id: 'a', title: 'Edited' }))).rejects.toThrow(
+				'is running'
+			);
+
+			const saved = (await storage.getRoutines()).find((routine) => routine.id === 'a');
+			expect(saved?.title).toBe('A');
+			expect(await storage.getLogEntries()).toEqual([]);
+		});
+
+		it('can’t be deleted, and nothing changes', async () => {
+			const storage = await storageRunning();
+
+			await expect(storage.deleteRoutine('a')).rejects.toThrow('is running');
+
+			expect(await placed(storage)).toEqual(['a:0', 'b:1', 'c:2']);
+			expect(await storage.getLogEntries()).toEqual([]);
+		});
+
+		it('leaves the other routines free to edit and delete', async () => {
+			const storage = await storageRunning();
+
+			await storage.saveRoutine(routineWith({ id: 'b', title: 'Edited' }));
+			const deleted = await storage.deleteRoutine('c');
+
+			expect(deleted).toBe(true);
+			expect((await storage.getRoutines()).map((routine) => routine.title)).toEqual([
+				'A',
+				'Edited'
+			]);
+		});
+
+		it('is free again once the run is forgotten', async () => {
+			const storage = await storageRunning();
+			await storage.clearRunInProgress('revision-1');
+
+			await storage.saveRoutine(routineWith({ id: 'a', title: 'Edited' }));
+
+			const saved = (await storage.getRoutines()).find((routine) => routine.id === 'a');
+			expect(saved?.title).toBe('Edited');
+		});
+	});
+
 	describe('deleteRoutine', () => {
 		it('sets deletedAt to the moment of the deletion and hides the routine from getRoutines', async () => {
 			const storage = await storageWithAbc(create);
