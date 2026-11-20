@@ -20,6 +20,7 @@ describe('breakAtTargetMs', () => {
 		['gives 3:45 for 25 minutes at 15%', 25, 15, seconds(225)],
 		['gives the smallest break at 1%', 25, 1, seconds(15)],
 		['rounds to whole seconds as a real break does', 7, 33, seconds(139)],
+		['rounds a fraction below half down, as 14.4 seconds', 2, 12, seconds(14)],
 		['gives the whole target at 100%', 240, 100, hours(4)]
 	])('%s', (_rule, targetMinutes, breakPercent, result) => {
 		expect(breakAtTargetMs(blockWith(targetMinutes, breakPercent))).toBe(result);
@@ -32,6 +33,7 @@ describe('describeBreakAtTarget', () => {
 		['says 3:45 for 25 minutes at 15%', 25, 15, '3:45 break at the 25-minute target'],
 		['says 0:15 for 25 minutes at 1%', 25, 1, '0:15 break at the 25-minute target'],
 		['rounds 138.6 seconds up to 2:19', 7, 33, '2:19 break at the 7-minute target'],
+		['rounds 14.4 seconds down to 0:14', 2, 12, '0:14 break at the 2-minute target'],
 		['writes hours from an hour on', 240, 100, '4:00:00 break at the 240-minute target']
 	])('%s', (_rule, targetMinutes, breakPercent, text) => {
 		expect(describeBreakAtTarget(blockWith(targetMinutes, breakPercent))).toBe(text);
