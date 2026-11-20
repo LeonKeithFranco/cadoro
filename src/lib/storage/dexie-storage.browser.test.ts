@@ -1,5 +1,6 @@
 import Dexie from 'dexie';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { minutes } from '../testing/durations';
 import { routineWith } from '../testing/routines';
 import { runInProgressWith, savedRunInProgress } from '../testing/run-in-progress';
 import { firstWorkPeriod, runInProgress, runWith, workPeriodWith } from '../testing/run-records';
@@ -174,8 +175,8 @@ describe('DexieStorage', () => {
 				endedPeriods: [],
 				position: { round: 0, block: 0, cycle: 0 },
 				nextWorkPosition: { round: 1, block: 0, cycle: 0 },
-				earnedMs: 300_000,
-				remainingMs: 120_000,
+				earnedMs: minutes(5),
+				remainingMs: minutes(2),
 				runningSince: null
 			}
 		});

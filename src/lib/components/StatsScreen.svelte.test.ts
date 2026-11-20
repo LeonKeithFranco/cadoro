@@ -1,6 +1,7 @@
 import { page, type Locator } from 'vitest/browser';
 import { describe, expect, it } from 'vitest';
 import { render } from 'vitest-browser-svelte';
+import { minutes } from '../testing/durations';
 import { routineWith } from '../testing/routines';
 import { workPeriodWith } from '../testing/run-records';
 import StatsScreen from './StatsScreen.svelte';
@@ -26,9 +27,6 @@ function period(
 	return workPeriodWith({ routineId, targetMinutes, segments: [{ start, end }], workedMs });
 }
 
-/** Minutes in milliseconds, written out so each period's length is visible. */
-const MINUTE = 60_000;
-
 /** The routines of the data below. */
 const routines = [
 	routineWith({ id: 'focus', title: 'Focus' }),
@@ -41,10 +39,10 @@ const routines = [
  * Nov 19 (40 of 50) in Reading.
  */
 const workPeriods = [
-	period('focus', '2026-10-14T12:00:00.000Z', '2026-10-14T12:10:00.000Z', 10 * MINUTE, 25),
-	period('focus', '2026-11-18T12:00:00.000Z', '2026-11-18T12:25:00.000Z', 25 * MINUTE, 25),
-	period('focus', '2026-11-19T11:00:00.000Z', '2026-11-19T11:30:00.000Z', 30 * MINUTE, 25),
-	period('reading', '2026-11-19T11:40:00.000Z', '2026-11-19T12:20:00.000Z', 40 * MINUTE, 50)
+	period('focus', '2026-10-14T12:00:00.000Z', '2026-10-14T12:10:00.000Z', minutes(10), 25),
+	period('focus', '2026-11-18T12:00:00.000Z', '2026-11-18T12:25:00.000Z', minutes(25), 25),
+	period('focus', '2026-11-19T11:00:00.000Z', '2026-11-19T11:30:00.000Z', minutes(30), 25),
+	period('reading', '2026-11-19T11:40:00.000Z', '2026-11-19T12:20:00.000Z', minutes(40), 50)
 ];
 
 /** Thursday Nov 19 2026, shortly after the last work period. */
@@ -136,7 +134,7 @@ describe('the Stats screen with work saved', () => {
 		render(StatsScreen, {
 			workPeriods: [
 				...workPeriods,
-				period('old', '2026-11-17T12:00:00.000Z', '2026-11-17T12:05:00.000Z', 5 * MINUTE, 25)
+				period('old', '2026-11-17T12:00:00.000Z', '2026-11-17T12:05:00.000Z', minutes(5), 25)
 			],
 			routines: [...routines, deleted],
 			now: NOW
@@ -176,7 +174,7 @@ describe('the daily chart', () => {
 	it('names each day of the table with its year, so All over several years has no repeats', async () => {
 		render(StatsScreen, {
 			workPeriods: [
-				period('focus', '2025-11-19T12:00:00.000Z', '2025-11-19T12:10:00.000Z', 10 * MINUTE, 25),
+				period('focus', '2025-11-19T12:00:00.000Z', '2025-11-19T12:10:00.000Z', minutes(10), 25),
 				...workPeriods
 			],
 			routines,
@@ -250,7 +248,7 @@ describe('the routine filter', () => {
 		render(StatsScreen, {
 			workPeriods: [
 				...workPeriods,
-				period('old', '2026-11-17T12:00:00.000Z', '2026-11-17T12:05:00.000Z', 5 * MINUTE, 25)
+				period('old', '2026-11-17T12:00:00.000Z', '2026-11-17T12:05:00.000Z', minutes(5), 25)
 			],
 			routines: [...routines, deleted],
 			now: NOW

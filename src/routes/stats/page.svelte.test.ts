@@ -4,6 +4,7 @@ import { useErrorLog } from '#lib/error-log.ts';
 import { DEFAULT_SETTINGS } from '#lib/settings.ts';
 import { InMemoryStorage } from '#lib/storage/in-memory-storage.ts';
 import type { CadoroStorage } from '#lib/storage/storage.ts';
+import { minutes } from '#lib/testing/durations.ts';
 import { oneRoundRoutine } from '#lib/testing/routines.ts';
 import { runInProgressWith } from '#lib/testing/run-in-progress.ts';
 import { runInProgress as startedRecord } from '#lib/testing/run-records.ts';
@@ -15,9 +16,6 @@ import StatsPage from './+page.svelte';
 
 /** The moment the fake clock stands at, in milliseconds since 1970 (UTC). */
 const START = Date.parse('2026-11-19T12:00:00Z');
-
-/** One minute in milliseconds. */
-const MINUTE = 60_000;
 
 // Fakes only the clock and the interval, so the page reads a moment the test controls while the
 // test's own polling keeps its real timers.
@@ -47,7 +45,7 @@ function countingSince(minutesAgo: number): StoredRunInProgress {
 			endedPeriods: [],
 			position: { round: 0, block: 0, cycle: 0 },
 			segments: [],
-			runningSince: new Date(START - minutesAgo * MINUTE).toISOString(),
+			runningSince: new Date(START - minutes(minutesAgo)).toISOString(),
 			bankedMs: 0
 		}
 	});
@@ -114,7 +112,7 @@ describe('the Stats page and the run in progress', () => {
 		await renderStats(new InMemoryStorage(), countingSince(20));
 		await expect.poll(figure('All time')).toBe('20:00');
 
-		vi.advanceTimersByTime(3 * MINUTE);
+		vi.advanceTimersByTime(minutes(3));
 
 		await expect.poll(figure('All time')).toBe('23:00');
 	});
@@ -135,8 +133,8 @@ describe('the Stats page when the work period in progress ends', () => {
 					endedPeriods: [],
 					position: { round: 0, block: 0, cycle: 0 },
 					nextWorkPosition: { round: 0, block: 0, cycle: 1 },
-					earnedMs: 4 * MINUTE,
-					remainingMs: 4 * MINUTE,
+					earnedMs: minutes(4),
+					remainingMs: minutes(4),
 					runningSince: new Date(START).toISOString()
 				},
 				revision: 'revision-2'
@@ -149,11 +147,11 @@ describe('the Stats page when the work period in progress ends', () => {
 						id: 'ended-period',
 						segments: [
 							{
-								start: new Date(START - 20 * MINUTE).toISOString(),
+								start: new Date(START - minutes(20)).toISOString(),
 								end: new Date(START).toISOString()
 							}
 						],
-						workedMs: 20 * MINUTE
+						workedMs: minutes(20)
 					})
 				]
 			}
@@ -203,8 +201,8 @@ function inBreak(revision: string): StoredRunInProgress {
 			endedPeriods: [],
 			position: { round: 0, block: 0, cycle: 0 },
 			nextWorkPosition: { round: 0, block: 0, cycle: 1 },
-			earnedMs: 4 * MINUTE,
-			remainingMs: 4 * MINUTE,
+			earnedMs: minutes(4),
+			remainingMs: minutes(4),
 			runningSince: new Date(START).toISOString()
 		},
 		revision
@@ -215,9 +213,9 @@ function inBreak(revision: string): StoredRunInProgress {
 const endedPeriod = workPeriodWith({
 	id: 'ended-period',
 	segments: [
-		{ start: new Date(START - 20 * MINUTE).toISOString(), end: new Date(START).toISOString() }
+		{ start: new Date(START - minutes(20)).toISOString(), end: new Date(START).toISOString() }
 	],
-	workedMs: 20 * MINUTE
+	workedMs: minutes(20)
 });
 
 describe('the Stats page when reads finish out of order or fail', () => {
@@ -252,7 +250,7 @@ describe('the Stats page when reads finish out of order or fail', () => {
 			workPeriods: [endedPeriod]
 		});
 		await vi.advanceTimersByTimeAsync(100);
-		await storage.saveHeartbeat('revision-2', new Date(START + MINUTE).toISOString());
+		await storage.saveHeartbeat('revision-2', new Date(START + minutes(1)).toISOString());
 		await vi.advanceTimersByTimeAsync(100);
 
 		expect(figure('All time')()).toBe('20:00');
@@ -266,7 +264,7 @@ describe('the Stats page following the run in progress', () => {
 		await expect.poll(figure('All time')).toBe('20:00');
 		const getWorkPeriods = vi.spyOn(storage, 'getWorkPeriods');
 
-		await storage.saveHeartbeat('revision-1', new Date(START + MINUTE).toISOString());
+		await storage.saveHeartbeat('revision-1', new Date(START + minutes(1)).toISOString());
 		await vi.advanceTimersByTimeAsync(100);
 
 		expect(getWorkPeriods).not.toHaveBeenCalled();
@@ -300,21 +298,21 @@ describe('the Stats page when another tab imports a backup', () => {
 	 * Makes a work period that ended at the fake clock's start.
 	 *
 	 * @param id - The work period's id.
-	 * @param minutes - How many minutes it lasted.
+	 * @param minutesLasted - How many minutes it lasted.
 	 * @returns The work period.
 	 */
-	function workPeriodOfMinutes(id: string, minutes: number): WorkPeriod {
+	function workPeriodOfMinutes(id: string, minutesLasted: number): WorkPeriod {
 		return workPeriodWith({
 			id,
 			runId: 'imported-run',
 			routineId: oneRoundRoutine.id,
 			segments: [
 				{
-					start: new Date(START - minutes * MINUTE).toISOString(),
+					start: new Date(START - minutes(minutesLasted)).toISOString(),
 					end: new Date(START).toISOString()
 				}
 			],
-			workedMs: minutes * MINUTE
+			workedMs: minutes(minutesLasted)
 		});
 	}
 
@@ -381,7 +379,7 @@ function lateWorkOnNov19(): WorkPeriod {
 	const end = new Date(2026, 10, 19, 23, 50);
 	return workPeriodWith({
 		segments: [{ start: start.toISOString(), end: end.toISOString() }],
-		workedMs: 10 * MINUTE
+		workedMs: minutes(10)
 	});
 }
 
@@ -391,7 +389,7 @@ describe('the Stats page left open past midnight', () => {
 		await renderStats(new InMemoryStorage(), null, [lateWorkOnNov19()]);
 		await expect.poll(figure('Today')).toBe('10:00');
 
-		vi.advanceTimersByTime(2 * MINUTE);
+		vi.advanceTimersByTime(minutes(2));
 
 		await expect.poll(figure('Today')).toBe('0:00');
 	});
