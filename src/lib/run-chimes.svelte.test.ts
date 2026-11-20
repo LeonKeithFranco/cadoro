@@ -76,9 +76,6 @@ function openTab(
 			onWorkSaved: vi.fn(),
 			onPress: (): void => {
 				chimes.unlock();
-			},
-			onTick: (): void => {
-				void chimes.catchUp();
 			}
 		},
 		{ saved: null, isAnotherTabOpen: false }
@@ -348,7 +345,7 @@ describe('when the audio clock stood still', () => {
 			.toEqual([expect.objectContaining({ alert: 'target', at: minutes(25), startsAt: 20 * 60 })]);
 	});
 
-	it('drops a chime on the next tick when the wall clock jumped past it with no event', async () => {
+	it('drops a chime within a second when the wall clock jumped past it with no event, whatever screen is open', async () => {
 		const tab = openTab(new InMemoryStorage());
 		tab.timer.play();
 		await expect.poll(() => tab.chimes.scheduled).toHaveLength(1);
@@ -357,23 +354,21 @@ describe('when the audio clock stood still', () => {
 		// neither the audio running again nor the page showing.
 		tab.audio.currentTime = 22 * 60;
 		nowMs = minutes(45);
-		tab.timer.tick();
 
-		await expect.poll(() => tab.audio.sources[0]?.isStopped).toBe(true);
+		await expect.poll(() => tab.audio.sources[0]?.isStopped, { timeout: 3000 }).toBe(true);
 		expect(tab.chimes.scheduled).toEqual([]);
 	});
 
-	it('places the chime again on the next tick when the audio clock fell behind with no event', async () => {
+	it('places the chime again within a second when the audio clock fell behind with no event, whatever screen is open', async () => {
 		const tab = openTab(new InMemoryStorage());
 		tab.timer.play();
 		await expect.poll(() => tab.chimes.scheduled).toHaveLength(1);
 
 		nowMs = minutes(20);
 		tab.audio.currentTime = 15 * 60;
-		tab.timer.tick();
 
 		await expect
-			.poll(() => tab.chimes.scheduled)
+			.poll(() => tab.chimes.scheduled, { timeout: 3000 })
 			.toEqual([expect.objectContaining({ at: minutes(25), startsAt: 20 * 60 })]);
 	});
 

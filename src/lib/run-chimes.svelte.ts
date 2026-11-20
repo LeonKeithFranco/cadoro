@@ -9,12 +9,16 @@ import { recordError } from './error-log';
 import { percentOf } from './percent';
 import type { RunState } from './run';
 import type { Settings } from './settings';
+import { MS_PER_SECOND } from './time';
 
 /**
  * The name of the lock the tab that sounds the chimes holds. A tab on an older version must take
  * turns with a newer one, so it never changes.
  */
 export const CHIME_LOCK = 'cadoro-chimes';
+
+/** How often the scheduled chime is checked to be still in place. */
+const CATCH_UP_INTERVAL_MS = MS_PER_SECOND;
 
 /** The gain that plays the chimes as recorded, which a volume of 100 stands for. */
 const FULL_GAIN = 1;
@@ -156,6 +160,13 @@ export class RunChimes {
 				void this.#player.catchUp();
 			}
 		});
+
+		// After a laptop sleeps, a background tab may hear neither the audio running again nor the
+		// page showing, so the check also runs on a timer of its own. It lives here, not in a
+		// screen, so it runs on every screen. It only checks a chime is in place and never counts time.
+		setInterval(() => {
+			void this.#player.catchUp();
+		}, CATCH_UP_INTERVAL_MS);
 	}
 
 	/** Whether this tab has its turn to sound the chimes, so no other tab does. */
@@ -231,11 +242,11 @@ export class RunChimes {
 	 * if the audio clock fell behind, or drops it if its moment has passed.
 	 *
 	 * @remarks
-	 * The app calls it on every tick, as an extra check beside the audio clock's own scheduling:
-	 * after a laptop sleeps, a background tab may hear neither the audio running again nor the
-	 * page showing, and its first tick after waking comes before the late chime would play. A
-	 * chime in place is left alone, so a tick never reschedules it. A tab that isn't sounding has
-	 * nothing placed, so it does nothing.
+	 * It runs once a second on a timer of its own, on every screen, as an extra check beside the
+	 * audio clock's own scheduling: after a laptop sleeps, a background tab may hear neither the
+	 * audio running again nor the page showing, and its first check after waking comes before the
+	 * late chime would play. A chime in place is left alone, so a check never reschedules it. A
+	 * tab that isn't sounding has nothing placed, so it does nothing.
 	 *
 	 * @returns A promise that settles once the chime is in place, or dropped. It never rejects.
 	 */
