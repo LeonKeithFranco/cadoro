@@ -253,6 +253,32 @@ describe('running a routine from the Timer screen', () => {
 		await expect.element(page.getByRole('button', { name: 'Pause' })).toBeVisible();
 	});
 
+	it('banks the break time left when Next skips the rest of a break, and adds it to the next break', async () => {
+		render(TimerScreen, { session: createSession() });
+		const card = page.getByRole('region', { name: 'Focus' });
+		const breakBox = card.getByRole('group', { name: /^Break/ });
+		await page.getByRole('button', { name: 'Play' }).click();
+		// 20% of 10 minutes is 2:00 of break.
+		elapse(minutes(10));
+		await page.getByRole('button', { name: 'Next' }).click();
+
+		elapse(seconds(30));
+		await page.getByRole('button', { name: 'Next' }).click();
+
+		// The 1:30 left of the break is banked, and shows at once in the new work period.
+		await expect.element(breakBox).toHaveAccessibleName('Break earned');
+		await expect.element(breakBox).toHaveTextContent('1:30');
+
+		elapse(minutes(10));
+		await expect.element(breakBox).toHaveTextContent('3:30');
+
+		await page.getByRole('button', { name: 'Next' }).click();
+		await expect.element(breakBox).toHaveAccessibleName('Break');
+		await expect.element(breakBox).toHaveTextContent('3:30');
+		elapse(seconds(30));
+		await expect.element(breakBox).toHaveTextContent('3:00');
+	});
+
 	it('shows the break as over at 0:00, stops ticking, and waits for Play', async () => {
 		render(TimerScreen, { session: createSession() });
 		await page.getByRole('button', { name: 'Play' }).click();
