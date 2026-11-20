@@ -188,6 +188,39 @@ test('dragging a routine’s handle with the mouse moves it, and the order is ke
 	await expect.poll(() => listedTitles(page)).toEqual(['Classic with long break', 'Classic']);
 });
 
+test('dragging a block’s handle in the editor moves the block, and Save keeps the order', async ({
+	page
+}) => {
+	await page.goto('/routines');
+	await cardOf(page, 'Classic with long break').getByRole('button', { name: 'Edit' }).click();
+	// Inside the list, so the copy of a block that follows the pointer during a drag isn't counted.
+	const blockTitles = page
+		.getByRole('list', { name: 'Blocks' })
+		.getByRole('textbox', { name: 'Block title' });
+	const originalTitles = await blockTitles.evaluateAll((fields) =>
+		fields.map((field) => (field as HTMLInputElement).value)
+	);
+	expect(originalTitles).toHaveLength(2);
+	// The mouse works in the window's coordinates, so both blocks must be on screen at once, which
+	// the phone's height doesn't allow: each block is about as tall as the screen.
+	const { width } = page.viewportSize() ?? { width: 1280 };
+	await page.setViewportSize({ width, height: 2400 });
+
+	await dragOnto(
+		page,
+		page.getByRole('button', { name: 'Drag block 1', exact: true }),
+		blockGroup(page, 2)
+	);
+
+	const swapped = [...originalTitles].reverse();
+	await expect(blockTitles.first()).toHaveValue(swapped[0] ?? '');
+	await expect(blockTitles.nth(1)).toHaveValue(swapped[1] ?? '');
+	await page.getByRole('button', { name: 'Save' }).click();
+	await cardOf(page, 'Classic with long break').getByRole('button', { name: 'Edit' }).click();
+	await expect(blockTitles.first()).toHaveValue(swapped[0] ?? '');
+	await expect(blockTitles.nth(1)).toHaveValue(swapped[1] ?? '');
+});
+
 test('opening another routine, or leaving the screen, with unsaved changes asks to discard them', async ({
 	page
 }) => {
