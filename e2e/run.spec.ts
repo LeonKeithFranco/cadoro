@@ -1,15 +1,14 @@
 import { expect, test } from '@playwright/test';
 import { minutes, seconds } from '../src/lib/testing/durations';
 import { openOnPausedClock } from './clock';
+import { closeSummary, finishRun, timerBox } from './timer';
 
 test('a run goes through work, overtime and a break, then Finish shows its summary', async ({
 	page
 }) => {
 	await openOnPausedClock(page, '/');
-	const card = page.getByRole('region', { name: 'Focus' });
-	// Each box is named by its label, which changes with the run, such as "Work · Overtime".
-	const workBox = card.getByRole('group', { name: /^Work/ });
-	const breakBox = card.getByRole('group', { name: /^Break/ });
+	const workBox = timerBox(page, 'Focus', 'Work');
+	const breakBox = timerBox(page, 'Focus', 'Break');
 	const finishQuestion = page.getByRole('dialog', { name: 'Finish this run?' });
 	const summary = page.getByRole('dialog', { name: 'Run summary' });
 
@@ -63,8 +62,7 @@ test('a run goes through work, overtime and a break, then Finish shows its summa
 	});
 
 	await test.step('confirming Finish ends the run and shows its summary', async () => {
-		await page.getByRole('button', { name: 'Finish' }).click();
-		await finishQuestion.getByRole('button', { name: 'Finish' }).click();
+		await finishRun(page);
 
 		await expect(summary).toBeVisible();
 		await expect(summary.getByText('Classic with long break')).toBeVisible();
@@ -78,7 +76,7 @@ test('a run goes through work, overtime and a break, then Finish shows its summa
 	});
 
 	await test.step('Done closes the summary and readies a new run of the same routine', async () => {
-		await summary.getByRole('button', { name: 'Done' }).click();
+		await closeSummary(page);
 
 		await expect(summary).toBeHidden();
 		await expect(page.getByRole('combobox', { name: 'Routine' })).toBeEnabled();
@@ -93,9 +91,7 @@ test('skipping the rest of a break banks it, and the next break starts from the 
 	page
 }) => {
 	await openOnPausedClock(page, '/');
-	const card = page.getByRole('region', { name: 'Focus' });
-	// Each box is named by its label, which changes with the run, such as "Break earned".
-	const breakBox = card.getByRole('group', { name: /^Break/ });
+	const breakBox = timerBox(page, 'Focus', 'Break');
 
 	await test.step('Next ends the work, and the break counts down', async () => {
 		await page.getByRole('button', { name: 'Play' }).click();

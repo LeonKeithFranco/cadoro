@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { CHIME_IDS } from '../../src/lib/chimes.ts';
 import { waitForActiveWorker } from '../service-worker.ts';
+import { timerBox } from '../timer.ts';
 
 test('a service worker registered from a deep screen covers the whole app', async ({ page }) => {
 	await page.goto('settings/log');
@@ -19,7 +20,7 @@ test('a service worker registered from a deep screen covers the whole app', asyn
 
 test('after one visit, the app opens and runs with no connection', async ({ page }) => {
 	const navigation = page.getByRole('navigation', { name: 'Screens' });
-	const workBox = page.getByRole('region', { name: 'Focus' }).getByRole('group', { name: 'Work' });
+	const workBox = timerBox(page, 'Focus', 'Work');
 
 	await test.step('the first visit installs the service worker', async () => {
 		await page.goto('');
