@@ -18,7 +18,7 @@ It works offline after the first load. When a new version is ready, a card offer
 
 - **Routines:** a routine is a list of up to 20 blocks, each with a work target in minutes, a break percentage and a number of cycles. It repeats a set number of rounds, or forever. The Routines screen creates, edits, duplicates, deletes and reorders them, and sorts the list. Two starter routines are there on the first launch.
 - **The timer:** pick a routine on the Timer screen and press Play. Work counts up from 0:00 and keeps counting past its target, turning amber as overtime, with a chime at the target. Next ends the work period and starts its break, Pause stops the clock, and Finish ends the run, with a summary. Switching to another screen pauses the run, and a reload restores it paused at its last moment.
-- **Breaks earned:** a break is the block's percentage of the time you actually worked, so longer work earns a longer break. It counts down, chimes at 0:00, and waits for Play.
+- **Breaks earned:** a break is the block's percentage of the time you actually worked, so longer work earns a longer break. It counts down, chimes at 0:00, and waits for Play. Next during a break banks the time left, which is added to the next break.
 - **Several tabs:** every tab shows the same run, and each work period is recorded once.
 - **Stats:** today, a daily chart over a chosen range, weekly and monthly totals, all-time totals per routine, streaks, time against target and targets reached, for every routine or one.
 - **Settings:** the theme, a chime for each alert with a preview, the volume, keeping the screen awake during a run, the persistent storage status, the data tools and the app's version.

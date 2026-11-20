@@ -11,6 +11,7 @@ The spec and plan were worked out in conversation on 2026-11-09, starting from t
 - A break is a percentage of the time actually worked, not a fixed length or a ratio. The sketch first described ratios such as 5:1, but a percentage of work time states the earned-break idea directly and avoids awkward ratios. Percentages are whole numbers from 1 to 100, with no cap or minimum on the break earned.
 - The earned break is rounded once, to the nearest whole second, with ordinary half-up rounding. Banker's rounding was considered, but it only matters when many rounded values are added up, and breaks are never summed. Work time keeps full precision.
 - Skip was merged into Next, which ends a work period and starts its break, or ends a break early. Unused break is lost. Banking it is an open item, to revisit after using the app.
+- **Changed later:** unused break is banked, in [the banked break](09-release-1-0.md#after-10-the-banked-break-featbanked-break-2026-11-20).
 - Reset was replaced by Finish, which confirms, then ends the run and keeps the work done in stats, because the two did the same job. Finish is also how an infinite routine ends.
 - A finite routine ends when its last work period ends, without the last break, which would serve no purpose.
 - A routine repeats in **rounds** and a block in **cycles**, so the timer can say "Round 2 of 4 · Block 2 of 3 · Cycle 1 of 3" without two meanings of "cycle".
